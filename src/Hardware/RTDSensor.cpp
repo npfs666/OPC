@@ -4,13 +4,7 @@
 RTDSensor::RTDSensor() {
 
 }
-/**
- * @brief Construct a new RTDSensor::RTDSensor object
- * 
- * @param type 3 or 4 Wire type
- * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
- * @param offset Sensor offset in °C
- */
+
 RTDSensor::RTDSensor(RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
  {
 
@@ -26,9 +20,9 @@ void RTDSensor::add(int32_t value)
     sampleCount++;
 }
 /**
- * @brief Low pass EMA (exponential moving average) Filter
+ * Low pass EMA (exponential moving average) Filter
  * 
- * @param value 
+ * @param value Last adc read value
  */
 void RTDSensor::addLP(int32_t value)
 {
@@ -60,7 +54,7 @@ double_t RTDSensor::readValue() const
 
 bool RTDSensor::isAccumulationHalfWay()
 {
-    if (settings.wiring != RTDWiring::Wire3)
+    if (settings.wiring != RTDWiring::ThreeWire)
         return false;
 
     if (sampleCount == (settings.samples / 2))

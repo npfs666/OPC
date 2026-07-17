@@ -1,8 +1,6 @@
 #include "Arduino.h"
 #include "Drivers/ADS1120.h"
 #include "SPI.h"
-#define ARDUINOJSON_ENABLE_PROGMEM 0
-#include <ArduinoJson.h>
 
 ADS1120::ADS1120()
 {
@@ -10,55 +8,55 @@ ADS1120::ADS1120()
 
 void ADS1120::writeRegister(uint8_t address, uint8_t value)
 {
-  digitalWrite(ADS1120_CS_PIN, LOW);
+  digitalWrite(cs, LOW);
   //delay(5);
   delayMicroseconds(1);
   HW_SPI->transfer(CMD_WREG | (address << 2));
   HW_SPI->transfer(value);
   //delay(5);
   delayMicroseconds(1);
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
 }
 
 uint8_t ADS1120::readRegister(uint8_t address)
 {
-  digitalWrite(ADS1120_CS_PIN, LOW);
+  digitalWrite(cs, LOW);
   //delay(5);
   delayMicroseconds(1);
   HW_SPI->transfer(CMD_RREG | (address << 2));
   uint8_t data = HW_SPI->transfer(SPI_MASTER_DUMMY);
   //delay(5);
   delayMicroseconds(1);
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
   return data;
 }
 
 void ADS1120::begin(SPIClassRP2040 *spiClass, uint8_t clk_pin, uint8_t miso_pin, uint8_t mosi_pin, uint8_t cs_pin, uint8_t drdy_pin)
 {
   // Set pins up
-  ADS1120_CS_PIN = cs_pin;
-  ADS1120_DRDY_PIN = drdy_pin;
-  ADS1120_CLK_PIN = clk_pin;
-  ADS1120_MISO_PIN = miso_pin;
-  ADS1120_MOSI_PIN = mosi_pin;
+  cs = cs_pin;
+  drdy = drdy_pin;
+  clk = clk_pin;
+  miso = miso_pin;
+  mosi = mosi_pin;
 
   // Configure the SPI interface (CPOL=0, CPHA=1)
   HW_SPI = spiClass;
   
-  HW_SPI->setSCK(ADS1120_CLK_PIN);
-  HW_SPI->setCS(ADS1120_CS_PIN);
-  HW_SPI->setRX(ADS1120_MISO_PIN);
-  HW_SPI->setTX(ADS1120_MOSI_PIN);
+  HW_SPI->setSCK(clk);
+  HW_SPI->setCS(cs);
+  HW_SPI->setRX(miso);
+  HW_SPI->setTX(mosi);
 
   HW_SPI->beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE1));
   HW_SPI->begin(true);
 
   // Configure chip select as an output
-  pinMode(ADS1120_CS_PIN, OUTPUT);
+  pinMode(cs, OUTPUT);
   // Configure DRDY as as input
-  pinMode(ADS1120_DRDY_PIN, INPUT);
+  pinMode(drdy, INPUT);
 
-  digitalWrite(ADS1120_CS_PIN, LOW); // Set CS Low
+  digitalWrite(cs, LOW); // Set CS Low
   delayMicroseconds(10);
   reset();
   delay(1);// Delay a minimum of 50 us + 32 * tclk
@@ -66,12 +64,12 @@ void ADS1120::begin(SPIClassRP2040 *spiClass, uint8_t clk_pin, uint8_t miso_pin,
 
   startSync();                        // Send start/sync for continuous conversion mode
   delayMicroseconds(10);               // Delay a minimum of td(SCCS)
-  digitalWrite(ADS1120_CS_PIN, HIGH); // Clear CS to high
+  digitalWrite(cs, HIGH); // Clear CS to high
 }
 
 bool ADS1120::isDataReady()
 {
-  if (digitalRead(ADS1120_DRDY_PIN) == HIGH)
+  if (digitalRead(drdy) == HIGH)
   {
     return false;
   }
@@ -80,18 +78,18 @@ bool ADS1120::isDataReady()
 
 int32_t ADS1120::readADC()
 {
-  digitalWrite(ADS1120_CS_PIN, LOW); // Take CS low
+  digitalWrite(cs, LOW); // Take CS low
   delayMicroseconds(1);              // Minimum of td(CSSC)
   int32_t adcVal = HW_SPI->transfer(SPI_MASTER_DUMMY);
   adcVal = (adcVal << 8) | HW_SPI->transfer(SPI_MASTER_DUMMY);
   delayMicroseconds(1); // Minimum of td(CSSC)
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
   return adcVal;
 }
 
 byte *ADS1120::readADC_Array()
 {
-  digitalWrite(ADS1120_CS_PIN, LOW); // Take CS low
+  digitalWrite(cs, LOW); // Take CS low
   delayMicroseconds(1);              // Minimum of td(CSSC)
   static byte dataarray[2];
   for (int x = 0; x < 2; x++)
@@ -99,18 +97,18 @@ byte *ADS1120::readADC_Array()
     dataarray[x] = HW_SPI->transfer(SPI_MASTER_DUMMY);
   }
   delayMicroseconds(1); // Minimum of td(CSSC)
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
   return dataarray;
 }
 
 // Single Conversion read modes
 int32_t ADS1120::readADC_Single()
 {
-  digitalWrite(ADS1120_CS_PIN, LOW); // Take CS low
+  digitalWrite(cs, LOW); // Take CS low
   delayMicroseconds(10);              // Minimum of td(CSSC)
 
   HW_SPI->transfer(CMD_START_SYNC);
-  while (digitalRead(ADS1120_DRDY_PIN) == HIGH)
+  while (digitalRead(drdy) == HIGH)
   {
     // Espera a que DRDY se ponga en nivel bajo. Esto es un riesgo porque pude quedar bloqueado el codigo aca.
     // Se deberia poner un timeout configurable en el metodo de begin y devolver un error si no responde
@@ -119,17 +117,17 @@ int32_t ADS1120::readADC_Single()
   int adcVal = HW_SPI->transfer(SPI_MASTER_DUMMY);
   adcVal = (adcVal << 8) | HW_SPI->transfer(SPI_MASTER_DUMMY);
   delayMicroseconds(1); // Minimum of td(CSSC)
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
   return adcVal;
 }
 
 byte *ADS1120::readADC_SingleArray()
 {
-  digitalWrite(ADS1120_CS_PIN, LOW); // Take CS low
+  digitalWrite(cs, LOW); // Take CS low
   delayMicroseconds(1);              // Minimum of td(CSSC)
 
   HW_SPI->transfer(CMD_START_SYNC);
-  while (digitalRead(ADS1120_DRDY_PIN) == HIGH)
+  while (digitalRead(drdy) == HIGH)
   {
     // Espera a que DRDY se ponga en nivel bajo. Esto es un riesgo porque pude quedar bloqueado el codigo aca.
     // Se deberia poner un timeout configurable en el metodo de begin y devolver un error si no responde
@@ -141,7 +139,7 @@ byte *ADS1120::readADC_SingleArray()
     dataarray[x] = HW_SPI->transfer(SPI_MASTER_DUMMY);
   }
   delayMicroseconds(1); // Minimum of td(CSSC)
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
   return dataarray;
 }
 
@@ -160,15 +158,15 @@ double ADS1120::readInternalTemp(void) {
 
 void ADS1120::sendCommand(uint8_t command)
 {
-  digitalWrite(ADS1120_CS_PIN, LOW);
+  digitalWrite(cs, LOW);
   delay(2);
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
   delay(2);
-  digitalWrite(ADS1120_CS_PIN, LOW);
+  digitalWrite(cs, LOW);
   delay(2);
   HW_SPI->transfer(command);
   delay(2);
-  digitalWrite(ADS1120_CS_PIN, HIGH);
+  digitalWrite(cs, HIGH);
 }
 
 void ADS1120::writeRegisterMasked(uint8_t value, uint8_t mask, uint8_t address)

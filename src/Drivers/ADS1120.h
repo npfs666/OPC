@@ -106,13 +106,6 @@
 class ADS1120 {
   public:
     ADS1120();
-    uint8_t ADS1120_CS_PIN;
-    uint8_t ADS1120_DRDY_PIN;
-    uint8_t ADS1120_CLK_PIN;
-    uint8_t ADS1120_MISO_PIN;
-    uint8_t ADS1120_MOSI_PIN;
-    SPIClassRP2040 *HW_SPI;
-
     void writeRegister(uint8_t address, uint8_t value);
     uint8_t readRegister(uint8_t address);
     void begin(SPIClassRP2040 *spiClass, uint8_t clk_pin, uint8_t miso_pin, uint8_t mosi_pin, uint8_t cs_pin, uint8_t drdy_pin);
@@ -143,5 +136,14 @@ class ADS1120 {
     void setIDAC1routing(uint8_t value);
     void setIDAC2routing(uint8_t value);
     void setDRDYmode(uint8_t value);
+
+  private:
+    uint8_t cs;
+    uint8_t drdy;
+    uint8_t clk;
+    uint8_t miso;
+    uint8_t mosi;
+    SPIClassRP2040 *HW_SPI;
   };
 #endif
+

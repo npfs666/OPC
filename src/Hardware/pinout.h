@@ -1,6 +1,15 @@
 #ifndef PINOUT_h
 #define PINOUT_h
 
+/**
+ * Pinout for the v0.1 OPC PCB
+ * Global settings
+ */
+
+// Used in RTDSensor
+#define MAX_RTD 3
+#define ALPHA 0.6f
+
 // Général ORDERS
 #define PAUSE_ADC_INTERRUPTS 1
 #define RESUME_ADC_INTERRUPTS 2

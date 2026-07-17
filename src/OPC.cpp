@@ -7,6 +7,7 @@
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
 #include <Measurements/Temperature/TemperatureBME.h>
+#include <Measurements/Humidity/HumidityBME.h>
 #include <Measurements/Pressure/PressureBME.h>
 
 OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
@@ -17,7 +18,7 @@ void OPC::initSerial()
 {
     Serial.begin(115200);
 
-    delay(100);
+    delay(1000);
 
     Serial.println("Open Process Controller v0.3");
 }
@@ -99,22 +100,25 @@ bool OPC::newMeasurement()
 
 void OPC::initMeasurements() {
 
-    input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::Wire4, 16, 0);
-    input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::Wire4, 16, 0);
+    input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
+    input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
     
-    auto* tempBME = new TemperatureBME("Temp interne", bme);
+    auto* tempBME = new TemperatureBME("BME", bme);
     measurements.add(*tempBME);
 
-    auto* pressure = new PressureBME("Pressure",bme);
-    measurements.add(*pressure);
+    auto* rhBME = new HumidityBME("BME", bme);
+    measurements.add(*rhBME);
 
-    auto* r = new Resistance("R1", input, input.rtd[0]);
-    auto* t = new TemperatureRTD("T1", *r);
+    auto* paBME = new PressureBME("BME",bme);
+    measurements.add(*paBME);
+
+    auto* r = new Resistance("rRTD 1", input, input.rtd[0]);
+    auto* t = new TemperatureRTD("TempRTD 1", *r);
     measurements.add(*r);
     measurements.add(*t);
 
-    auto* r1 = new Resistance("R2", input, input.rtd[1]);
-    auto* t1 = new TemperatureRTD("T2", *r1);
+    auto* r1 = new Resistance("rRTD 2", input, input.rtd[1]);
+    auto* t1 = new TemperatureRTD("TempRTD 2", *r1);
     measurements.add(*r1);
     measurements.add(*t1);
 

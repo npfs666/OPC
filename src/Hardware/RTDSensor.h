@@ -2,12 +2,10 @@
 #define RTDSENSOR_H
 
 #include <Arduino.h>
+#include <Hardware/pinout.h>
 
 class RTDSensor
 {
-
-#define MAX_RTD 3
-#define ALPHA 0.6f
 
 public:
     enum class RTDType : uint8_t
@@ -16,29 +14,34 @@ public:
         Pt1000
     };
 
+    // Measurement method
     enum class RTDWiring : uint8_t
     {
-        Wire2,
-        Wire3,
-        Wire4
+        TwoWire,
+        ThreeWire,
+        FourWire
     };
 
+    // Settings that can be configured in the menu and needs to be public
     struct Settings
     {
         RTDType type;
-
         RTDWiring wiring;
-
-        double offset;
-
+        double_t offset;
         uint16_t samples;
     };
 
-    // Settings that can be configured in the menu
     Settings settings;
-    
 
     RTDSensor();
+    
+    /**
+     * @brief Construct a new RTDSensor::RTDSensor object
+     *
+     * @param type 3 or 4 Wire type
+     * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
+     * @param offset Sensor offset in °C
+     */
     RTDSensor(RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
     void reset();
     void add(int32_t value);

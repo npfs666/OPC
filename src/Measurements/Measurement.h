@@ -54,6 +54,8 @@ public:
 
     bool valid() const;
 
+    void printSerial();
+
 protected:
     void setValue(double_t value);
 

@@ -5,8 +5,8 @@
  *
  * @author GAOU (arstaligtredan.fr)
  * @brief
- * @version 0.1
- * @date 2022-02-07
+ * @version 0.3
+ * @date 2026-07-12
  *
  * @copyright Copyright (c) 2022
  *
@@ -36,37 +36,18 @@ void adcInterrupt();
 
 void setup()
 {
-	delay(100);
+	delay(1000);
 
 	opc.initSensorBoard();
 
 	attachInterrupt(digitalPinToInterrupt(SPI_DRDY), adcInterrupt, FALLING);
     
-
-    //opc.input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::Wire4, 16, 0);
-    //opc.input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::Wire4, 16, 0);
-    
-
-    //Resistance r1("R1", opc.input, opc.input.rtd[0]);
-    //Resistance r2("R2", input, input.rtd[1]);
-
-    //Temperature t1("T1", r1);
-    //Temperature t2("T2", r2);
-
-    //opc.measurements.add(r1);
-    //measurements.add(r2);
-
-    //measurements.add(t1);
-    //measurements.add(t2);
-
-    //opc.input.startContinuous();
     opc.initMeasurements();
 }
 
 /**
  * CPU0 : contrôle de la mesure ADC et de la régulation
  * @brief
- *
  */
 void loop()
 {	
@@ -125,10 +106,11 @@ void loop1()
     sprintf(TX, "%.2lf", res2);
     opc.printScreen(0, 80, 4, ST77XX_ORANGE, TX);
 
-    Serial.print("BME = ");Serial.print(opc.measurements[0].value());Serial.println(opc.measurements[0].unit());
-    Serial.print("BME = ");Serial.print(opc.measurements[1].value());Serial.println(opc.measurements[1].unit());
-    Serial.print("r1 = ");Serial.println(res1, 3);
-    Serial.print("r2 = ");Serial.println(res2, 3);
+    Serial.println("---------- Measure ----------");
+    for( int i = 0; i < opc.measurements.count(); i++) {
+        opc.measurements[i].printSerial();
+    }
+    Serial.println();
 
     //Serial.print("RH = ");Serial.println(Psychrometer::relativeHumidity(25,20,98025), 3);
     //Serial.print("RH = ");Serial.println(Psychrometer::relativeHumidity(25,20,104025), 3);

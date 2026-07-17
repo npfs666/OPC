@@ -37,3 +37,12 @@ void Measurement::setValid(bool valid)
 {
     m_valid = valid;
 }
+
+void Measurement::printSerial()
+{
+    char str[50];
+
+    // %NAME% is %VALUE% %UNIT%
+    sprintf ( str, "%s is %.3lf %s", m_name, m_value, m_unit );
+    Serial.println(str);
+}
