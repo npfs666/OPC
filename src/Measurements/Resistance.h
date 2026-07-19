@@ -25,14 +25,14 @@ public:
 
     void update() override;
 
-    RTDSensor& sensor();
+    RTDSensor& getSensor();
 
-    const RTDSensor& sensor() const;
+    const RTDSensor& getSensor() const;
 
 private:
 
-    SensorBoard& m_board;
-    RTDSensor&   m_sensor;
+    SensorBoard& board;
+    RTDSensor&   sensor;
 };
 
 #endif

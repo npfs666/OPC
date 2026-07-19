@@ -244,12 +244,14 @@ double_t SensorBoard::computeResistance(RTDSensor& rtdSensor) {
     #define TEMPERATURE_COEFFICIENT_PPM_C 7.5 // ancien calcul 7.5
     //#define TEMPERATURE_AT_CALIBRATION 25.4
 
-    double_t gain = 1;
-    if( rtdSensor.settings.wiring == RTDSensor::RTDWiring::ThreeWire ) {
+    double_t gain = 8.0;
+    /*if( rtdSensor.settings.wiring == RTDSensor::RTDWiring::ThreeWire ) {
         gain = 8.0;
     } else if (rtdSensor.settings.wiring == RTDSensor::RTDWiring::FourWire ) {
         gain = 8.0;
-    }
+    } else {
+        gain = 1;
+    }*/
 
     double_t Rrtd = (rtdSensor.readValue() * settings.refResistanceValue) / (32768.0 * gain);
 

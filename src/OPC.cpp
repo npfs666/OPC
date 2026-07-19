@@ -9,6 +9,7 @@
 #include <Measurements/Temperature/TemperatureBME.h>
 #include <Measurements/Humidity/HumidityBME.h>
 #include <Measurements/Pressure/PressureBME.h>
+#include <Measurements/Humidity/HumidityPsychrometer.h>
 
 OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
 {
@@ -121,6 +122,10 @@ void OPC::initMeasurements() {
     auto* t1 = new TemperatureRTD("TempRTD 2", *r1);
     measurements.add(*r1);
     measurements.add(*t1);
+
+    auto* p = new Psychrometer(*t, *t1, *paBME);
+    auto* ph = new HumidityPsychrometer("RH psychrom", *p);
+    measurements.add(*ph);
 
     input.startContinuous();
 }

@@ -2,46 +2,46 @@
 
 MeasurementManager::MeasurementManager()
 {
-    m_count = 0;
+    count = 0;
 
     for(uint8_t i = 0; i < MAX_MEASUREMENTS; i++)
     {
-        m_measurements[i] = nullptr;
+        measurements[i] = nullptr;
     }
 }
 
 bool MeasurementManager::add(Measurement& measurement)
 {
-    if(m_count >= MAX_MEASUREMENTS)
+    if(count >= MAX_MEASUREMENTS)
         return false;
 
-    m_measurements[m_count++] = &measurement;
+    measurements[count++] = &measurement;
 
     return true;
 }
 
 void MeasurementManager::update()
 {
-    for(uint8_t i = 0; i < m_count; i++)
+    for(uint8_t i = 0; i < count; i++)
     {
-        m_measurements[i]->update();
+        measurements[i]->update();
     }
 }
 
 Measurement* MeasurementManager::get(uint8_t index)
 {
-    if(index >= m_count)
+    if(index >= count)
         return nullptr;
 
-    return m_measurements[index];
+    return measurements[index];
 }
 
 const Measurement* MeasurementManager::get(uint8_t index) const
 {
-    if(index >= m_count)
+    if(index >= count)
         return nullptr;
 
-    return m_measurements[index];
+    return measurements[index];
 }
 
 
@@ -50,7 +50,7 @@ Measurement& MeasurementManager::operator[](uint8_t index)
     /*if(index >= m_count)
         return nullptr;*/
 
-    return *m_measurements[index];
+    return *measurements[index];
 }
 
 const Measurement& MeasurementManager::operator[](uint8_t index) const
@@ -58,11 +58,11 @@ const Measurement& MeasurementManager::operator[](uint8_t index) const
     /*if(index >= m_count)
         return nullptr;*/
 
-    return *m_measurements[index];
+    return *measurements[index];
 }
 
 
-uint8_t MeasurementManager::count() const
+uint8_t MeasurementManager::getCount() const
 {
-    return m_count;
+    return count;
 }

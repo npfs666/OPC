@@ -4,9 +4,9 @@
 Psychrometer::Psychrometer(const Temperature& dryBulb,
                            const Temperature& wetBulb,
                            const Pressure& pressure)
-    : m_dryBulb(dryBulb),
-      m_wetBulb(wetBulb),
-      m_pressure(pressure)
+    : dryBulb(dryBulb),
+      wetBulb(wetBulb),
+      pressure(pressure)
 {
 }
 
@@ -21,9 +21,9 @@ Psychrometer::Psychrometer(const Temperature& dryBulb,
  */
 double_t Psychrometer::relativeHumidity() const
 {
-    double_t dryTemperature = m_dryBulb.value();
-    double_t wetTemperature = m_wetBulb.value();
-    double_t atmPressure = m_pressure.value();
+    double_t dryTemperature = dryBulb.getValue();
+    double_t wetTemperature = wetBulb.getValue();
+    double_t atmPressure = pressure.getValue();
 
     // 1: Calcul de la "constante" psychrométrique
     // Capacité thermique massique de l'air [kJ/kg.°C]

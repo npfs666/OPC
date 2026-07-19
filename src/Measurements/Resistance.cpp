@@ -7,8 +7,8 @@ Resistance::Resistance(const char* name,
                        SensorBoard& board,
                        RTDSensor& sensor)
     : Measurement(name, "Ohm"),
-      m_board(board),
-      m_sensor(sensor)
+      board(board),
+      sensor(sensor)
 {
 }
 
@@ -18,16 +18,16 @@ void Resistance::update()
     Serial.println(m_sensor.readValue());
     Serial.print("resistance ");
     Serial.println(value());*/
-    setValue(m_board.computeResistance(m_sensor));
+    setValue(board.computeResistance(sensor));
     setValid(true);
 }
 
-RTDSensor& Resistance::sensor()
+RTDSensor& Resistance::getSensor()
 {
-    return m_sensor;
+    return sensor;
 }
 
-const RTDSensor& Resistance::sensor() const
+const RTDSensor& Resistance::getSensor() const
 {
-    return m_sensor;
+    return sensor;
 }

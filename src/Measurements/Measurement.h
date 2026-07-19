@@ -46,13 +46,13 @@ public:
 
     MeasurementType type() const;
 
-    double_t value() const;
+    double_t getValue() const;
 
-    const char *name() const;
+    const char *getName() const;
 
-    const char *unit() const;
+    const char *getUnit() const;
 
-    bool valid() const;
+    bool isValid() const;
 
     void printSerial();
 
@@ -62,13 +62,13 @@ protected:
     void setValid(bool valid = true);
 
 private:
-    const char *m_name;
+    const char *name;
 
-    const char *m_unit;
+    const char *unit;
 
-    double_t m_value = 0.0;
+    double_t value = 0.0;
 
-    bool m_valid = false;
+    bool valid = false;
 };
 
 #endif

@@ -13,7 +13,7 @@ public:
     void update() override;
 
 private:
-    Resistance& m_resistance;
+    Resistance& resistance;
 };
 
 #endif

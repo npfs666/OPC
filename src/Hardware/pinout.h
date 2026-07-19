@@ -10,6 +10,9 @@
 #define MAX_RTD 3
 #define ALPHA 0.6f
 
+// Used in Actuator
+#define MAX_OUTPUTS 4
+
 // Général ORDERS
 #define PAUSE_ADC_INTERRUPTS 1
 #define RESUME_ADC_INTERRUPTS 2

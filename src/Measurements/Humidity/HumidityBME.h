@@ -16,7 +16,7 @@ public:
 
 private:
 
-    Adafruit_BME280& m_bme;
+    Adafruit_BME280& bme;
 };
 
 #endif

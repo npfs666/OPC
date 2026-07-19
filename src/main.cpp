@@ -97,8 +97,8 @@ void loop1()
     double_t res1, res2;
 
     //res1 = opc.input.rtd[0].readValue();
-    res1 = opc.measurements[3].value();
-    res2 = opc.measurements[5].value();
+    res1 = opc.measurements[3].getValue();
+    res2 = opc.measurements[5].getValue();
     
     opc.printScreen(0, 5, 4, ST77XX_ORANGE, "test");
     sprintf(TX, "%.2lf", res1);
@@ -107,7 +107,7 @@ void loop1()
     opc.printScreen(0, 80, 4, ST77XX_ORANGE, TX);
 
     Serial.println("---------- Measure ----------");
-    for( int i = 0; i < opc.measurements.count(); i++) {
+    for( int i = 0; i < opc.measurements.getCount(); i++) {
         opc.measurements[i].printSerial();
     }
     Serial.println();

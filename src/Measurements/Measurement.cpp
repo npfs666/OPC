@@ -3,39 +3,39 @@
 Measurement::Measurement(const char* name,
                          const char* unit)
     :
-    m_name(name),
-    m_unit(unit)
+    name(name),
+    unit(unit)
 {
 }
 
-double_t Measurement::value() const
+double_t Measurement::getValue() const
 {
-    return m_value;
+    return value;
 }
 
-const char* Measurement::name() const
+const char* Measurement::getName() const
 {
-    return m_name;
+    return name;
 }
 
-const char* Measurement::unit() const
+const char* Measurement::getUnit() const
 {
-    return m_unit;
+    return unit;
 }
 
-bool Measurement::valid() const
+bool Measurement::isValid() const
 {
-    return m_valid;
+    return valid;
 }
 
 void Measurement::setValue(double_t value)
 {
-    m_value = value;
+    this->value = value;
 }
 
 void Measurement::setValid(bool valid)
 {
-    m_valid = valid;
+    this->valid = valid;
 }
 
 void Measurement::printSerial()
@@ -43,6 +43,6 @@ void Measurement::printSerial()
     char str[50];
 
     // %NAME% is %VALUE% %UNIT%
-    sprintf ( str, "%s is %.3lf %s", m_name, m_value, m_unit );
+    sprintf ( str, "%s is %.3lf %s", name, value, unit );
     Serial.println(str);
 }

@@ -21,13 +21,13 @@ public:
     Measurement& operator[](uint8_t index);
     const Measurement& operator[](uint8_t index) const;
 
-    uint8_t count() const;
+    uint8_t getCount() const;
 
 private:
 
-    Measurement* m_measurements[MAX_MEASUREMENTS];
+    Measurement* measurements[MAX_MEASUREMENTS];
 
-    uint8_t m_count;
+    uint8_t count;
 };
 
 #endif

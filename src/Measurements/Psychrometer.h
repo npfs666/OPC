@@ -20,9 +20,9 @@ public:
 
 private:
 
-    const Temperature& m_dryBulb;
-    const Temperature& m_wetBulb;
-    const Pressure& m_pressure;
+    const Temperature& dryBulb;
+    const Temperature& wetBulb;
+    const Pressure& pressure;
 };
 
 #endif

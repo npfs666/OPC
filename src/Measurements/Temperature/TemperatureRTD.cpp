@@ -8,13 +8,13 @@
 TemperatureRTD::TemperatureRTD(const char* name,
                          Resistance& resistance)
     : Temperature(name),
-      m_resistance(resistance)
+      resistance(resistance)
 {
 }
 
 void TemperatureRTD::update()
 {
-    if(!m_resistance.valid())
+    if(!resistance.isValid())
     {
         setValid(false);
         return;
@@ -22,11 +22,11 @@ void TemperatureRTD::update()
 
     double temperature = 0.0;
 
-    switch(m_resistance.sensor().settings.type)
+    switch(resistance.getSensor().settings.type)
     {
         case RTDSensor::RTDType::Pt100:
             temperature = PT100::getResistanceToTemperature(
-                m_resistance.value());
+                resistance.getValue());
             break;
 
         /*case RTDSensor::RTDType::Pt1000:
@@ -39,7 +39,7 @@ void TemperatureRTD::update()
             return;
     }
 
-    temperature += m_resistance.sensor().settings.offset;
+    temperature += resistance.getSensor().settings.offset;
 
     setValue(temperature);
     setValid(true);

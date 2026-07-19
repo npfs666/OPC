@@ -3,7 +3,7 @@
 PressureBME::PressureBME(const char* name,
                          Adafruit_BME280& bme)
     : Pressure(name),
-      m_bme(bme)
+      bme(bme)
 {
 }
 
@@ -11,7 +11,7 @@ void PressureBME::update()
 {
     //m_bme.takeForcedMeasurement();
 
-    setValue(m_bme.readPressure());
+    setValue(bme.readPressure());
 
     setValid(true);
 }

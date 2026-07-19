@@ -4,18 +4,18 @@
 #include <Measurements/Humidity/Humidity.h>
 #include <Measurements/Psychrometer.h>
 
-class PsychrometerHumidity : public Humidity
+class HumidityPsychrometer : public Humidity
 {
 public:
 
-    PsychrometerHumidity(const char* name,
+    HumidityPsychrometer(const char* name,
                          const Psychrometer& psychrometer);
 
     void update() override;
 
 private:
 
-    const Psychrometer& m_psychrometer;
+    const Psychrometer& psychrometer;
 };
 
 #endif
