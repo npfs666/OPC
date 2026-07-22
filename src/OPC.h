@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 #include "Hardware/SensorBoard.h"
-#include "Measurements/MeasurementManager.h"
+#include <ProcessControl.h>
 
 #include <Adafruit_ST7789.h>
 #include <Adafruit_BME280.h>
@@ -63,7 +63,7 @@ public:
 
     Adafruit_BME280 bme;
 
-    MeasurementManager measurements;
+    ProcessControl controller;
 
     void printScreen(int16_t x, int16_t y, uint8_t size, uint16_t color, const char* text);
 

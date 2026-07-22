@@ -1,8 +1,7 @@
 #include "Outputs/Output.h"
 
-Output::Output(const char *name)
+Output::Output(const char *name) : Displayable(name)
 {
-    outputName = name;
     command = 0.0;
 }
 
@@ -14,9 +13,4 @@ void Output::writeCommand(double_t value)
 double_t Output::readCommand() const
 {
     return command;
-}
-
-const char *Output::name() const
-{
-    return outputName;
 }

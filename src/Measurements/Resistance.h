@@ -29,6 +29,8 @@ public:
 
     const RTDSensor& getSensor() const;
 
+    uint8_t printDecimals() const override;
+
 private:
 
     SensorBoard& board;

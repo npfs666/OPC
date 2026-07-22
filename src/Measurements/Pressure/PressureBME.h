@@ -12,7 +12,13 @@ public:
     PressureBME(const char* name,
                 Adafruit_BME280& bme);
 
+    double_t pressureSeaLevel(int16_t altitude);
+
     void update() override;
+
+    double_t printValue() const override;
+
+    uint8_t printDecimals() const override;
 
 private:
 

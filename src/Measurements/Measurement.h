@@ -2,6 +2,7 @@
 #define MEASUREMENT_H
 
 #include <Arduino.h>
+#include <hmi/Displayable.h>
 
 /**
  * @brief Classe de base de toutes les grandeurs physiques.
@@ -15,7 +16,7 @@
  *
  * Elle ne connait pas le matériel.
  */
-class Measurement
+class Measurement : public Displayable
 {
 public:
 
@@ -48,13 +49,12 @@ public:
 
     double_t getValue() const;
 
-    const char *getName() const;
-
     const char *getUnit() const;
 
     bool isValid() const;
 
-    void printSerial();
+    virtual double_t printValue() const override;
+
 
 protected:
     void setValue(double_t value);
@@ -62,8 +62,6 @@ protected:
     void setValid(bool valid = true);
 
 private:
-    const char *name;
-
     const char *unit;
 
     double_t value = 0.0;

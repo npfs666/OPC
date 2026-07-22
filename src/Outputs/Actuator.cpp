@@ -1,11 +1,7 @@
 #include <Outputs/Actuator.h>
 
-Actuator::Actuator(const char* name)
+Actuator::Actuator(const char* name, Regulator& regulator):regulator(regulator), Displayable(name)
 {
-    actuatorName = name;
-
-    command = 0.0;
-
     outputCount = 0;
 }
 
@@ -17,17 +13,3 @@ void Actuator::addOutput(Output& output)
     outputs[outputCount++] = &output;
 }
 
-void Actuator::writeCommand(double_t value)
-{
-    command = constrain(value, 0.0, 1.0);
-}
-
-double_t Actuator::readCommand() const
-{
-    return command;
-}
-
-const char* Actuator::readName() const
-{
-    return actuatorName;
-}

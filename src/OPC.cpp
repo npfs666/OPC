@@ -10,6 +10,7 @@
 #include <Measurements/Humidity/HumidityBME.h>
 #include <Measurements/Pressure/PressureBME.h>
 #include <Measurements/Humidity/HumidityPsychrometer.h>
+#include <Regulator/Thermostat.h>
 
 OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
 {
@@ -94,38 +95,44 @@ bool OPC::newMeasurement()
     bme.takeForcedMeasurement();    
 
     // Faire la MAJ des mesures (conversion data -> mesure)
-    measurements.update();
+    controller.update(millis());
 
     return true;
 }
 
 void OPC::initMeasurements() {
 
+    // Déclaration des entrées de la carte de mesure
     input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
     input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
     
+    // Déclaration des mesures, régulateurs, actionneur et sorties
     auto* tempBME = new TemperatureBME("BME", bme);
-    measurements.add(*tempBME);
+    controller.add(*tempBME);
 
     auto* rhBME = new HumidityBME("BME", bme);
-    measurements.add(*rhBME);
+    controller.add(*rhBME);
 
     auto* paBME = new PressureBME("BME",bme);
-    measurements.add(*paBME);
+    controller.add(*paBME);
 
     auto* r = new Resistance("rRTD 1", input, input.rtd[0]);
     auto* t = new TemperatureRTD("TempRTD 1", *r);
-    measurements.add(*r);
-    measurements.add(*t);
+    controller.add(*r);
+    controller.add(*t);
 
     auto* r1 = new Resistance("rRTD 2", input, input.rtd[1]);
     auto* t1 = new TemperatureRTD("TempRTD 2", *r1);
-    measurements.add(*r1);
-    measurements.add(*t1);
+    controller.add(*r1);
+    controller.add(*t1);
 
     auto* p = new Psychrometer(*t, *t1, *paBME);
     auto* ph = new HumidityPsychrometer("RH psychrom", *p);
-    measurements.add(*ph);
+    controller.add(*ph);
+
+    auto* thermos = new Thermostat("Thermos", *t1);
+    thermos->settings.setpoint = 25;
+    controller.add(*thermos);
 
     input.startContinuous();
 }

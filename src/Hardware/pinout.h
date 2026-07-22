@@ -10,8 +10,11 @@
 #define MAX_RTD 3
 #define ALPHA 0.6f
 
-// Used in Actuator
-#define MAX_OUTPUTS 4
+// Maxixum array sizes
+#define MAX_MEASUREMENTS 16 // Used in ProcessControl
+#define MAX_REGULATORS 16   // Used in ProcessControl
+#define MAX_ACTUATORS 16    // Used in ProcessControl
+#define MAX_OUTPUTS 4       // Used in Actuator
 
 // Général ORDERS
 #define PAUSE_ADC_INTERRUPTS 1

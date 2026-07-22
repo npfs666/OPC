@@ -16,6 +16,7 @@ public:
 
     TimeProportionalActuator(
         const char* name,
+        Regulator& regulator,
         uint32_t period);
 
     void update(uint32_t now) override;

@@ -2,9 +2,10 @@
 #define OUTPUT_H
 
 #include <Arduino.h>
+#include <hmi/Displayable.h>
 
 
-class Output
+class Output : public Displayable
 {
 public:
 
@@ -17,11 +18,7 @@ public:
 
     double_t readCommand() const;
 
-    const char *name() const;
-
 protected:
-
-    const char *outputName;
 
     // Commande réellement appliquée au matériel
     double_t command;

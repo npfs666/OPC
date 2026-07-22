@@ -7,7 +7,7 @@ class ActuatorOnOff : public Actuator
 {
 public:
 
-    ActuatorOnOff(const char* name);
+    ActuatorOnOff(const char* name, Regulator& regulator);
 
     void update(uint32_t now) override;
 };

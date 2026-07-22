@@ -2,12 +2,11 @@
 #define MEASUREMENTMANAGER_H
 
 #include "Measurement.h"
+#include "Hardware/pinout.h"
 
 class MeasurementManager
 {
 public:
-
-    static constexpr uint8_t MAX_MEASUREMENTS = 16;
 
     MeasurementManager();
 

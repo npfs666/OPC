@@ -31,3 +31,8 @@ const RTDSensor& Resistance::getSensor() const
 {
     return sensor;
 }
+
+uint8_t Resistance::printDecimals() const
+{
+    return 3;
+}
