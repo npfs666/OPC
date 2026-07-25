@@ -16,9 +16,9 @@ public:
 
     Settings settings;
 
-    Thermostat(
-        const char* name,
-        Temperature& temperature);
+    Thermostat();
+
+    void begin(const char* name, Temperature& temperature);
 
     void update(uint32_t now);
 
@@ -26,7 +26,7 @@ public:
 
 private:
 
-    Temperature& temperature;
+    Temperature* temperature;
 };
 
 #endif

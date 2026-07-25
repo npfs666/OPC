@@ -6,10 +6,11 @@
 class Humidity : public Measurement
 {
 public:
+    Humidity() = default;
 
-    Humidity(const char* name)
-        : Measurement(name, "%")
+    void begin(const char* name)
     {
+        Measurement::begin(name, "%");
     }
 
     virtual void update() = 0;

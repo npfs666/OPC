@@ -7,8 +7,9 @@
 class Regulator : public Displayable
 {
 public:
+    Regulator();
 
-    Regulator(const char* name);
+    void begin(const char* name);
 
     virtual ~Regulator() = default;
 
@@ -24,7 +25,7 @@ protected:
 
     void writeCommand(double_t value);
 
-    double_t command;
+    double_t command = 0;
 };
 
 #endif

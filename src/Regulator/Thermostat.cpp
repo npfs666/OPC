@@ -1,11 +1,15 @@
 #include <Regulator/Thermostat.h>
 
-Thermostat::Thermostat(
-    const char* name,
-    Temperature& temperature)
-    : Regulator(name),
-      temperature(temperature)
+Thermostat::Thermostat()
 {
+}
+
+void Thermostat::begin(const char* name,Temperature& temperature)
+{
+    Regulator::begin(name);
+
+    this->temperature = &temperature;
+    
     settings.setpoint = 20.0;
     settings.hysteresis = 1.0;
 }
@@ -14,7 +18,7 @@ void Thermostat::update(uint32_t now)
 {
     (void)now;
     
-    double_t value = temperature.getValue();
+    double_t value = temperature->getValue();
 
     if (value <= settings.setpoint - settings.hysteresis / 2.0)
     {

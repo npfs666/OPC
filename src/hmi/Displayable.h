@@ -10,9 +10,13 @@ public:
 
     virtual ~Displayable() = default;
 
-    Displayable(const char* name);
+    Displayable();
+
+    void begin(const char* name);
 
     virtual void print(Stream& stream) const;
+
+    bool display = true;
 
 protected:
 
@@ -24,7 +28,7 @@ protected:
 
     virtual uint8_t printDecimals() const;
 
-    const char* name;
+    const char* name = "";
 };
 
 #endif

@@ -1,15 +1,20 @@
 #include <Regulator/SolarRegulator.h>
 
-SolarRegulator::SolarRegulator(
-    const char* name,
-    Temperature& collector,
-    Temperature& tankTop,
-    Temperature& tankBottom)
-    : Regulator(name),
-      collector(collector),
-      tankTop(tankTop),
-      tankBottom(tankBottom)
+SolarRegulator::SolarRegulator()
 {
+}
+
+void SolarRegulator::begin(const char* name,
+                            Temperature& collector,
+                            Temperature& tankTop,
+                            Temperature& tankBottom)
+{
+    Regulator::begin(name);
+
+    this->collector = &collector;
+    this->tankTop = &tankTop;
+    this->tankBottom = &tankBottom;
+
     settings.startDelta = 8.0;
     settings.stopDelta = 4.0;
 
@@ -21,9 +26,9 @@ void SolarRegulator::update(uint32_t now)
 {
     (void)now;
 
-    double_t collectorTemperature = collector.getValue();
-    double_t topTemperature       = tankTop.getValue();
-    double_t bottomTemperature    = tankBottom.getValue();
+    double_t collectorTemperature = collector->getValue();
+    double_t topTemperature       = tankTop->getValue();
+    double_t bottomTemperature    = tankBottom->getValue();
 
     bool canRun = true;
 

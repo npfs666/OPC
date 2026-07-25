@@ -1,11 +1,17 @@
 #include <Regulator/PID.h>
 
-PID::PID(
+PID::PID()
+{
+}
+
+void PID::begin(
     const char* name,
     Measurement& measurement)
-    : Regulator(name),
-      measurement(measurement)
 {
+    Regulator::begin(name);
+
+    this->measurement = &measurement;
+
     settings.setpoint  = 0.0;
 
     settings.kp = 1.0;
@@ -33,7 +39,7 @@ void PID::reset()
 
 void PID::update(uint32_t now)
 {
-    double_t pv = measurement.getValue();
+    double_t pv = measurement->getValue();
 
     if(!initialized)
     {

@@ -45,25 +45,45 @@ void ProcessControl::update(uint32_t now)
 
 Measurement* ProcessControl::getMeasurement(uint8_t id) {
 
+    if (id >= measurementCount)
+        return nullptr;
+
     return measurements[id];
+}
+
+/**
+ * Only for testing hardware, do not correct
+ */
+void ProcessControl::printCSVPsychro(uint32_t now) {
+
+    Serial.print(now/1000.0,1);
+    Serial.print(" ; ");
+    Serial.print(getMeasurement(4)->getValue());
+    Serial.print(" ; ");
+    Serial.println(getMeasurement(7)->getValue());
 }
 
 void ProcessControl::print(Stream& stream) const
 {
-    stream.println();
-    stream.println(F("===== Process Control ====="));
+    //stream.println();
+    //stream.println(F("===== Process Control ====="));
 
-    stream.println(F("Measurements"));
+    //stream.println(F("Measurements"));
     stream.println(F("--------------------------"));
     for (uint8_t i = 0; i < measurementCount; i++)
     {
         measurements[i]->print(stream);
     }
 
-    stream.println();
-
-    stream.println(F("Regulators"));
-    stream.println(F("--------------------------"));
+    //double_t deltas = measurements[3]->getValue() - measurements[5]->getValue(); 
+    //Serial.println(deltas, 3);
+    
+    if (regulatorCount > 0 )  {
+        stream.println();
+        stream.println(F("Regulators"));
+        stream.println(F("--------------------------"));
+    }
+    
     for (uint8_t i = 0; i < regulatorCount; i++)
     {
         regulators[i]->print(stream);

@@ -25,6 +25,8 @@ public:
 
     void print(Stream& stream) const;
 
+    void printCSVPsychro(uint32_t now);
+
 private:
 
     Measurement* measurements[MAX_MEASUREMENTS];

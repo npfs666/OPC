@@ -6,9 +6,10 @@
 class Temperature : public Measurement
 {
 public:
-    Temperature(const char* name)
-        : Measurement(name, "°C")
-    {
+    Temperature() = default;
+
+    void begin(const char* name) {
+        Measurement::begin(name, "°C");
     }
 
     virtual void update() = 0;

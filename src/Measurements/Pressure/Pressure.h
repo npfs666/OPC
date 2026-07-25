@@ -6,9 +6,11 @@
 class Pressure : public Measurement
 {
 public:
-    Pressure(const char* name)
-        : Measurement(name, "Pa")
+    Pressure() = default;
+
+    void begin(const char* name)
     {
+        Measurement::begin(name, "Pa");
     }
 
     virtual void update() = 0;

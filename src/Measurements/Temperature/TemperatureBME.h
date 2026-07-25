@@ -7,13 +7,14 @@
 class TemperatureBME : public Temperature
 {
 public:
-    TemperatureBME(const char* name,
-                   Adafruit_BME280& bme);
+    TemperatureBME();
+
+    void begin(const char* name,Adafruit_BME280& bme);
 
     void update() override;
 
 private:
-    Adafruit_BME280& bme;
+    Adafruit_BME280* bme;
 };
 
 #endif

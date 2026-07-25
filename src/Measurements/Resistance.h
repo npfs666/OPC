@@ -17,11 +17,13 @@ class Resistance : public Measurement
 {
 public:
 
-    Resistance(const char* name,
-               SensorBoard& board,
-               RTDSensor& sensor);
+    Resistance();
 
     virtual ~Resistance() = default;
+
+    void begin(const char* name,
+               SensorBoard& board,
+               RTDSensor& sensor);
 
     void update() override;
 
@@ -33,8 +35,8 @@ public:
 
 private:
 
-    SensorBoard& board;
-    RTDSensor&   sensor;
+    SensorBoard* board = nullptr;
+    RTDSensor*   sensor = nullptr;
 };
 
 #endif

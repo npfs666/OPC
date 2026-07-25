@@ -1,11 +1,16 @@
 #include <Outputs/TimeProportionalActuator.h>
 
-TimeProportionalActuator::TimeProportionalActuator(
+TimeProportionalActuator::TimeProportionalActuator()
+{
+}
+
+void TimeProportionalActuator::begin(
     const char* name,
     Regulator& regulator,
     uint32_t period)
-    : Actuator(name, regulator)
 {
+    Actuator::begin(name, regulator);
+
     settings.period = period;
 
     cycleStart = 0;
@@ -15,7 +20,7 @@ TimeProportionalActuator::TimeProportionalActuator(
 
 void TimeProportionalActuator::update(uint32_t now)
 {
-    double_t command = regulator.readCommand();
+    double_t command = regulator->readCommand();
 
     while (now - cycleStart >= settings.period)
         cycleStart += settings.period;

@@ -1,7 +1,12 @@
 #include "Outputs/Output.h"
 
-Output::Output(const char *name) : Displayable(name)
+Output::Output()
 {
+}
+
+void Output::begin(const char *name)
+{
+    Displayable::begin(name);
     command = 0.0;
 }
 

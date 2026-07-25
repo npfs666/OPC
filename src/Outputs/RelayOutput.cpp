@@ -1,11 +1,19 @@
 #include "Outputs/RelayOutput.h"
 
-RelayOutput::RelayOutput(
+
+RelayOutput::RelayOutput()
+{
+}
+
+
+
+void RelayOutput::begin(
     const char *name,
     uint8_t pin,
     bool activeHigh)
-    : Output(name)
 {
+    Output::begin(name);
+    
     settings.pin = pin;
     settings.activeHigh = activeHigh;
 }

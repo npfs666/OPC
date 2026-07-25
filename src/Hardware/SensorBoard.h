@@ -26,11 +26,11 @@ public:
     AnalogMux mux;  // Front end multiplexers
     RTDSensor rtd[MAX_RTD]; // Sensor array
     
-    bool newMeasurement=false;    // ADC has finished accumulating values, data is readable
+    volatile bool newMeasurement=false;    // ADC has finished accumulating values, data is readable
     
     SensorBoard();
     void init();
-    void addRTD(RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset);
+    bool addRTD(RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset);
     void startContinuous();
     void pause();
     void restart();

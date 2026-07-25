@@ -1,25 +1,22 @@
 /**
  * @file main.cpp
  *
- *
- *
  * @author GAOU (arstaligtredan.fr)
- * @brief
  * @version 0.3
  * @date 2026-07-12
  *
  * @copyright Copyright (c) 2022
- *
+ * 
  * MIT license, all text above must be included in any redistribution 
  */
-#include <Hardware/pinout.h>
+//#include <Hardware/pinout.h>
 #include <OPC.h>
-#include "pico/stdlib.h"
-#include <math.h>
-#include <EEPROM.h>
+//#include "pico/stdlib.h"
+//#include <math.h>
+//#include <EEPROM.h>
+//#include <Measurements/Resistance.h>
+//#include <Measurements/Temperature/TemperatureRTD.h>
 
-#include <Measurements/Resistance.h>
-#include <Measurements/Temperature/TemperatureRTD.h>
 
 
 namespace
@@ -33,10 +30,12 @@ void adcInterrupt();
 
 
 
-
+/**
+ * CPU0 : contrôle de la mesure ADC et de la régulation
+ */
 void setup()
 {
-	delay(1000);
+	delay(100);
 
 	opc.initSensorBoard();
 
@@ -45,9 +44,17 @@ void setup()
     opc.initMeasurements();
 }
 
+
+
+void adcInterrupt() {
+
+	opc.input.adcInterrupt();
+}
+
+
+
 /**
  * CPU0 : contrôle de la mesure ADC et de la régulation
- * @brief
  */
 void loop()
 {	
@@ -59,18 +66,24 @@ void loop()
 		// Pauses ADC IRQ while calibrating
 		if( val == PAUSE_ADC_INTERRUPTS ) {
 			irq_set_enabled(13, false); // Pause IO interrupts
+            Serial.println("pause");
 		} else if( val == RESUME_ADC_INTERRUPTS ) {
 			irq_set_enabled(13, true); // Resume IO interrupts
 		}
 	}
 
     // Mettre en place le calcul des measurement, car ici on est pas dans l'ISR donc on a le temps.
+    if (!opc.newMeasurement())  return;
 }
 
 
 
+/**
+ * Cpu1 : contrôle des IT utilisateur et écran
+ */
 void setup1()
 {
+    delay(100);
 	opc.initSerial();
 	//opc.initRotenc();
 	opc.initDisplay();
@@ -79,22 +92,37 @@ void setup1()
 
 
 
+uint32_t currentTime, previousTime = 3000, refreshTime = 3000;     // All in ms
 /**
  * Cpu1 : contrôle des IT utilisateur et écran
- * @brief
- *
  */
 void loop1()
 {
+    /**
+     * ATTENTION ! Avec ce système de refresh timé, il faut que le temps de mesure soit plus court !
+     * Système uniquement valable pour des mesures
+     */
 
-    if (!opc.newMeasurement())
-        return;
+    currentTime = millis();
+
+    // Refresh loop, every refreshTime ms
+    if ( (currentTime - previousTime) >= refreshTime) {
+
+        //opc.controller.printCSVPsychro(currentTime);
+        opc.controller.print(Serial);
+        
+        opc.input.restart(); // Once UI update is done we can restart conversions.
+        
+        previousTime = currentTime;  // Remember the time
+    }
+
+
 
     // Affichage écran
-    char TX[50];
+    //char TX[50];
 
     // Affichage de la mesure
-    double_t res1, res2;
+    /*double_t res1, res2;
 
     //res1 = opc.input.rtd[0].readValue();
     res1 = opc.controller.getMeasurement(3)->getValue();
@@ -104,25 +132,7 @@ void loop1()
     sprintf(TX, "%.2lf", res1);
     opc.printScreen(0, 40, 4, ST77XX_ORANGE, TX);
     sprintf(TX, "%.2lf", res2);
-    opc.printScreen(0, 80, 4, ST77XX_ORANGE, TX);
-
-
-    opc.controller.print(Serial);
-    /*Serial.println("---------- Measure ----------");
-    for( int i = 0; i < opc.measurements.getCount(); i++) {
-        opc.measurements[i].printSerial();
-    }
-    Serial.println();*/
-
-    //Serial.print("RH = ");Serial.println(Psychrometer::relativeHumidity(25,20,98025), 3);
-    //Serial.print("RH = ");Serial.println(Psychrometer::relativeHumidity(25,20,104025), 3);
-    //Serial.print("SVP = ");Serial.println(Psychrometer::saturationVaporPressure(25), 3);
-    //Serial.print("VP = ");Serial.println(Psychrometer::saturationVaporPressure(20), 3);
-
-    //Serial.print("RH2 = ");Serial.println(Psychrometer::getRH(25,20,98025), 3);
-    //Serial.print("RH2 = ");Serial.println(Psychrometer::getRH(25,20,104025), 3);
-
-    //delay(1000);
+    opc.printScreen(0, 80, 4, ST77XX_ORANGE, TX);*/
 }
 
 
@@ -131,13 +141,3 @@ void loop1()
 
 
 
-
-
-
-
-
-
-void adcInterrupt() {
-
-	opc.input.adcInterrupt();
-}

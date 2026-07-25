@@ -14,8 +14,9 @@ public:
 
     Settings settings;
 
-    TimeProportionalActuator(
-        const char* name,
+    TimeProportionalActuator();
+
+    void begin(const char* name,
         Regulator& regulator,
         uint32_t period);
 

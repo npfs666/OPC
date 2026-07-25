@@ -1,7 +1,15 @@
 #include <Outputs/Actuator.h>
 
-Actuator::Actuator(const char* name, Regulator& regulator):regulator(regulator), Displayable(name)
+Actuator::Actuator()
 {
+}
+
+void Actuator::begin(const char* name, Regulator& regulator)
+{
+    Displayable::begin(name);
+
+    this->regulator = &regulator;
+
     outputCount = 0;
 }
 

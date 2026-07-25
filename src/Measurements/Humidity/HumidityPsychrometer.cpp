@@ -1,16 +1,20 @@
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 
-HumidityPsychrometer::HumidityPsychrometer(
+HumidityPsychrometer::HumidityPsychrometer()
+{
+}
+
+void HumidityPsychrometer::begin(
     const char* name,
     const Psychrometer& psychrometer)
-    : Humidity(name),
-      psychrometer(psychrometer)
 {
+    Humidity::begin(name);
+    this->psychrometer = &psychrometer;
 }
 
 void HumidityPsychrometer::update()
 {
-    setValue(psychrometer.relativeHumidity());
+    setValue(psychrometer->relativeHumidity());
 
     setValid(true);
 }

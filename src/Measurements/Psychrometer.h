@@ -8,7 +8,9 @@ class Psychrometer
 {
 public:
 
-    Psychrometer(const Temperature& dryBulb,
+    Psychrometer();
+
+    void begin(const Temperature& dryBulb,
                  const Temperature& wetBulb,
                  const Pressure& pressure);
 
@@ -20,9 +22,9 @@ public:
 
 private:
 
-    const Temperature& dryBulb;
-    const Temperature& wetBulb;
-    const Pressure& pressure;
+    const Temperature* dryBulb;
+    const Temperature* wetBulb;
+    const Pressure* pressure;
 };
 
 #endif

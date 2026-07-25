@@ -22,8 +22,9 @@ public:
 
     Settings settings;
 
-    SolarRegulator(
-        const char* name,
+    SolarRegulator();
+
+    void begin(const char* name,
         Temperature& collector,
         Temperature& tankTop,
         Temperature& tankBottom);
@@ -32,11 +33,11 @@ public:
 
 private:
 
-    Temperature& collector;
+    Temperature* collector;
 
-    Temperature& tankTop;
+    Temperature* tankTop;
 
-    Temperature& tankBottom;
+    Temperature* tankBottom;
 
     bool running;
 

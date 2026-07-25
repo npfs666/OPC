@@ -16,6 +16,10 @@ OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
 {
 }
 
+/*OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET), userInstallation(NULL)
+{
+}*/
+
 void OPC::initSerial()
 {
     Serial.begin(115200);
@@ -46,12 +50,12 @@ void OPC::initBME280()
     bme.begin(0x76,&Wire);
 
     bme.setSampling(
-        Adafruit_BME280::MODE_FORCED,
-        Adafruit_BME280::SAMPLING_X1,
-        Adafruit_BME280::SAMPLING_X1,
-        Adafruit_BME280::SAMPLING_X1,
+        Adafruit_BME280::MODE_NORMAL,
+        Adafruit_BME280::SAMPLING_X16,
+        Adafruit_BME280::SAMPLING_X16,
+        Adafruit_BME280::SAMPLING_X16,
         Adafruit_BME280::FILTER_OFF,
-        Adafruit_BME280::STANDBY_MS_1000);
+        Adafruit_BME280::STANDBY_MS_0_5);
 }
 
 void OPC::initSensorBoard()
@@ -90,19 +94,39 @@ bool OPC::newMeasurement()
         return false;
 
     input.newMeasurement = false;
-  
+    
     // MAJ du BME280
-    bme.takeForcedMeasurement();    
+    //bme.takeForcedMeasurement(); // inutile maintenant, il fait sa mesure en auto et sleep.
 
     // Faire la MAJ des mesures (conversion data -> mesure)
-    controller.update(millis());
+    unsigned long times = millis();
+    controller.update(times);
+
+    // Sortie des affichage sur le port série -> On va éviter de print sur le CPU0
+    //controller.print(Serial);
+    //controller.printCSVPsychro(times);
 
     return true;
 }
 
 void OPC::initMeasurements() {
 
-    // Déclaration des entrées de la carte de mesure
+    //input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
+    //input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
+    
+    userInstall.begin(input, bme, controller);
+    
+    /*tempBME.begin("BME", bme);
+    controller.add(tempBME);
+
+    rRTD.begin("rRTD 1", input, input.rtd[0]);
+    tempRTD.begin("sonde 1", rRTD);
+    controller.add(rRTD);
+    controller.add(tempRTD);*/
+
+
+
+    /*// Déclaration des entrées de la carte de mesure
     input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
     input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
     
@@ -118,21 +142,25 @@ void OPC::initMeasurements() {
 
     auto* r = new Resistance("rRTD 1", input, input.rtd[0]);
     auto* t = new TemperatureRTD("TempRTD 1", *r);
+    t->display = true;
     controller.add(*r);
     controller.add(*t);
 
     auto* r1 = new Resistance("rRTD 2", input, input.rtd[1]);
     auto* t1 = new TemperatureRTD("TempRTD 2", *r1);
+    //r1->getSensor().settings.offset = 0.045;
+    t1->display = true;
     controller.add(*r1);
     controller.add(*t1);
 
     auto* p = new Psychrometer(*t, *t1, *paBME);
     auto* ph = new HumidityPsychrometer("RH psychrom", *p);
+    ph->display = true;
     controller.add(*ph);
 
-    auto* thermos = new Thermostat("Thermos", *t1);
+    /*auto* thermos = new Thermostat("Thermos", *t1);
     thermos->settings.setpoint = 25;
-    controller.add(*thermos);
+    controller.add(*thermos);*/
 
     input.startContinuous();
 }

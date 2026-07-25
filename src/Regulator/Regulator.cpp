@@ -1,7 +1,12 @@
 #include <Regulator/Regulator.h>
 
-Regulator::Regulator(const char* name) : Displayable(name)
+Regulator::Regulator() 
 {
+}
+
+void Regulator::begin(const char* name)
+{
+    Displayable::begin(name);
     command = 0.0;
 }
 

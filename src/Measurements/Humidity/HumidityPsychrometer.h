@@ -7,15 +7,15 @@
 class HumidityPsychrometer : public Humidity
 {
 public:
+    HumidityPsychrometer();
 
-    HumidityPsychrometer(const char* name,
-                         const Psychrometer& psychrometer);
+    void begin(const char* name, const Psychrometer& psychrometer);
 
     void update() override;
 
 private:
 
-    const Psychrometer& psychrometer;
+    const Psychrometer* psychrometer = nullptr;
 };
 
 #endif

@@ -16,6 +16,7 @@ void SensorBoard::init()
 {
     mux.begin();
     adc.begin(&SPI,SPI_CLK, SPI_MISO, SPI_MOSI, SPI_CS, SPI_DRDY);
+    adc.setOpMode(0);
 }
 
 
@@ -29,10 +30,15 @@ void SensorBoard::init()
  * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
  * @param offset Sensor offset
  */
-void SensorBoard::addRTD(RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset) {
+bool SensorBoard::addRTD(RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset) {
+
+    if (numRTDSensors >= MAX_RTD)
+        return false;
 
     rtd[numRTDSensors] = RTDSensor(type, wiring, samples, offset);
     numRTDSensors++;
+
+    return true;
 }
 
 
@@ -148,8 +154,15 @@ void SensorBoard::pause() {
 
 // Restarts conversion
 void SensorBoard::restart() {
+    setWiringRoute(rtd[curRTDSensor].settings);
     adc.setConversionMode(CONVERSION_CONTINUOUS);
+    /**
+     * When in pause(), any write to a registry starts a single shot conversion (and triggers interrupt), and we write many
+     * so before restarting we need to clear any previous "random" measurement
+     */
+    rtd[curRTDSensor].reset();
     adc.startSync();
+    
 }
 
 
@@ -189,9 +202,9 @@ void SensorBoard::adcInterrupt() {
     #endif
 
     int32_t value = adc.readADC();
-    //Serial.println(value);
 	
-    rtd[curRTDSensor].add(value);
+    //rtd[curRTDSensor].add(value);
+    rtd[curRTDSensor].addLP(value);
 
     // Cas particulier de la mesure en 3 fils (current chopping) : 
 	// inversion des sources d'exitation de courant à la moitié de la série, pour supprimer leur inégalité de courant
@@ -216,9 +229,10 @@ void SensorBoard::adcInterrupt() {
         if( curRTDSensor == numRTDSensors ) {
             curRTDSensor = 0;
 			newMeasurement = true;
+            return; // when all measurement are done, we pause and wait for UI update to restart them.
         }
 
-        setWiringRoute(rtd[curRTDSensor].settings);
+        //setWiringRoute(rtd[curRTDSensor].settings); // Inclus dans le restart mtn.
 
         // Pause et relance de la conversion continue
 		//delay(2); // TODO: uniformiser les delay

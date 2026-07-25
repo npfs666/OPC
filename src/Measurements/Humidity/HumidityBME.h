@@ -9,14 +9,15 @@ class HumidityBME : public Humidity
 {
 public:
 
-    HumidityBME(const char* name,
-                Adafruit_BME280& bme);
+    HumidityBME();
+
+    void begin(const char* name, Adafruit_BME280& bme);
 
     void update() override;
 
 private:
 
-    Adafruit_BME280& bme;
+    Adafruit_BME280* bme = nullptr;
 };
 
 #endif

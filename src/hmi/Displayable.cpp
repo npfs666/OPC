@@ -1,13 +1,17 @@
 #include <hmi/Displayable.h>
 
 
-Displayable::Displayable(const char* name) 
-    : name(name) 
+Displayable::Displayable() 
 {
 } 
 
+void Displayable::begin(const char* name) 
+{
+    this->name = name;
+} 
+
 uint8_t Displayable::printDecimals() const {
-    return 2;
+    return 3;
 }
 
 const char* Displayable::getName() const {
@@ -16,6 +20,8 @@ const char* Displayable::getName() const {
 
 void Displayable::print(Stream& stream) const
 {
+    if ( !display ) return;
+
     PrintSize ps;
 
     stream.print(getName());

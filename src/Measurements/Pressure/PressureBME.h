@@ -9,8 +9,9 @@ class PressureBME : public Pressure
 {
 public:
 
-    PressureBME(const char* name,
-                Adafruit_BME280& bme);
+    PressureBME();
+
+    void begin(const char* name, Adafruit_BME280& bme);
 
     double_t pressureSeaLevel(int16_t altitude);
 
@@ -22,7 +23,7 @@ public:
 
 private:
 
-    Adafruit_BME280& bme;
+    Adafruit_BME280* bme;
 };
 
 #endif

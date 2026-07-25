@@ -12,8 +12,9 @@ class Actuator : public Displayable
 {
 public:
 
-    Actuator(const char* name,
-        Regulator& regulator);
+    Actuator();
+
+    void begin(const char* name,Regulator& regulator);
         
     virtual ~Actuator() = default;
 
@@ -28,7 +29,7 @@ protected:
 
     uint8_t outputCount;
 
-    Regulator& regulator;
+    Regulator* regulator;
 };
 
 #endif

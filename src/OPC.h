@@ -9,6 +9,15 @@
 #include <Adafruit_ST7789.h>
 #include <Adafruit_BME280.h>
 
+#include <testInstallation.h>
+
+#include <Measurements/Resistance.h>
+#include <Measurements/Temperature/TemperatureRTD.h>
+#include <Measurements/Temperature/TemperatureBME.h>
+#include <Measurements/Humidity/HumidityBME.h>
+#include <Measurements/Pressure/PressureBME.h>
+#include <Measurements/Humidity/HumidityPsychrometer.h>
+
 class OPC
 {
 public:
@@ -68,8 +77,10 @@ public:
     void printScreen(int16_t x, int16_t y, uint8_t size, uint16_t color, const char* text);
 
 private:
-
-    
+        /*TemperatureBME tempBME;
+        Resistance rRTD;
+        TemperatureRTD tempRTD;*/
+        TestInstallation userInstall;
 };
 
 #endif

@@ -31,8 +31,10 @@ public:
         Average
     };
 
-    Measurement(const char *name,
-                const char *unit);
+    /*Measurement(const char *name,
+                const char *unit);*/
+
+    Measurement();
 
     virtual ~Measurement() = default;
 
@@ -57,12 +59,15 @@ public:
 
 
 protected:
+    void begin(const char* name,
+               const char* unit);
+
     void setValue(double_t value);
 
     void setValid(bool valid = true);
 
 private:
-    const char *unit;
+    const char *unit = "";
 
     double_t value = 0.0;
 

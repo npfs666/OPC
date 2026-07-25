@@ -5,16 +5,22 @@
 #include <Physics/PT100.h>
 //#include <Measurement/PT1000.h>
 
-TemperatureRTD::TemperatureRTD(const char* name,
-                         Resistance& resistance)
-    : Temperature(name),
-      resistance(resistance)
+TemperatureRTD::TemperatureRTD()
 {
 }
 
+void TemperatureRTD::begin(const char* name,
+                         Resistance& resistance)
+{
+    Temperature::begin(name);
+    this->resistance = &resistance;
+}
+
+
+
 void TemperatureRTD::update()
 {
-    if(!resistance.isValid())
+    if(!resistance->isValid())
     {
         setValid(false);
         return;
@@ -22,11 +28,11 @@ void TemperatureRTD::update()
 
     double temperature = 0.0;
 
-    switch(resistance.getSensor().settings.type)
+    switch(resistance->getSensor().settings.type)
     {
         case RTDSensor::RTDType::Pt100:
             temperature = PT100::getResistanceToTemperature(
-                resistance.getValue());
+                resistance->getValue());
             break;
 
         /*case RTDSensor::RTDType::Pt1000:
@@ -39,7 +45,7 @@ void TemperatureRTD::update()
             return;
     }
 
-    temperature += resistance.getSensor().settings.offset;
+    temperature += resistance->getSensor().settings.offset;
 
     setValue(temperature);
     setValid(true);

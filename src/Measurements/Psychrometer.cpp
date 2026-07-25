@@ -1,13 +1,17 @@
 #include <Measurements/Psychrometer.h>
 #include <math.h>
 
-Psychrometer::Psychrometer(const Temperature& dryBulb,
+Psychrometer::Psychrometer()
+{
+}
+
+void Psychrometer::begin(const Temperature& dryBulb,
                            const Temperature& wetBulb,
                            const Pressure& pressure)
-    : dryBulb(dryBulb),
-      wetBulb(wetBulb),
-      pressure(pressure)
 {
+    this->dryBulb = &dryBulb;
+    this->wetBulb = &wetBulb;
+    this->pressure = &pressure;
 }
 
 /**
@@ -21,9 +25,9 @@ Psychrometer::Psychrometer(const Temperature& dryBulb,
  */
 double_t Psychrometer::relativeHumidity() const
 {
-    double_t dryTemperature = dryBulb.getValue();
-    double_t wetTemperature = wetBulb.getValue();
-    double_t atmPressure = pressure.getValue();
+    double_t dryTemperature = dryBulb->getValue();
+    double_t wetTemperature = wetBulb->getValue();
+    double_t atmPressure = pressure->getValue();
 
     // 1: Calcul de la "constante" psychrométrique
     // Capacité thermique massique de l'air [kJ/kg.°C]

@@ -7,13 +7,16 @@
 class TemperatureRTD : public Temperature
 {
 public:
-    TemperatureRTD(const char* name,
+
+    TemperatureRTD();
+
+    void begin(const char* name,
                    Resistance& resistance);
 
     void update() override;
 
 private:
-    Resistance& resistance;
+    Resistance* resistance = nullptr;
 };
 
 #endif

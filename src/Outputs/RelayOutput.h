@@ -15,7 +15,9 @@ public:
 
     Settings settings;
 
-    RelayOutput(
+    RelayOutput();
+
+    void begin(
         const char *name,
         uint8_t pin,
         bool activeHigh = true);

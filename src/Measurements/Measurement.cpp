@@ -1,12 +1,22 @@
 #include "Measurements/Measurement.h"
 #include <PrintSize.h>
 
-Measurement::Measurement(const char* name,
+/*Measurement::Measurement(const char* name,
                          const char* unit)
     :
     Displayable(name),
     unit(unit)
 {
+}*/
+
+Measurement::Measurement()
+{
+}
+
+void Measurement::begin(const char* name, const char* unit)
+{
+    Displayable::begin(name);
+    this->unit = unit;
 }
 
 double_t Measurement::getValue() const

@@ -24,8 +24,9 @@ public:
 
     Settings settings;
 
-    PID(
-        const char* name,
+    PID();
+
+    void begin(const char* name,
         Measurement& measurement);
 
     void reset();
@@ -34,7 +35,7 @@ public:
 
 private:
 
-    Measurement& measurement;
+    Measurement* measurement;
 
     double_t integral;
 

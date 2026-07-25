@@ -9,7 +9,10 @@ class Output : public Displayable
 {
 public:
 
-    Output(const char *name);
+    Output();
+
+    void begin(const char *name);
+
     virtual ~Output() = default;
 
     virtual void begin() = 0;
