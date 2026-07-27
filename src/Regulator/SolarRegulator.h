@@ -29,7 +29,17 @@ public:
         Temperature& tankTop,
         Temperature& tankBottom);
 
+    void begin(
+        const char* key,
+        const char* name,
+        Temperature& collector,
+        Temperature& tankTop,
+        Temperature& tankBottom);
+
     void update(uint32_t now) override;
+
+    void registerParameters(
+        ParameterList& list) override;
 
 private:
 
@@ -40,8 +50,6 @@ private:
     Temperature* tankBottom;
 
     bool running;
-
-    bool canRun;
 };
 
 #endif

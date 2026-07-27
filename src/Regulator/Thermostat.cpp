@@ -6,7 +6,15 @@ Thermostat::Thermostat()
 
 void Thermostat::begin(const char* name,Temperature& temperature)
 {
-    Regulator::begin(name);
+    begin(name, name, temperature);
+}
+
+void Thermostat::begin(
+    const char* key,
+    const char* name,
+    Temperature& temperature)
+{
+    Regulator::begin(key, name);
 
     this->temperature = &temperature;
     
@@ -48,13 +56,19 @@ void Thermostat::print(Stream& stream) const {
     stream.print(" | Hyst : ");
     stream.print(settings.hysteresis);
 
-    stream.print(' ');
+    stream.println(' ');
 }
 
 void Thermostat::registerParameters(ParameterList& list) {
 
-    list.addDouble(
-        getName(),
+    auto parameters = list.forOwner({
+        "regulators",
+        "Regulateur",
+        getKey(),
+        getName()
+    });
+
+    parameters.addDouble(
         "setpoint",
         "Consigne",
         settings.setpoint,
@@ -64,8 +78,7 @@ void Thermostat::registerParameters(ParameterList& list) {
         1,
         "°C");
 
-    list.addDouble(
-        getName(),
+    parameters.addDouble(
         "hysteresis",
         "Hystérésis",
         settings.hysteresis,

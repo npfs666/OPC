@@ -5,11 +5,26 @@ SolarRegulator::SolarRegulator()
 }
 
 void SolarRegulator::begin(const char* name,
-                            Temperature& collector,
-                            Temperature& tankTop,
-                            Temperature& tankBottom)
+                           Temperature& collector,
+                           Temperature& tankTop,
+                           Temperature& tankBottom)
 {
-    Regulator::begin(name);
+    begin(
+        name,
+        name,
+        collector,
+        tankTop,
+        tankBottom);
+}
+
+void SolarRegulator::begin(
+    const char* key,
+    const char* name,
+    Temperature& collector,
+    Temperature& tankTop,
+    Temperature& tankBottom)
+{
+    Regulator::begin(key, name);
 
     this->collector = &collector;
     this->tankTop = &tankTop;
@@ -20,6 +35,8 @@ void SolarRegulator::begin(const char* name,
 
     settings.maximumTankTemperature = 80.0;
     settings.minimumCollectorTemperature = 20.0;
+
+    running = false;
 }
 
 void SolarRegulator::update(uint32_t now)
@@ -61,4 +78,55 @@ void SolarRegulator::update(uint32_t now)
     }
 
     writeCommand(running ? 1.0 : 0.0);
+}
+
+void SolarRegulator::registerParameters(
+    ParameterList& list)
+{
+    auto parameters = list.forOwner({
+        "regulators",
+        "Regulateur",
+        getKey(),
+        getName()
+    });
+
+    parameters.addDouble(
+        "start_delta",
+        "Delta démarrage",
+        settings.startDelta,
+        1.0,
+        30.0,
+        0.5,
+        1,
+        "K");
+
+    parameters.addDouble(
+        "stop_delta",
+        "Delta arrêt",
+        settings.stopDelta,
+        0.0,
+        20.0,
+        0.5,
+        1,
+        "K");
+
+    parameters.addDouble(
+        "maximum_tank_temperature",
+        "Temp. ballon max",
+        settings.maximumTankTemperature,
+        40.0,
+        95.0,
+        0.5,
+        1,
+        "°C");
+
+    parameters.addDouble(
+        "minimum_collector_temperature",
+        "Temp. capteur min",
+        settings.minimumCollectorTemperature,
+        0.0,
+        100.0,
+        0.5,
+        1,
+        "°C");
 }

@@ -33,13 +33,28 @@ void ParameterEditor::capture()
             break;
 
         case Parameter::Type::Integer:
-            if (parameter.value.integer != nullptr)
-                drafts[i].integerValue = *parameter.value.integer;
+            if (parameter.discrete.target != nullptr &&
+                parameter.discrete.read != nullptr)
+            {
+                drafts[i].integerValue =
+                    parameter.discrete.read(
+                        parameter.discrete.target);
+            }
             break;
 
         case Parameter::Type::Double:
             if (parameter.value.number != nullptr)
                 drafts[i].numberValue = *parameter.value.number;
+            break;
+
+        case Parameter::Type::Selection:
+            if (parameter.discrete.target != nullptr &&
+                parameter.discrete.read != nullptr)
+            {
+                drafts[i].selectionValue =
+                    parameter.discrete.read(
+                        parameter.discrete.target);
+            }
             break;
         }
     }

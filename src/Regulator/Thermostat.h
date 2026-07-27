@@ -19,6 +19,10 @@ public:
     Thermostat();
 
     void begin(const char* name, Temperature& temperature);
+    void begin(
+        const char* key,
+        const char* name,
+        Temperature& temperature);
 
     void update(uint32_t now);
 

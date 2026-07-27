@@ -9,9 +9,25 @@ void TimeProportionalActuator::begin(
     Regulator& regulator,
     uint32_t period)
 {
-    Actuator::begin(name, regulator);
+    begin(
+        name,
+        name,
+        regulator,
+        period);
+}
 
-    settings.period = period;
+void TimeProportionalActuator::begin(
+    const char* key,
+    const char* name,
+    Regulator& regulator,
+    uint32_t period)
+{
+    Actuator::begin(key, name, regulator);
+
+    settings.period =
+        period == 0
+            ? 1000
+            : period;
 
     cycleStart = 0;
 
@@ -20,10 +36,18 @@ void TimeProportionalActuator::begin(
 
 void TimeProportionalActuator::update(uint32_t now)
 {
+    if (settings.period == 0)
+        return;
+
     double_t command = regulator->readCommand();
 
-    while (now - cycleStart >= settings.period)
-        cycleStart += settings.period;
+    const uint32_t elapsedCycles =
+        (now - cycleStart) /
+        settings.period;
+
+    cycleStart +=
+        elapsedCycles *
+        settings.period;
 
     uint32_t elapsed = now - cycleStart;
 
@@ -36,4 +60,26 @@ void TimeProportionalActuator::update(uint32_t now)
 
     for (uint8_t i = 0; i < outputCount; i++)
         outputs[i]->writeCommand(relayState);
+}
+
+void TimeProportionalActuator::registerParameters(
+    ParameterList& list)
+{
+    auto parameters = list.forOwner({
+        "actuators",
+        "Actionneurs",
+        getKey(),
+        getName()
+    });
+
+    parameters.addInteger(
+        "period",
+        "Période",
+        settings.period,
+        1000,
+        3600000,
+        1000,
+        "ms");
+
+    Actuator::registerParameters(list);
 }

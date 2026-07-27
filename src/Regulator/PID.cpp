@@ -8,7 +8,15 @@ void PID::begin(
     const char* name,
     Measurement& measurement)
 {
-    Regulator::begin(name);
+    begin(name, name, measurement);
+}
+
+void PID::begin(
+    const char* key,
+    const char* name,
+    Measurement& measurement)
+{
+    Regulator::begin(key, name);
 
     this->measurement = &measurement;
 
@@ -76,4 +84,72 @@ void PID::update(uint32_t now)
     previousMeasurement = pv;
 
     previousTime = now;
+}
+
+void PID::registerParameters(ParameterList& list) {
+
+    auto parameters = list.forOwner({
+        "regulators",
+        "Regulateur",
+        getKey(),
+        getName()
+    });
+
+    parameters.addDouble(
+        "setpoint",
+        "Consigne",
+        settings.setpoint,
+        0.0,
+        80.0,
+        0.5,
+        1,
+        "°C");
+
+    parameters.addDouble(
+        "kp",
+        "Kp",
+        settings.kp,
+        0.0,
+        10.0,
+        0.01,
+        2,
+        "1/°C");
+
+    parameters.addDouble(
+        "ki",
+        "Ki",
+        settings.ki,
+        0.0,
+        0.1,
+        0.001,
+        3,
+        "1/(°C.s)");
+
+    parameters.addDouble(
+        "kd",
+        "Kd",
+        settings.kd,
+        0.0,
+        100.0,
+        0.1,
+        1,
+        "s/°C");
+
+    parameters.addDouble(
+        "output_min",
+        "Sortie min",
+        settings.outputMin,
+        0.0,
+        1.0,
+        0.01,
+        2);
+
+    parameters.addDouble(
+        "output_max",
+        "Sortie max",
+        settings.outputMax,
+        0.0,
+        1.0,
+        0.01,
+        2);
 }

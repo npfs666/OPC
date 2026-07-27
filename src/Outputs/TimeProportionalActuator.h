@@ -20,7 +20,16 @@ public:
         Regulator& regulator,
         uint32_t period);
 
+    void begin(
+        const char* key,
+        const char* name,
+        Regulator& regulator,
+        uint32_t period);
+
     void update(uint32_t now) override;
+
+    void registerParameters(
+        ParameterList& list) override;
 
 private:
 

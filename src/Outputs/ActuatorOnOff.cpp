@@ -7,11 +7,21 @@ ActuatorOnOff::ActuatorOnOff()
 
 void ActuatorOnOff::begin(const char* name, Regulator& regulator)
 {
-    Actuator::begin(name, regulator);
+    begin(name, name, regulator);
+}
+
+void ActuatorOnOff::begin(
+    const char* key,
+    const char* name,
+    Regulator& regulator)
+{
+    Actuator::begin(key, name, regulator);
 }
 
 void ActuatorOnOff::update(uint32_t now)
 {
+    (void)now;
+
     double_t outputCommand;
 
     double_t command = regulator->readCommand();

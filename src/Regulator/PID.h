@@ -29,9 +29,16 @@ public:
     void begin(const char* name,
         Measurement& measurement);
 
+    void begin(
+        const char* key,
+        const char* name,
+        Measurement& measurement);
+
     void reset();
 
     void update(uint32_t now) override;
+
+    void registerParameters(ParameterList& list) override;
 
 private:
 

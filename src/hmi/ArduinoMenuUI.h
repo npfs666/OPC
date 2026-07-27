@@ -24,8 +24,9 @@ public:
     bool isInitialized() const;
 
 private:
-    static constexpr size_t MAX_DEPTH = 4;
+    static constexpr size_t MAX_DEPTH = 5;
     static constexpr size_t LABEL_LENGTH = 32;
+    static constexpr size_t UNIT_LENGTH = 12;
     static constexpr uint8_t TEXT_SCALE = 2;
     static constexpr Menu::idx_t CHARACTER_WIDTH = 6 * TEXT_SCALE;
     static constexpr Menu::idx_t CHARACTER_HEIGHT = 9 * TEXT_SCALE;
@@ -33,13 +34,20 @@ private:
         MenuBuilder::MAX_GROUPS;
     static constexpr size_t MAX_MENU_ITEMS =
         MAX_PARAMETERS + (2 * (MAX_GROUPS - 1));
+    static constexpr size_t MAX_SELECTION_OPTIONS =
+        ParameterList::MAX_SELECTION_OPTIONS;
 
     bool initialized = false;
 
     Menu::prompt* parameterItems[MAX_PARAMETERS] = {};
     MenuBuilder::GroupId parameterGroups[MAX_PARAMETERS] = {};
     Menu::prompt* booleanOptions[MAX_PARAMETERS][2] = {};
+    Menu::prompt* selectionOptionItems[MAX_SELECTION_OPTIONS] = {};
     char labels[MAX_PARAMETERS][LABEL_LENGTH] = {};
+    char unitLabels[MAX_PARAMETERS][UNIT_LENGTH] = {};
+    char groupLabels[MAX_GROUPS][LABEL_LENGTH] = {};
+    char selectionOptionLabels
+        [MAX_SELECTION_OPTIONS][LABEL_LENGTH] = {};
 
     Menu::prompt* menuItems[MAX_MENU_ITEMS] = {};
     Menu::menuNode* menuNodes[MAX_GROUPS] = {};
@@ -48,6 +56,7 @@ private:
     Menu::idx_t menuItemCounts[MAX_GROUPS] = {};
     size_t menuItemOffsets[MAX_GROUPS] = {};
     size_t menuItemCursors[MAX_GROUPS] = {};
+    size_t selectionOptionsUsed = 0;
 
     Menu::menuNode* root = nullptr;
     Menu::navRoot* nav = nullptr;
@@ -83,6 +92,11 @@ private:
         ParameterDraft& draft,
         const Parameter& parameter,
         const char* unit,
+        const char* label);
+
+    Menu::prompt* createSelectionItem(
+        ParameterDraft& draft,
+        const Parameter& parameter,
         const char* label);
 };
 

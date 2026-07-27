@@ -1,9 +1,8 @@
 #include "testInstallation.h"
 
 #include "Hardware/SensorBoard.h"
-#include "MenuBuilder.h"
 #include "ProcessControl.h"
-
+#include <Adafruit_ST77xx.h>
 
 TestInstallation::TestInstallation()
 {
@@ -34,10 +33,10 @@ void TestInstallation::printParameters(const ParameterList& list, Stream& stream
 bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessControl &controller)
 {
     // ----- Configuration du matériel -----
-    input1.begin("input1", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
+    input1.begin("input1", "Input 1", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
     board.addRTD(input1);
 
-    input2.begin("input2", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
+    input2.begin("input2", "Input 2", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
     board.addRTD(input2);
 
     // ----- Construction des objets -----
@@ -69,59 +68,28 @@ bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessCo
 
     controller.add(psychroHumidity);
 
-    thermostat.begin("Thermostat", rtd2Temperature);
+    thermostat.begin("thermostat", "Thermostats", rtd2Temperature);
     thermostat.settings.setpoint = 25;
-
     controller.add(thermostat);
+
+    pid.begin("pid", "PID", rtd1Temperature);
+    controller.add(pid);
 
     parameterList.begin(parameterStorage, MAX_PARAMETERS);
     parameterList.clear();
     board.registerParameters(parameterList);
     controller.registerParameters(parameterList);
 
+    if (parameterList.hasError())
+    {
+        Serial.println(
+            "Parameter registration failed");
+        return false;
+    }
+
     printParameters(parameterList, Serial);
 
     return true;
-}
-
-void TestInstallation::buildMenu(MenuBuilder& menu)
-{
-    const MenuBuilder::GroupId inputMenu =
-        menu.addSubmenu(
-            menu.root(),
-            "Input");
-
-    const MenuBuilder::GroupId input1Menu =
-        menu.addSubmenu(
-            inputMenu,
-            "Input 1");
-
-    const MenuBuilder::GroupId input2Menu =
-        menu.addSubmenu(
-            inputMenu,
-            "Input 2");
-
-    menu.addParameters(
-        input1Menu,
-        "input1");
-
-    menu.addParameters(
-        input2Menu,
-        "input2");
-
-    const MenuBuilder::GroupId regulatorMenu =
-        menu.addSubmenu(
-            menu.root(),
-            "Regulateur");
-
-    const MenuBuilder::GroupId thermostatMenu =
-        menu.addSubmenu(
-            regulatorMenu,
-            "Thermostats");
-
-    menu.addParameters(
-        thermostatMenu,
-        "Thermostat");
 }
 
 void TestInstallation::load(Storage& storage)
@@ -135,3 +103,5 @@ void TestInstallation::save(Storage& storage)
 void TestInstallation::factoryReset()
 {
 }
+
+

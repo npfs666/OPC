@@ -11,6 +11,7 @@ struct ParameterDraft
     bool booleanValue = false;
     int32_t integerValue = 0;
     double_t numberValue = 0.0;
+    int32_t selectionValue = 0;
 };
 
 class ParameterEditor

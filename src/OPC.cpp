@@ -102,7 +102,15 @@ bool OPC::newMeasurement()
 
 void OPC::initMeasurements()
 {
-    userInstall.begin(input, bme, controller);
+    if (!userInstall.begin(
+            input,
+            bme,
+            controller))
+    {
+        Serial.println(
+            "Installation initialization failed");
+        return;
+    }
 
     input.startContinuous();
 }
@@ -115,13 +123,13 @@ void OPC::initMenu()
     parameterEditor.begin(userInstall.getParameters());
     parameterEditor.capture();
 
-    if (!menuDefinition.begin("Parametres"))
+    if (!menuDefinition.build(
+            userInstall.getParameters(),
+            "Parametres"))
     {
-        Serial.println("Menu definition initialization failed");
+        Serial.println("Automatic menu generation failed");
         return;
     }
-
-    userInstall.buildMenu(menuDefinition);
 
     if (!menu.begin(
             tft,

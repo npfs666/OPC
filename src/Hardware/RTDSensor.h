@@ -36,7 +36,7 @@ public:
     Settings settings;
 
     RTDSensor();
-    
+
     /**
      * @brief Construct a new RTDSensor::RTDSensor object
      *
@@ -45,8 +45,10 @@ public:
      * @param offset Sensor offset in °C
      */
     RTDSensor(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
+    RTDSensor(const char* key, const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
 
     void begin(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
+    void begin(const char* key, const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
     void reset();
     void add(int32_t value);
     void addLP(int32_t value);
@@ -59,7 +61,8 @@ public:
 
 private:
 
-    const char* name = "";
+    const char* ownerKey = "";
+    const char* ownerName = "";
     double_t nMinusOneValue;
     double_t sum;
     double_t resistance;

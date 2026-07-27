@@ -39,5 +39,7 @@ void Displayable::print(Stream& stream) const
 
     stream.print(' ');
 
-    stream.println(getUnit());
+    stream.print(getUnit());
+
+    stream.println();
 }

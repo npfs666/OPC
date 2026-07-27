@@ -6,6 +6,15 @@ Actuator::Actuator()
 
 void Actuator::begin(const char* name, Regulator& regulator)
 {
+    begin(name, name, regulator);
+}
+
+void Actuator::begin(
+    const char* key,
+    const char* name,
+    Regulator& regulator)
+{
+    this->key = key;
     Displayable::begin(name);
 
     this->regulator = &regulator;
@@ -21,3 +30,30 @@ void Actuator::addOutput(Output& output)
     outputs[outputCount++] = &output;
 }
 
+const char* Actuator::getKey() const
+{
+    return key;
+}
+
+double_t Actuator::printValue() const
+{
+    if (regulator == nullptr)
+        return 0.0;
+
+    return regulator->readCommand();
+}
+
+const char* Actuator::getUnit() const
+{
+    return "";
+}
+
+void Actuator::registerParameters(
+    ParameterList& list)
+{
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        if (outputs[i] != nullptr)
+            outputs[i]->registerParameters(list);
+    }
+}

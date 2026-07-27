@@ -9,13 +9,20 @@
 #include <Configurable.h>
 
 
-class Actuator : public Displayable, Configurable
+class Actuator : public Displayable, public Configurable
 {
 public:
 
     Actuator();
 
-    void begin(const char* name,Regulator& regulator);
+    void begin(
+        const char* name,
+        Regulator& regulator);
+
+    void begin(
+        const char* key,
+        const char* name,
+        Regulator& regulator);
         
     virtual ~Actuator() = default;
 
@@ -23,15 +30,23 @@ public:
 
     virtual void update(uint32_t now) = 0;
 
-    void registerParameters(ParameterList& list) override {};
+    void registerParameters(
+        ParameterList& list) override;
 
 protected:
 
-    Output* outputs[MAX_OUTPUTS];
+    const char* getKey() const;
 
-    uint8_t outputCount;
+    double_t printValue() const override;
+    const char* getUnit() const override;
 
-    Regulator* regulator;
+    const char* key = "";
+
+    Output* outputs[MAX_OUTPUTS] = {};
+
+    uint8_t outputCount = 0;
+
+    Regulator* regulator = nullptr;
 };
 
 #endif

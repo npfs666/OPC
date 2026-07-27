@@ -10,6 +10,10 @@ public:
     ActuatorOnOff();
 
     void begin(const char* name, Regulator& regulator);
+    void begin(
+        const char* key,
+        const char* name,
+        Regulator& regulator);
 
     void update(uint32_t now) override;
 };

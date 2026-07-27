@@ -7,7 +7,6 @@
 class SensorBoard;
 class Adafruit_BME280;
 class ProcessControl;
-class MenuBuilder;
 class Storage;
 
 class Installation
@@ -22,8 +21,6 @@ public:
         SensorBoard& board,
         Adafruit_BME280& bme,
         ProcessControl& process) = 0;
-
-    virtual void buildMenu(MenuBuilder& menu) = 0;
 
     virtual void load(Storage& storage) = 0;
 

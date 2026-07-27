@@ -94,7 +94,8 @@ void setup1()
     delay(100);
 	opc.initSerial();
 	opc.initRotenc();
-    attachInterrupt(digitalPinToInterrupt(ROTENC_A),ISRRotenc,FALLING);
+    attachInterrupt(digitalPinToInterrupt(ROTENC_A), ISRRotenc, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ROTENC_B), ISRRotenc, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ROTENC_CLIC), ISRButton, FALLING);
 	opc.initDisplay();
 	opc.initBME280();
@@ -140,24 +141,7 @@ void loop1()
     }
 
     opc.menuPoll();
-
-    // Affichage écran
-    //char TX[50];
-
-    // Affichage de la mesure
-    /*double_t res1, res2;
-
-    //res1 = opc.input.rtd[0].readValue();
-    res1 = opc.controller.getMeasurement(3)->getValue();
-    res2 = opc.controller.getMeasurement(5)->getValue();
-    
-    opc.printScreen(0, 5, 4, ST77XX_ORANGE, "test");
-    sprintf(TX, "%.2lf", res1);
-    opc.printScreen(0, 40, 4, ST77XX_ORANGE, TX);
-    sprintf(TX, "%.2lf", res2);
-    opc.printScreen(0, 80, 4, ST77XX_ORANGE, TX);*/
 }
-
 
 
 

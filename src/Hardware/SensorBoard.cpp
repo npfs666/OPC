@@ -298,6 +298,63 @@ void SensorBoard::registerParameters(ParameterList& list)
     {
         rtd[i]->registerParameters(list);
     }
+
+    auto parameters = list.forOwner({
+        "calibration",
+        "Calibration",
+        "sensor_board",
+        "Carte capteurs"
+    });
+
+    parameters.addDouble(
+        "reference_resistance",
+        "Résistance réf.",
+        settings.refResistanceValue,
+        1500.0,
+        1800.0,
+        0.001,
+        3,
+        "Ω");
+
+    parameters.addDouble(
+        "reference_coefficient",
+        "Coeff. réf.",
+        settings.refResistanceCoeff,
+        -100.0,
+        100.0,
+        0.1,
+        1,
+        "ppm/°C");
+
+    parameters.addDouble(
+        "calibration_resistance",
+        "Résistance cal.",
+        settings.calResistanceValue,
+        99.0,
+        101.0,
+        0.001,
+        3,
+        "Ω");
+
+    parameters.addDouble(
+        "adc_calibration_temperature",
+        "Température ADC",
+        settings.calTemperatureADC,
+        -40.0,
+        125.0,
+        0.01,
+        2,
+        "°C");
+
+    parameters.addDouble(
+        "bme_calibration_temperature",
+        "Température BME",
+        settings.calTemperatureBME,
+        -40.0,
+        85.0,
+        0.01,
+        2,
+        "°C");
 }
 
 void SensorBoard::resetAcquisition()

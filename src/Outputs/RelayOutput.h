@@ -18,13 +18,22 @@ public:
     RelayOutput();
 
     void begin(
-        const char *name,
+        const char* name,
+        uint8_t pin,
+        bool activeHigh = true);
+
+    void begin(
+        const char* key,
+        const char* name,
         uint8_t pin,
         bool activeHigh = true);
 
     void begin() override;
 
     void writeCommand(double_t value) override;
+
+    void registerParameters(
+        ParameterList& list) override;
 };
 
 #endif

@@ -2,6 +2,52 @@
 
 #include <cstring>
 
+ParameterList::Writer::Writer(
+    ParameterList& list,
+    const ParameterOwner& owner)
+    : list(&list),
+      owner(owner)
+{
+}
+
+bool ParameterList::Writer::addBool(
+    const char* key,
+    const char* name,
+    bool& value)
+{
+    return list != nullptr &&
+           list->remember(
+               list->addBool(
+                   owner,
+                   key,
+                   name,
+                   value));
+}
+
+bool ParameterList::Writer::addDouble(
+    const char* key,
+    const char* name,
+    double_t& value,
+    double_t minimum,
+    double_t maximum,
+    double_t step,
+    uint8_t decimals,
+    const char* unit)
+{
+    return list != nullptr &&
+           list->remember(
+               list->addDouble(
+                   owner,
+                   key,
+                   name,
+                   value,
+                   minimum,
+                   maximum,
+                   step,
+                   decimals,
+                   unit));
+}
+
 void ParameterList::begin(
     Parameter* storage,
     size_t capacity)
@@ -14,11 +60,15 @@ void ParameterList::begin(
         parameterCapacity = capacity;
 
     parameterCount = 0;
+    selectionOptionCount = 0;
+    registrationError = false;
 }
 
 void ParameterList::clear()
 {
     parameterCount = 0;
+    selectionOptionCount = 0;
+    registrationError = false;
 }
 
 size_t ParameterList::count() const
@@ -45,6 +95,11 @@ bool ParameterList::isInitialized() const
 {
     return parameters != nullptr &&
            parameterCapacity > 0;
+}
+
+bool ParameterList::hasError() const
+{
+    return registrationError;
 }
 
 const Parameter* ParameterList::get(size_t index) const
@@ -93,14 +148,20 @@ const Parameter* ParameterList::find(
     return nullptr;
 }
 
+ParameterList::Writer ParameterList::forOwner(
+    const ParameterOwner& owner)
+{
+    return Writer(*this, owner);
+}
+
 bool ParameterList::addBool(
-    const char* ownerKey,
+    const ParameterOwner& owner,
     const char* key,
     const char* name,
     bool& value)
 {
     Parameter* parameter = create(
-        ownerKey,
+        owner,
         key,
         name,
         Parameter::Type::Bool);
@@ -114,15 +175,22 @@ bool ParameterList::addBool(
 }
 
 bool ParameterList::addInteger(
-    const char* ownerKey,
+    const ParameterOwner& owner,
     const char* key,
     const char* name,
-    int32_t& value,
+    const ParameterDiscreteBinding& binding,
     int32_t minimum,
     int32_t maximum,
     int32_t step,
     const char* unit)
 {
+    if (binding.target == nullptr ||
+        binding.read == nullptr ||
+        binding.write == nullptr)
+    {
+        return false;
+    }
+
     if (minimum > maximum)
         return false;
 
@@ -130,7 +198,7 @@ bool ParameterList::addInteger(
         return false;
 
     Parameter* parameter = create(
-        ownerKey,
+        owner,
         key,
         name,
         Parameter::Type::Integer);
@@ -138,7 +206,7 @@ bool ParameterList::addInteger(
     if (parameter == nullptr)
         return false;
 
-    parameter->value.integer = &value;
+    parameter->discrete = binding;
 
     parameter->data.integer.minimum = minimum;
     parameter->data.integer.maximum = maximum;
@@ -149,7 +217,7 @@ bool ParameterList::addInteger(
 }
 
 bool ParameterList::addDouble(
-    const char* ownerKey,
+    const ParameterOwner& owner,
     const char* key,
     const char* name,
     double_t& value,
@@ -159,14 +227,23 @@ bool ParameterList::addDouble(
     uint8_t decimals,
     const char* unit)
 {
-    if (minimum > maximum)
+    if (!(minimum <= maximum))
         return false;
 
-    if (step <= 0.0)
+    if (!(step > 0.0))
         return false;
+
+    if (decimals > 3)
+        return false;
+
+    if (!(value >= minimum &&
+          value <= maximum))
+    {
+        return false;
+    }
 
     Parameter* parameter = create(
-        ownerKey,
+        owner,
         key,
         name,
         Parameter::Type::Double);
@@ -185,8 +262,81 @@ bool ParameterList::addDouble(
     return true;
 }
 
+bool ParameterList::addSelection(
+    const ParameterOwner& owner,
+    const char* key,
+    const char* name,
+    const ParameterDiscreteBinding& binding,
+    const ParameterOption* options,
+    uint8_t optionCount)
+{
+    if (binding.target == nullptr ||
+        binding.read == nullptr ||
+        binding.write == nullptr)
+    {
+        return false;
+    }
+
+    if (options == nullptr ||
+        optionCount == 0)
+    {
+        return false;
+    }
+
+    if (selectionOptionCount +
+            optionCount >
+        MAX_SELECTION_OPTIONS)
+    {
+        return false;
+    }
+
+    const int32_t currentValue =
+        binding.read(binding.target);
+
+    bool currentValueFound = false;
+
+    for (uint8_t i = 0; i < optionCount; i++)
+    {
+        if (!isValidText(options[i].name))
+            return false;
+
+        if (options[i].value == currentValue)
+            currentValueFound = true;
+
+        for (uint8_t j = 0; j < i; j++)
+        {
+            if (options[j].value ==
+                options[i].value)
+            {
+                return false;
+            }
+        }
+    }
+
+    if (!currentValueFound)
+        return false;
+
+    Parameter* parameter = create(
+        owner,
+        key,
+        name,
+        Parameter::Type::Selection);
+
+    if (parameter == nullptr)
+        return false;
+
+    parameter->discrete = binding;
+    parameter->data.selection.options = options;
+    parameter->data.selection.count =
+        optionCount;
+
+    selectionOptionCount += optionCount;
+
+    return true;
+}
+
 Parameter* ParameterList::create(
-    const char* ownerKey,
+    const ParameterOwner& owner,
     const char* key,
     const char* name,
     Parameter::Type type)
@@ -197,7 +347,7 @@ Parameter* ParameterList::create(
     if (isFull())
         return nullptr;
 
-    if (!isValidText(ownerKey) ||
+    if (!isValidOwner(owner) ||
         !isValidText(key) ||
         !isValidText(name))
     {
@@ -210,7 +360,7 @@ Parameter* ParameterList::create(
      * Deux thermostats peuvent donc avoir chacun
      * un paramètre nommé "setpoint".
      */
-    if (find(ownerKey, key) != nullptr)
+    if (find(owner.ownerKey, key) != nullptr)
         return nullptr;
 
     Parameter& parameter =
@@ -222,7 +372,10 @@ Parameter* ParameterList::create(
      */
     parameter = Parameter{};
 
-    parameter.ownerKey = ownerKey;
+    parameter.categoryKey = owner.categoryKey;
+    parameter.categoryName = owner.categoryName;
+    parameter.ownerKey = owner.ownerKey;
+    parameter.ownerName = owner.ownerName;
     parameter.key = key;
     parameter.name = name;
     parameter.type = type;
@@ -236,4 +389,21 @@ bool ParameterList::isValidText(const char* text)
 {
     return text != nullptr &&
            text[0] != '\0';
+}
+
+bool ParameterList::isValidOwner(
+    const ParameterOwner& owner)
+{
+    return isValidText(owner.categoryKey) &&
+           isValidText(owner.categoryName) &&
+           isValidText(owner.ownerKey) &&
+           isValidText(owner.ownerName);
+}
+
+bool ParameterList::remember(bool result)
+{
+    if (!result)
+        registrationError = true;
+
+    return result;
 }

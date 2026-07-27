@@ -1,23 +1,93 @@
 #include <Hardware/RTDSensor.h>
 
+namespace
+{
+    constexpr ParameterOption RTD_TYPE_OPTIONS[] = {
+        {
+            static_cast<int32_t>(
+                RTDSensor::RTDType::Pt100),
+            "PT100"
+        }
+    };
+
+    constexpr ParameterOption RTD_WIRING_OPTIONS[] = {
+        {
+            static_cast<int32_t>(
+                RTDSensor::RTDWiring::ThreeWire),
+            "3 fils"
+        },
+        {
+            static_cast<int32_t>(
+                RTDSensor::RTDWiring::FourWire),
+            "4 fils"
+        }
+    };
+
+    constexpr ParameterOption RTD_SAMPLE_OPTIONS[] = {
+        {2, "2"},
+        {4, "4"},
+        {8, "8"},
+        {16, "16"},
+        {32, "32"},
+        {64, "64"},
+        {128, "128"}
+    };
+}
+
 
 RTDSensor::RTDSensor() {
 
 }
 
 RTDSensor::RTDSensor(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
- {
-    this->name = name;
-    settings.type = type;
-    settings.wiring = wiring;
-    settings.samples = samples;
-    settings.offset = offset;
-    reset();
+{
+    begin(
+        name,
+        name,
+        type,
+        wiring,
+        samples,
+        offset);
+}
+
+RTDSensor::RTDSensor(
+    const char* key,
+    const char* name,
+    RTDType type,
+    RTDWiring wiring,
+    uint16_t samples,
+    float_t offset)
+{
+    begin(
+        key,
+        name,
+        type,
+        wiring,
+        samples,
+        offset);
 }
 
 void RTDSensor::begin(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
- {
-    this->name = name;
+{
+    begin(
+        name,
+        name,
+        type,
+        wiring,
+        samples,
+        offset);
+}
+
+void RTDSensor::begin(
+    const char* key,
+    const char* name,
+    RTDType type,
+    RTDWiring wiring,
+    uint16_t samples,
+    float_t offset)
+{
+    ownerKey = key;
+    ownerName = name;
     settings.type = type;
     settings.wiring = wiring;
     settings.samples = samples;
@@ -84,20 +154,26 @@ bool RTDSensor::isAccumulationDone()
 
 void RTDSensor::registerParameters(ParameterList& list)
 {
-    /*list.addSelection(
-        "Wiring",
-        settings.wiring,
-        wiringNames,
-        3);
+    auto parameters = list.forOwner({
+        "inputs",
+        "Input",
+        ownerKey,
+        ownerName
+    });
 
-    list.addSelection(
+    parameters.addSelection(
+        "rtd.type",
         "Type",
         settings.type,
-        typeNames,
-        2);*/
+        RTD_TYPE_OPTIONS);
 
-    list.addDouble(
-        name,
+    parameters.addSelection(
+        "rtd.wiring",
+        "Câblage",
+        settings.wiring,
+        RTD_WIRING_OPTIONS);
+
+    parameters.addDouble(
         "rtd.offset",
         "Offset",
         settings.offset,
@@ -107,12 +183,9 @@ void RTDSensor::registerParameters(ParameterList& list)
         3,
         "°C");
 
-    list.addInteger(
-        name,
+    parameters.addSelection(
         "rtd.samples",
         "Samples",
         settings.samples,
-        1,
-        128,
-        1);
+        RTD_SAMPLE_OPTIONS);
 }

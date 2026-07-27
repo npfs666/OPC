@@ -16,11 +16,11 @@
 #include "Measurements/Humidity/HumidityPsychrometer.h"
 
 #include <Regulator/Thermostat.h>
+#include <Regulator/PID.h>
 
 class SensorBoard;
 class Adafruit_BME280;
 class ProcessControl;
-class MenuBuilder;
 class Storage;
 
 class TemperatureBME;
@@ -48,7 +48,7 @@ public:
         Adafruit_BME280& bme,
         ProcessControl& process) override;
 
-    void buildMenu(MenuBuilder& menu) override;
+    void printHomeScreen();
 
     void load(Storage& storage) override;
 
@@ -89,6 +89,8 @@ private:
     // ---------- Régulateurs ----------
 
     Thermostat thermostat;
+
+    PID pid;
 
     //SolarRegulator solar;
 

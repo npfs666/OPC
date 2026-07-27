@@ -1,6 +1,6 @@
 #include <hmi/ArduinoMenuUI.h>
 
-#include <cstdio>
+#include <hmi/DisplayTextCodec.h>
 
 namespace
 {
@@ -61,6 +61,7 @@ bool ArduinoMenuUI::begin(Adafruit_ST7789 &display,
     panelDefinitions[0].h = static_cast<Menu::idx_t>(
         display.height() / CHARACTER_HEIGHT);
 
+    display.cp437(true);
     display.setTextSize(TEXT_SCALE);
     display.setTextWrap(false);
     display.fillScreen(ST77XX_BLACK);
@@ -142,6 +143,15 @@ bool ArduinoMenuUI::buildMenuTree(
         return false;
     }
 
+    selectionOptionsUsed = 0;
+
+    for (size_t i = 0;
+         i < MAX_SELECTION_OPTIONS;
+         i++)
+    {
+        selectionOptionItems[i] = nullptr;
+    }
+
     for (size_t i = 0; i < MAX_GROUPS; i++)
     {
         menuNodes[i] = nullptr;
@@ -186,14 +196,14 @@ bool ArduinoMenuUI::buildMenuTree(
         ParameterDraft& draft = editor.get(i);
 
         if (draft.parameter == nullptr)
-            continue;
+            return false;
 
         const MenuBuilder::GroupId group =
             menuDefinition.findGroupForOwner(
                 draft.parameter->ownerKey);
 
         if (group == MenuBuilder::INVALID_GROUP)
-            continue;
+            return false;
 
         if (menuDefinition.getGroup(group) == nullptr)
             return false;
@@ -202,7 +212,7 @@ bool ArduinoMenuUI::buildMenuTree(
             createItem(draft, i);
 
         if (item == nullptr)
-            continue;
+            return false;
 
         parameterItems[i] = item;
         parameterGroups[i] = group;
@@ -239,8 +249,16 @@ bool ArduinoMenuUI::buildMenuTree(
             return false;
         }
 
-        menuNodes[i] = new Menu::menuNode(
+        DisplayTextCodec::utf8ToCp437(
             group->name,
+            groupLabels[i],
+            LABEL_LENGTH);
+
+        if (groupLabels[i][0] == '\0')
+            return false;
+
+        menuNodes[i] = new Menu::menuNode(
+            groupLabels[i],
             menuItemCounts[i],
             &menuItems[menuItemOffsets[i]]);
     }
@@ -341,11 +359,15 @@ Menu::prompt* ArduinoMenuUI::createItem(
     if (name == nullptr)
         return nullptr;
 
-    std::snprintf(
+    DisplayTextCodec::utf8ToCp437(
+        name,
         labels[index],
-        LABEL_LENGTH,
-        "%s",
-        name);
+        LABEL_LENGTH);
+
+    if (labels[index][0] == '\0')
+        return nullptr;
+
+    unitLabels[index][0] = '\0';
 
     switch (parameter.type)
     {
@@ -368,10 +390,15 @@ Menu::prompt* ArduinoMenuUI::createItem(
                 ? parameter.data.integer.unit
                 : "";
 
+        DisplayTextCodec::utf8ToCp437(
+            unit,
+            unitLabels[index],
+            UNIT_LENGTH);
+
         return new Menu::menuField<int32_t>(
             draft.integerValue,
             labels[index],
-            unit,
+            unitLabels[index],
             parameter.data.integer.minimum,
             parameter.data.integer.maximum,
             parameter.data.integer.step,
@@ -385,15 +412,100 @@ Menu::prompt* ArduinoMenuUI::createItem(
                 ? parameter.data.number.unit
                 : "";
 
+        DisplayTextCodec::utf8ToCp437(
+            unit,
+            unitLabels[index],
+            UNIT_LENGTH);
+
         return createNumberItem(
             draft,
             parameter,
-            unit,
+            unitLabels[index],
             labels[index]);
     }
+
+    case Parameter::Type::Selection:
+        return createSelectionItem(
+            draft,
+            parameter,
+            labels[index]);
     }
 
     return nullptr;
+}
+
+Menu::prompt* ArduinoMenuUI::createSelectionItem(
+    ParameterDraft& draft,
+    const Parameter& parameter,
+    const char* label)
+{
+    const Parameter::Data::Selection& selection =
+        parameter.data.selection;
+
+    if (selection.options == nullptr ||
+        selection.count == 0)
+    {
+        return nullptr;
+    }
+
+    bool selectedValueFound = false;
+
+    for (uint8_t i = 0;
+         i < selection.count;
+         i++)
+    {
+        if (selection.options[i].value ==
+            draft.selectionValue)
+        {
+            selectedValueFound = true;
+            break;
+        }
+    }
+
+    if (!selectedValueFound)
+        return nullptr;
+
+    if (selectionOptionsUsed +
+            selection.count >
+        MAX_SELECTION_OPTIONS)
+    {
+        return nullptr;
+    }
+
+    const size_t firstOption =
+        selectionOptionsUsed;
+
+    for (uint8_t i = 0;
+         i < selection.count;
+         i++)
+    {
+        DisplayTextCodec::utf8ToCp437(
+            selection.options[i].name,
+            selectionOptionLabels[
+                selectionOptionsUsed],
+            LABEL_LENGTH);
+
+        if (selectionOptionLabels[
+                selectionOptionsUsed][0] == '\0')
+        {
+            return nullptr;
+        }
+
+        selectionOptionItems[
+            selectionOptionsUsed] =
+            new Menu::menuValue<int32_t>(
+                selectionOptionLabels[
+                    selectionOptionsUsed],
+                selection.options[i].value);
+
+        selectionOptionsUsed++;
+    }
+
+    return new Menu::select<int32_t>(
+        label,
+        draft.selectionValue,
+        selection.count,
+        &selectionOptionItems[firstOption]);
 }
 
 Menu::prompt* ArduinoMenuUI::createNumberItem(

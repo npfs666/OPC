@@ -6,13 +6,16 @@
 #include <Configurable.h>
 
 
-class Output : public Displayable, Configurable
+class Output : public Displayable, public Configurable
 {
 public:
 
     Output();
 
-    void begin(const char *name);
+    void begin(const char* name);
+    void begin(
+        const char* key,
+        const char* name);
 
     virtual ~Output() = default;
 
@@ -26,8 +29,15 @@ public:
 
 protected:
 
+    const char* getKey() const;
+
+    double_t printValue() const override;
+    const char* getUnit() const override;
+
+    const char* key = "";
+
     // Commande réellement appliquée au matériel
-    double_t command;
+    double_t command = 0.0;
 };
 
 #endif
