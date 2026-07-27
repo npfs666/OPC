@@ -101,3 +101,26 @@ void ProcessControl::print(Stream& stream) const
     stream.println(F("=========================="));
     stream.println();
 }
+
+void ProcessControl::registerParameters(ParameterList& list)
+{
+    for (size_t i = 0; i < regulatorCount; i++)
+    {
+        regulators[i]->registerParameters(list);
+    }
+
+    for (size_t i = 0; i < actuatorCount; i++)
+    {
+        actuators[i]->registerParameters(list);
+    }
+
+    /*for (size_t i = 0; i < outputCount; i++)
+    {
+        outputs[i]->registerParameters(list);
+    }*/
+
+    /*for (size_t i = 0; i < measurementCount; i++)
+    {
+        measurements[i]->registerParameters(list);
+    }*/
+}

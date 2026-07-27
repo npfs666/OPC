@@ -24,6 +24,8 @@ public:
 
     void print(Stream& stream) const override;
 
+    void registerParameters(ParameterList& list) override;
+
 private:
 
     Temperature* temperature;

@@ -3,8 +3,10 @@
 
 #include <Arduino.h>
 #include <Hardware/pinout.h>
+#include <Configurable.h>
+#include <hmi/Displayable.h>
 
-class RTDSensor
+class RTDSensor : public Configurable
 {
 
 public:
@@ -28,7 +30,7 @@ public:
         RTDType type;
         RTDWiring wiring;
         double_t offset;
-        uint16_t samples;
+        int32_t samples;
     };
 
     Settings settings;
@@ -42,7 +44,9 @@ public:
      * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
      * @param offset Sensor offset in °C
      */
-    RTDSensor(RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
+    RTDSensor(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
+
+    void begin(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset);
     void reset();
     void add(int32_t value);
     void addLP(int32_t value);
@@ -51,7 +55,11 @@ public:
     bool isAccumulationDone();
     double_t readValue() const;
 
+    void registerParameters(ParameterList& list) override;
+
 private:
+
+    const char* name = "";
     double_t nMinusOneValue;
     double_t sum;
     double_t resistance;

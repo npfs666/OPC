@@ -25,23 +25,23 @@ namespace
 }
 
 void adcInterrupt();
-
-
-
-
+void ISRRotenc();
+void ISRButton();
 
 /**
  * CPU0 : contrôle de la mesure ADC et de la régulation
  */
 void setup()
 {
-	delay(100);
+	delay(1200);
 
 	opc.initSensorBoard();
 
 	attachInterrupt(digitalPinToInterrupt(SPI_DRDY), adcInterrupt, FALLING);
     
     opc.initMeasurements();
+
+    rp2040.fifo.push(PARAMETERS_READY);
 }
 
 
@@ -51,6 +51,15 @@ void adcInterrupt() {
 	opc.input.adcInterrupt();
 }
 
+void ISRRotenc() {
+    //Serial.println("rotenc");
+    opc.handleISRRotenc();
+}
+
+void ISRButton() {
+    //Serial.println("clic");
+    opc.handleISRButton();
+}
 
 
 /**
@@ -60,14 +69,13 @@ void loop()
 {	
     // opc.handleISRPause();
     // Gestion des messages entre CPU0 et CPU1 pour la mise en pause des ISR en cas d'entrée dans le menu
-	if(  rp2040.fifo.available() > 0) {
+	if (rp2040.fifo.available() > 0) {
 		uint32_t val = rp2040.fifo.pop();
 		
 		// Pauses ADC IRQ while calibrating
-		if( val == PAUSE_ADC_INTERRUPTS ) {
+		if (val == PAUSE_ADC_INTERRUPTS) {
 			irq_set_enabled(13, false); // Pause IO interrupts
-            Serial.println("pause");
-		} else if( val == RESUME_ADC_INTERRUPTS ) {
+		} else if (val == RESUME_ADC_INTERRUPTS) {
 			irq_set_enabled(13, true); // Resume IO interrupts
 		}
 	}
@@ -85,38 +93,53 @@ void setup1()
 {
     delay(100);
 	opc.initSerial();
-	//opc.initRotenc();
+	opc.initRotenc();
+    attachInterrupt(digitalPinToInterrupt(ROTENC_A),ISRRotenc,FALLING);
+    attachInterrupt(digitalPinToInterrupt(ROTENC_CLIC), ISRButton, FALLING);
 	opc.initDisplay();
 	opc.initBME280();
 }
 
 
+/**
+ * ATTENTION ! Avec ce système de refresh timé, il faut que le temps de mesure soit plus court !
+ * Système uniquement valable pour des mesures d'essai
+ */
+/*uint32_t currentTime, previousTime = 3000, refreshTime = 7000;     // All in ms
+ currentTime = millis();
 
-uint32_t currentTime, previousTime = 3000, refreshTime = 3000;     // All in ms
+    // Refresh loop, every refreshTime ms
+    if ( (currentTime - previousTime) >= refreshTime) {
+        opc.controller.printCSVPsychro(currentTime);
+
+        opc.input.restart(); // Once UI update is done we can restart conversions.
+        
+        previousTime = currentTime;  // Remember the time
+    }
+*/
 /**
  * Cpu1 : contrôle des IT utilisateur et écran
  */
 void loop1()
 {
-    /**
-     * ATTENTION ! Avec ce système de refresh timé, il faut que le temps de mesure soit plus court !
-     * Système uniquement valable pour des mesures
-     */
 
-    currentTime = millis();
+    uint32_t message;
 
-    // Refresh loop, every refreshTime ms
-    if ( (currentTime - previousTime) >= refreshTime) {
+    while (rp2040.fifo.pop_nb(&message))
+    {
+        switch (message)
+        {
+        case PARAMETERS_READY:
+            opc.initMenu();
+            break;
 
-        //opc.controller.printCSVPsychro(currentTime);
-        opc.controller.print(Serial);
-        
-        opc.input.restart(); // Once UI update is done we can restart conversions.
-        
-        previousTime = currentTime;  // Remember the time
+        case PRINT_DATA_AVAILABLE:
+            opc.controller.print(Serial);
+            break;
+        }
     }
 
-
+    opc.menuPoll();
 
     // Affichage écran
     //char TX[50];
@@ -134,7 +157,6 @@ void loop1()
     sprintf(TX, "%.2lf", res2);
     opc.printScreen(0, 80, 4, ST77XX_ORANGE, TX);*/
 }
-
 
 
 

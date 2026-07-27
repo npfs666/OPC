@@ -3,9 +3,10 @@
 
 #include <Arduino.h>
 #include <hmi/Displayable.h>
+#include <Configurable.h>
 
 
-class Output : public Displayable
+class Output : public Displayable, Configurable
 {
 public:
 
@@ -20,6 +21,8 @@ public:
     virtual void writeCommand(double_t value);
 
     double_t readCommand() const;
+
+    void registerParameters(ParameterList& list) override {};
 
 protected:
 

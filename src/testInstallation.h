@@ -3,6 +3,8 @@
 
 #include "Installation.h"
 
+#include <Hardware/RTDSensor.h>
+
 #include "Measurements/Temperature/TemperatureBME.h"
 #include "Measurements/Humidity/HumidityBME.h"
 #include "Measurements/Pressure/PressureBME.h"
@@ -35,6 +37,8 @@ class TestInstallation : public Installation
 {
 public:
 
+    //static constexpr size_t MAX_PARAMETERS = 32;
+
     TestInstallation();
 
     const char* name() const override;
@@ -52,7 +56,20 @@ public:
 
     void factoryReset() override;
 
+    ParameterList& getParameters()
+    {
+        return parameterList;
+    }
+
+    void printParameters(const ParameterList& list,Stream& stream);
+
 private:
+
+
+
+    // Entrées
+
+    RTDSensor input1, input2;
 
     // ---------- Mesures ----------
 

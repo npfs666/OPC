@@ -1,0 +1,89 @@
+#ifndef ARDUINOMENUUI_h
+#define ARDUINOMENUUI_h
+
+#include <Adafruit_ST7789.h>
+#include <MenuBuilder.h>
+#include <ParameterEditor.h>
+
+#include <menu.h>
+#include <menuIO/adafruitGfxOut.h>
+
+class ArduinoMenuUI
+{
+public:
+    ArduinoMenuUI();
+
+    bool begin(Adafruit_ST7789& display,
+        ParameterEditor& editor,
+        const MenuBuilder& menuDefinition);
+
+    void move(int32_t direction);
+    void enter();
+    void poll();
+
+    bool isInitialized() const;
+
+private:
+    static constexpr size_t MAX_DEPTH = 4;
+    static constexpr size_t LABEL_LENGTH = 32;
+    static constexpr uint8_t TEXT_SCALE = 2;
+    static constexpr Menu::idx_t CHARACTER_WIDTH = 6 * TEXT_SCALE;
+    static constexpr Menu::idx_t CHARACTER_HEIGHT = 9 * TEXT_SCALE;
+    static constexpr size_t MAX_GROUPS =
+        MenuBuilder::MAX_GROUPS;
+    static constexpr size_t MAX_MENU_ITEMS =
+        MAX_PARAMETERS + (2 * (MAX_GROUPS - 1));
+
+    bool initialized = false;
+
+    Menu::prompt* parameterItems[MAX_PARAMETERS] = {};
+    MenuBuilder::GroupId parameterGroups[MAX_PARAMETERS] = {};
+    Menu::prompt* booleanOptions[MAX_PARAMETERS][2] = {};
+    char labels[MAX_PARAMETERS][LABEL_LENGTH] = {};
+
+    Menu::prompt* menuItems[MAX_MENU_ITEMS] = {};
+    Menu::menuNode* menuNodes[MAX_GROUPS] = {};
+    Menu::Exit* backItems[MAX_GROUPS] = {};
+
+    Menu::idx_t menuItemCounts[MAX_GROUPS] = {};
+    size_t menuItemOffsets[MAX_GROUPS] = {};
+    size_t menuItemCursors[MAX_GROUPS] = {};
+
+    Menu::menuNode* root = nullptr;
+    Menu::navRoot* nav = nullptr;
+
+    Menu::noInput input;
+
+    Menu::panel panelDefinitions[1] = {
+        {0, 0, 0, 0}
+    };
+    Menu::navNode* panelNodes[1] = {};
+    Menu::panelsList panels;
+
+    Menu::idx_t tops[MAX_DEPTH] = {};
+    Menu::navNode path[MAX_DEPTH];
+
+    Menu::adaGfxOut* screenOutput = nullptr;
+    Menu::menuOut* outputPointers[1] = {};
+    Menu::outputsList* outputs = nullptr;
+
+    bool buildMenuTree(
+        ParameterEditor& editor,
+        const MenuBuilder& menuDefinition);
+
+    bool appendMenuItem(
+        MenuBuilder::GroupId group,
+        Menu::prompt* item);
+
+    Menu::prompt* createItem(
+        ParameterDraft& draft,
+        size_t index);
+
+    Menu::prompt* createNumberItem(
+        ParameterDraft& draft,
+        const Parameter& parameter,
+        const char* unit,
+        const char* label);
+};
+
+#endif

@@ -1,28 +1,53 @@
-#include<hmi/RotaryEncoder.h>
-#include<Hardware/pinout.h>
+#include <hmi/RotaryEncoder.h>
+
+#include <Hardware/pinout.h>
 
 void RotaryEncoder::begin()
 {
-    attachInterrupt(
-        digitalPinToInterrupt(ROTENC_A),
-        isrRotation,
-        FALLING);
-
-    attachInterrupt(
-        digitalPinToInterrupt(ROTENC_CLIC),
-        isrButton,
-        FALLING);
+    pinMode(ROTENC_A, INPUT_PULLUP);
+    pinMode(ROTENC_B, INPUT_PULLUP);
+    pinMode(ROTENC_CLIC, INPUT_PULLUP);
 }
 
-void RotaryEncoder::isrButton()
+void RotaryEncoder::onButtonISR()
 {
-    //nav.doNav(navCmds::enterCmd);
+    const uint32_t now = micros();
+
+    if ((now - lastButtonTime) < BUTTON_DEBOUNCE_US)
+        return;
+
+    lastButtonTime = now;
+    clicked = true;
 }
 
-void RotaryEncoder::isrRotation()
+void RotaryEncoder::onRotationISR()
 {
-    /*if(digitalRead(ROTENC_B))
-        nav.doNav(navCmds::upCmd);
+    if (digitalRead(ROTENC_B))
+        rotation--;
     else
-        nav.doNav(navCmds::downCmd);*/
+        rotation++;
+}
+
+int32_t RotaryEncoder::takeRotation()
+{
+    noInterrupts();
+
+    const int32_t result = rotation;
+    rotation = 0;
+
+    interrupts();
+
+    return result;
+}
+
+bool RotaryEncoder::takeClick()
+{
+    noInterrupts();
+
+    const bool result = clicked;
+    clicked = false;
+
+    interrupts();
+
+    return result;
 }

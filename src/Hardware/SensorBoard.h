@@ -6,8 +6,9 @@
 #include<Hardware/RTDSensor.h>
 #include<Drivers/ADS1120.h>
 #include<Hardware/AnalogMux.h>
+#include <Configurable.h>
 
-class SensorBoard {
+class SensorBoard: public Configurable {
 
 public:
 
@@ -24,13 +25,14 @@ public:
 
     ADS1120   adc;  // ADC
     AnalogMux mux;  // Front end multiplexers
-    RTDSensor rtd[MAX_RTD]; // Sensor array
+    RTDSensor* rtd[MAX_RTD]; // Sensor array
     
     volatile bool newMeasurement=false;    // ADC has finished accumulating values, data is readable
     
     SensorBoard();
     void init();
-    bool addRTD(RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset);
+    //bool addRTD(const char* name, RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset);
+    bool addRTD(RTDSensor& sensor);
     void startContinuous();
     void pause();
     void restart();
@@ -42,10 +44,14 @@ public:
 
     double_t computeResistance(RTDSensor& rtdSensor);
 
+    void registerParameters(ParameterList& list) override;
+    void resetAcquisition();
+
 private:
 
     uint8_t curRTDSensor;   // cur sensor index
     uint8_t numRTDSensors;  // number of RTD sensors in rtd array[]
+    volatile bool pauseInterrupts = true;
   };
 
 #endif

@@ -1,6 +1,8 @@
 #ifndef PINOUT_h
 #define PINOUT_h
 
+#include <Arduino.h>
+
 /**
  * Pinout for the v0.1 OPC PCB
  * Global settings
@@ -15,10 +17,15 @@
 #define MAX_REGULATORS 16   // Used in ProcessControl
 #define MAX_ACTUATORS 16    // Used in ProcessControl
 #define MAX_OUTPUTS 4       // Used in Actuator
+#define MAX_PARAMETERS 64   // Used in ParameterList
 
 // Général ORDERS
 #define PAUSE_ADC_INTERRUPTS 1
 #define RESUME_ADC_INTERRUPTS 2
+constexpr uint32_t PRINT_DATA_AVAILABLE = 3;
+constexpr uint32_t APPLY_MENU_PARAMETERS = 4;
+constexpr uint32_t MENU_PARAMETERS_APPLIED = 5;
+constexpr uint32_t PARAMETERS_READY = 6;
 
 // Ecran SPI TFT (SPI1)
 #define LCD_SCK 14

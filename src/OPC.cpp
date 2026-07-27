@@ -1,8 +1,8 @@
-#include "Hardware/pinout.h"
 #include "OPC.h"
 
 #include <SPI.h>
 #include <Wire.h>
+#include <Hardware/pinout.h>
 
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
@@ -71,21 +71,17 @@ void OPC::initSensorBoard()
 
 void OPC::initRotenc()
 {
-    pinMode(ROTENC_A,INPUT);
+    encoder.begin();
+}
 
-    pinMode(ROTENC_B,INPUT);
+void OPC::handleISRRotenc()
+{
+    encoder.onRotationISR();
+}
 
-    pinMode(ROTENC_CLIC,INPUT);
-
-    /*attachInterrupt(
-        digitalPinToInterrupt(ROTENC_A),
-        IsrRotenc,
-        FALLING);
-
-    attachInterrupt(
-        digitalPinToInterrupt(ROTENC_CLIC),
-        IsrButton,
-        FALLING);*/
+void OPC::handleISRButton()
+{
+    encoder.onButtonISR();
 }
 
 bool OPC::newMeasurement()
@@ -95,79 +91,67 @@ bool OPC::newMeasurement()
 
     input.newMeasurement = false;
     
-    // MAJ du BME280
-    //bme.takeForcedMeasurement(); // inutile maintenant, il fait sa mesure en auto et sleep.
-
     // Faire la MAJ des mesures (conversion data -> mesure)
     unsigned long times = millis();
     controller.update(times);
 
-    // Sortie des affichage sur le port série -> On va éviter de print sur le CPU0
-    //controller.print(Serial);
-    //controller.printCSVPsychro(times);
+    rp2040.fifo.push_nb(PRINT_DATA_AVAILABLE);
 
     return true;
 }
 
-void OPC::initMeasurements() {
-
-    //input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
-    //input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
-    
+void OPC::initMeasurements()
+{
     userInstall.begin(input, bme, controller);
-    
-    /*tempBME.begin("BME", bme);
-    controller.add(tempBME);
-
-    rRTD.begin("rRTD 1", input, input.rtd[0]);
-    tempRTD.begin("sonde 1", rRTD);
-    controller.add(rRTD);
-    controller.add(tempRTD);*/
-
-
-
-    /*// Déclaration des entrées de la carte de mesure
-    input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
-    input.addRTD(RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
-    
-    // Déclaration des mesures, régulateurs, actionneur et sorties
-    auto* tempBME = new TemperatureBME("BME", bme);
-    controller.add(*tempBME);
-
-    auto* rhBME = new HumidityBME("BME", bme);
-    controller.add(*rhBME);
-
-    auto* paBME = new PressureBME("BME",bme);
-    controller.add(*paBME);
-
-    auto* r = new Resistance("rRTD 1", input, input.rtd[0]);
-    auto* t = new TemperatureRTD("TempRTD 1", *r);
-    t->display = true;
-    controller.add(*r);
-    controller.add(*t);
-
-    auto* r1 = new Resistance("rRTD 2", input, input.rtd[1]);
-    auto* t1 = new TemperatureRTD("TempRTD 2", *r1);
-    //r1->getSensor().settings.offset = 0.045;
-    t1->display = true;
-    controller.add(*r1);
-    controller.add(*t1);
-
-    auto* p = new Psychrometer(*t, *t1, *paBME);
-    auto* ph = new HumidityPsychrometer("RH psychrom", *p);
-    ph->display = true;
-    controller.add(*ph);
-
-    /*auto* thermos = new Thermostat("Thermos", *t1);
-    thermos->settings.setpoint = 25;
-    controller.add(*thermos);*/
 
     input.startContinuous();
 }
 
+void OPC::initMenu()
+{
+    if (menu.isInitialized())
+        return;
+
+    parameterEditor.begin(userInstall.getParameters());
+    parameterEditor.capture();
+
+    if (!menuDefinition.begin("Parametres"))
+    {
+        Serial.println("Menu definition initialization failed");
+        return;
+    }
+
+    userInstall.buildMenu(menuDefinition);
+
+    if (!menu.begin(
+            tft,
+            parameterEditor,
+            menuDefinition))
+    {
+        Serial.println("Menu initialization failed");
+    }
+}
+
 void OPC::menuPoll()
 {
-    //nav.poll();
+    int32_t movement = encoder.takeRotation();
+
+    while (movement > 0)
+    {
+        menu.move(1);
+        movement--;
+    }
+
+    while (movement < 0)
+    {
+        menu.move(-1);
+        movement++;
+    }
+
+    if (encoder.takeClick())
+        menu.enter();
+
+    menu.poll();
 }
 
 void OPC::handleISRPause()

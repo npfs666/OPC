@@ -9,6 +9,8 @@
 #include <Regulator/Regulator.h>
 #include <Outputs/Actuator.h>
 
+#include <ParameterList.h>
+
 class ProcessControl
 {
 public:
@@ -26,6 +28,8 @@ public:
     void print(Stream& stream) const;
 
     void printCSVPsychro(uint32_t now);
+
+    void registerParameters(ParameterList& list);
 
 private:
 

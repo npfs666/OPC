@@ -18,6 +18,11 @@
 #include <Measurements/Pressure/PressureBME.h>
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 
+#include <MenuBuilder.h>
+#include <ParameterEditor.h>
+#include "hmi/RotaryEncoder.h"
+#include <hmi/ArduinoMenuUI.h>
+
 class OPC
 {
 public:
@@ -50,6 +55,10 @@ public:
 
     void handleISRPause();
 
+    void handleISRRotenc();
+
+    void handleISRButton();
+
     //-------------------------
     // Affichage
     //-------------------------
@@ -77,10 +86,12 @@ public:
     void printScreen(int16_t x, int16_t y, uint8_t size, uint16_t color, const char* text);
 
 private:
-        /*TemperatureBME tempBME;
-        Resistance rRTD;
-        TemperatureRTD tempRTD;*/
-        TestInstallation userInstall;
+
+    TestInstallation userInstall;
+    ParameterEditor parameterEditor;
+    MenuBuilder menuDefinition;
+    RotaryEncoder encoder;
+    ArduinoMenuUI menu;
 };
 
 #endif

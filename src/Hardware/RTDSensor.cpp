@@ -5,15 +5,26 @@ RTDSensor::RTDSensor() {
 
 }
 
-RTDSensor::RTDSensor(RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
+RTDSensor::RTDSensor(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
  {
-
+    this->name = name;
     settings.type = type;
     settings.wiring = wiring;
     settings.samples = samples;
     settings.offset = offset;
     reset();
 }
+
+void RTDSensor::begin(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
+ {
+    this->name = name;
+    settings.type = type;
+    settings.wiring = wiring;
+    settings.samples = samples;
+    settings.offset = offset;
+    reset();
+}
+
 void RTDSensor::add(int32_t value)
 {
     sum += value;
@@ -69,4 +80,39 @@ bool RTDSensor::isAccumulationDone()
         return true;
     else
         return false;
+}
+
+void RTDSensor::registerParameters(ParameterList& list)
+{
+    /*list.addSelection(
+        "Wiring",
+        settings.wiring,
+        wiringNames,
+        3);
+
+    list.addSelection(
+        "Type",
+        settings.type,
+        typeNames,
+        2);*/
+
+    list.addDouble(
+        name,
+        "rtd.offset",
+        "Offset",
+        settings.offset,
+        -5,
+        5,
+        0.01,
+        3,
+        "°C");
+
+    list.addInteger(
+        name,
+        "rtd.samples",
+        "Samples",
+        settings.samples,
+        1,
+        128,
+        1);
 }

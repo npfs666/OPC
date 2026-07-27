@@ -3,8 +3,9 @@
 
 #include <Arduino.h>
 #include <hmi/Displayable.h>
+#include <Configurable.h>
 
-class Regulator : public Displayable
+class Regulator : public Displayable, Configurable
 {
 public:
     Regulator();
@@ -20,6 +21,8 @@ public:
     double_t printValue() const override;
 
     const char* getUnit() const override;
+
+    void registerParameters(ParameterList& list) override {};
 
 protected:
 

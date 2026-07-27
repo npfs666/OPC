@@ -1,6 +1,9 @@
 #ifndef INSTALLATION_H
 #define INSTALLATION_H
 
+#include <Hardware/pinout.h>
+#include <ParameterList.h>
+
 class SensorBoard;
 class Adafruit_BME280;
 class ProcessControl;
@@ -27,6 +30,16 @@ public:
     virtual void save(Storage& storage) = 0;
 
     virtual void factoryReset() = 0;
+
+    ParameterList& getParameters()
+    {
+        return parameterList;
+    }
+
+protected: 
+
+    Parameter parameterStorage[MAX_PARAMETERS];
+    ParameterList parameterList;
 };
 
 #endif

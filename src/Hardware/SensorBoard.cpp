@@ -5,6 +5,7 @@ SensorBoard::SensorBoard()
 {
     numRTDSensors = 0;
     newMeasurement = false;
+    pauseInterrupts = true;
 }
 
 
@@ -30,12 +31,23 @@ void SensorBoard::init()
  * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
  * @param offset Sensor offset
  */
-bool SensorBoard::addRTD(RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset) {
+/*bool SensorBoard::addRTD(const char* name, RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset) {
 
     if (numRTDSensors >= MAX_RTD)
         return false;
 
-    rtd[numRTDSensors] = RTDSensor(type, wiring, samples, offset);
+    //rtd[numRTDSensors] = RTDSensor(name, type, wiring, samples, offset);
+    numRTDSensors++;
+
+    return true;
+}*/
+
+bool SensorBoard::addRTD(RTDSensor& sensor) {
+
+    if (numRTDSensors >= MAX_RTD)
+        return false;
+
+    rtd[numRTDSensors] = &sensor;
     numRTDSensors++;
 
     return true;
@@ -120,11 +132,8 @@ void SensorBoard::setWiringRoute(RTDSensor::Settings settings)
  */
 void SensorBoard::invert3WireIDAC()
 {
-    adc.setConversionMode(CONVERSION_SINGLE_SHOT); // Stop conversion
     adc.setIDAC1routing(IDAC_AIN2);
     adc.setIDAC2routing(IDAC_AIN3_REFN1);
-    //delay(10); // TODO : test in real life to check reading integrity
-    restart();
 }
 
 
@@ -132,14 +141,16 @@ void SensorBoard::invert3WireIDAC()
 // Starts continuous conversion of the ADC
 void SensorBoard::startContinuous()
 {
+    if (numRTDSensors == 0 || rtd[0] == nullptr) 
+        return;
+
     // Init first read
     curRTDSensor = 0;
 
-    setWiringRoute(rtd[curRTDSensor].settings);
-
-    //delay(10);  // TODO : test in real life to check reading integrity
+    setWiringRoute(rtd[curRTDSensor]->settings);
 
     adc.setConversionMode(CONVERSION_CONTINUOUS);
+    pauseInterrupts = false;
     adc.startSync();
 }
 
@@ -147,6 +158,7 @@ void SensorBoard::startContinuous()
 
 // Pauses conversion
 void SensorBoard::pause() {
+    pauseInterrupts = true;
     adc.setConversionMode(CONVERSION_SINGLE_SHOT);
 }
 
@@ -154,13 +166,14 @@ void SensorBoard::pause() {
 
 // Restarts conversion
 void SensorBoard::restart() {
-    setWiringRoute(rtd[curRTDSensor].settings);
+    
     adc.setConversionMode(CONVERSION_CONTINUOUS);
     /**
      * When in pause(), any write to a registry starts a single shot conversion (and triggers interrupt), and we write many
      * so before restarting we need to clear any previous "random" measurement
      */
-    rtd[curRTDSensor].reset();
+    //rtd[curRTDSensor].reset();
+    pauseInterrupts = false;
     adc.startSync();
     
 }
@@ -195,8 +208,9 @@ void SensorBoard::calRefResistor()
 
 void SensorBoard::adcInterrupt() {
 
-    //#define PRINT_CONVERSION_TIME 
+    if( pauseInterrupts ) return;
 
+    //#define PRINT_CONVERSION_TIME 
     #ifdef PRINT_CONVERSION_TIME
         uint32_t time = millis();//micros();
     #endif
@@ -204,23 +218,25 @@ void SensorBoard::adcInterrupt() {
     int32_t value = adc.readADC();
 	
     //rtd[curRTDSensor].add(value);
-    rtd[curRTDSensor].addLP(value);
+    rtd[curRTDSensor]->addLP(value);
 
     // Cas particulier de la mesure en 3 fils (current chopping) : 
 	// inversion des sources d'exitation de courant à la moitié de la série, pour supprimer leur inégalité de courant
-	if ( rtd[curRTDSensor].isAccumulationHalfWay() )
+	if ( rtd[curRTDSensor]->isAccumulationHalfWay() )
 	{
+        pause();
 		invert3WireIDAC();
+        restart();
 	}
 
     // If all samples of one RTD are measured, compute the result
-    if ( rtd[curRTDSensor].isAccumulationDone() )
+    if ( rtd[curRTDSensor]->isAccumulationDone() )
 	{
         pause();
 
 		//temperatureADC = board.ads1120.readInternalTemp();	// T°C interne de l'ADC
 
-		rtd[curRTDSensor].compute();
+		rtd[curRTDSensor]->compute();
 
         mux.disableChannel(curRTDSensor);
 		curRTDSensor++;
@@ -229,13 +245,12 @@ void SensorBoard::adcInterrupt() {
         if( curRTDSensor == numRTDSensors ) {
             curRTDSensor = 0;
 			newMeasurement = true;
-            return; // when all measurement are done, we pause and wait for UI update to restart them.
+            //return; // when all measurement are done, we pause and wait for UI update to restart them.
         }
 
-        //setWiringRoute(rtd[curRTDSensor].settings); // Inclus dans le restart mtn.
+        setWiringRoute(rtd[curRTDSensor]->settings);
 
-        // Pause et relance de la conversion continue
-		//delay(2); // TODO: uniformiser les delay
+        // relance de la conversion continue
 		restart();
     }
 
@@ -275,4 +290,21 @@ double_t SensorBoard::computeResistance(RTDSensor& rtdSensor) {
     //Rrtd = Rrtd * (1 + ppm/1000000.0);
 
     return Rrtd;
+}
+
+void SensorBoard::registerParameters(ParameterList& list)
+{
+    for (size_t i = 0; i < numRTDSensors; i++)
+    {
+        rtd[i]->registerParameters(list);
+    }
+}
+
+void SensorBoard::resetAcquisition()
+{
+    pauseInterrupts = true;
+    newMeasurement = false;
+
+    for (uint8_t i = 0; i < numRTDSensors; i++)
+        rtd[i]->reset();
 }

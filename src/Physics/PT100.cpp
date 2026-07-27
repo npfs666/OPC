@@ -19,10 +19,10 @@ const float PT100::interpolationTable[interpolationSize] =
  */
 double_t PT100::getResistanceToTemperature(double_t Rrtd) {
 
-    if(Rrtd <= 0 )
-        return -300.0f;
+    if(Rrtd <= 10 )
+        return -219.415f;
 
-    if(Rrtd >= interpolationTable[interpolationSize - 1])
+    if(Rrtd > (interpolationSize - 1) * 10 )
         return 300.0f;
 
     int16_t index=(int16_t) (Rrtd/10);

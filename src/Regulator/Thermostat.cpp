@@ -50,3 +50,28 @@ void Thermostat::print(Stream& stream) const {
 
     stream.print(' ');
 }
+
+void Thermostat::registerParameters(ParameterList& list) {
+
+    list.addDouble(
+        getName(),
+        "setpoint",
+        "Consigne",
+        settings.setpoint,
+        0.0,
+        80.0,
+        0.5,
+        1,
+        "°C");
+
+    list.addDouble(
+        getName(),
+        "hysteresis",
+        "Hystérésis",
+        settings.hysteresis,
+        0.1,
+        10.0,
+        0.1,
+        1,
+        "°C");
+}

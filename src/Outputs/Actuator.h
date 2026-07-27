@@ -6,9 +6,10 @@
 #include <Hardware/pinout.h>
 #include <Regulator/Regulator.h>
 #include <hmi/Displayable.h>
+#include <Configurable.h>
 
 
-class Actuator : public Displayable
+class Actuator : public Displayable, Configurable
 {
 public:
 
@@ -22,6 +23,7 @@ public:
 
     virtual void update(uint32_t now) = 0;
 
+    void registerParameters(ParameterList& list) override {};
 
 protected:
 

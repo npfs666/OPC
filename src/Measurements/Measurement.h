@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <hmi/Displayable.h>
+#include <Configurable.h>
 
 /**
  * @brief Classe de base de toutes les grandeurs physiques.
@@ -16,7 +17,7 @@
  *
  * Elle ne connait pas le matériel.
  */
-class Measurement : public Displayable
+class Measurement : public Displayable, Configurable
 {
 public:
 
@@ -55,7 +56,9 @@ public:
 
     bool isValid() const;
 
-    virtual double_t printValue() const override;
+    double_t printValue() const override;
+
+    void registerParameters(ParameterList& list) override {};
 
 
 protected:
