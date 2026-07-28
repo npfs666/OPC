@@ -6,6 +6,8 @@
 #include <Adafruit_GFX.h>
 
 #include <hmi/DisplayTextCodec.h>
+#include <hmi/HomeScreen.h>
+#include <Measurements/MeasurementSnapshot.h>
 
 namespace
 {
@@ -38,7 +40,9 @@ namespace
             return;
         }
 
-        display.print(sample->value, 1);
+        display.print(
+            sample->value,
+            sample->decimals);
         display.print(' ');
 
         char unit[12] = {};
@@ -213,16 +217,4 @@ bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessCo
     }
 
     return true;
-}
-
-void TestInstallation::load(Storage& storage)
-{
-}
-
-void TestInstallation::save(Storage& storage)
-{
-}
-
-void TestInstallation::factoryReset()
-{
 }

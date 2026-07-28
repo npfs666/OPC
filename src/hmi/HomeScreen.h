@@ -1,11 +1,10 @@
 #ifndef HOMESCREEN_H
 #define HOMESCREEN_H
 
-#include <Arduino.h>
-
-#include <Measurements/MeasurementSnapshot.h>
+#include <cstdint>
 
 class Adafruit_GFX;
+class MeasurementSnapshot;
 
 struct HomeScreenContext
 {

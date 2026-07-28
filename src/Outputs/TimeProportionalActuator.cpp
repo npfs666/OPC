@@ -1,5 +1,9 @@
 #include <Outputs/TimeProportionalActuator.h>
 
+#include <Outputs/Output.h>
+#include <Regulator/Regulator.h>
+#include <hmi/ParameterList.h>
+
 TimeProportionalActuator::TimeProportionalActuator()
 {
 }

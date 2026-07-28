@@ -1,5 +1,4 @@
 #include "Measurements/Measurement.h"
-#include <PrintSize.h>
 
 /*Measurement::Measurement(const char* name,
                          const char* unit)

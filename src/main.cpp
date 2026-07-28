@@ -11,11 +11,34 @@
  */
 
 #include <OPC.h>
+#include <hardware/sync.h>
 
 
 namespace
 {
     OPC opc;
+
+    void synchronizeStartup(
+        uint32_t localCoreReady,
+        uint32_t remoteCoreReady)
+    {
+        rp2040.fifo.push(localCoreReady);
+
+        uint32_t message;
+
+        do
+        {
+            message = rp2040.fifo.pop();
+        }
+        while (message != remoteCoreReady);
+
+        /*
+         * Toutes les initialisations effectuées avant
+         * la barrière sont maintenant visibles par
+         * les deux coeurs.
+         */
+        __dmb();
+    }
 }
 
 void adcInterrupt();
@@ -27,9 +50,11 @@ void ISRButton();
  */
 void setup()
 {
-	delay(1200);
-
 	opc.initSensorBoard();
+
+    synchronizeStartup(
+        CONTROL_CORE_READY,
+        UI_CORE_READY);
 
 	attachInterrupt(digitalPinToInterrupt(SPI_DRDY), adcInterrupt, FALLING);
     
@@ -40,7 +65,6 @@ void setup()
 
 
 void adcInterrupt() {
-
 	opc.input.adcInterrupt();
 }
 
@@ -76,7 +100,6 @@ void loop()
  */
 void setup1()
 {
-    delay(100);
 	opc.initSerial();
 	opc.initRotenc();
     attachInterrupt(digitalPinToInterrupt(ROTENC_A), ISRRotenc, CHANGE);
@@ -84,6 +107,10 @@ void setup1()
     attachInterrupt(digitalPinToInterrupt(ROTENC_CLIC), ISRButton, FALLING);
 	opc.initDisplay();
 	opc.initBME280();
+
+    synchronizeStartup(
+        UI_CORE_READY,
+        CONTROL_CORE_READY);
 }
 
 
@@ -116,5 +143,3 @@ void loop1()
 
     opc.uiPoll();
 }
-
-

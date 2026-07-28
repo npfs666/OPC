@@ -1,5 +1,8 @@
 #include <Hardware/RTDSensor.h>
 
+#include <Hardware/pinout.h>
+#include <hmi/ParameterList.h>
+
 namespace
 {
     constexpr ParameterOption RTD_TYPE_OPTIONS[] = {

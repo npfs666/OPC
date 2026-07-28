@@ -2,7 +2,6 @@
 #define DISPLAYABLE_h
 
 #include <Arduino.h>
-#include <PrintSize.h>
 
 class Displayable
 {

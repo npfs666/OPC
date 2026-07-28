@@ -1,6 +1,11 @@
 #include <ProcessControl.h>
 
+#include <Measurements/Measurement.h>
 #include <Measurements/MeasurementSnapshot.h>
+#include <Outputs/Actuator.h>
+#include <Outputs/Output.h>
+#include <Regulator/Regulator.h>
+#include <hmi/ParameterList.h>
 
 ProcessControl::ProcessControl()
 {

@@ -1,10 +1,12 @@
 #ifndef MENU_BUILDER_H
 #define MENU_BUILDER_H
 
-#include <Arduino.h>
-
 #include <Hardware/pinout.h>
-#include <ParameterList.h>
+
+#include <cstddef>
+#include <cstdint>
+
+class ParameterList;
 
 class MenuBuilder
 {

@@ -51,6 +51,8 @@ bool MeasurementSnapshot::add(
     sample.source = &measurement;
     sample.value = measurement.getValue();
     sample.unit = measurement.getUnit();
+    sample.decimals =
+        measurement.printDecimals();
     sample.valid = measurement.isValid();
 
     return true;

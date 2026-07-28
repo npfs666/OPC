@@ -3,7 +3,7 @@
 
 #include <Measurements/Pressure/Pressure.h>
 
-#include <Adafruit_BME280.h>
+class Adafruit_BME280;
 
 class PressureBME : public Pressure
 {

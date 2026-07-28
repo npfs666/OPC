@@ -1,5 +1,6 @@
 #include <hmi/ArduinoMenuUI.h>
 
+#include <Adafruit_ST7789.h>
 #include <hmi/DisplayTextCodec.h>
 
 namespace
@@ -476,7 +477,7 @@ Menu::prompt* ArduinoMenuUI::createItem(
             parameter.data.integer.minimum,
             parameter.data.integer.maximum,
             parameter.data.integer.step,
-            parameter.data.integer.step);
+            0);
     }
 
     case Parameter::Type::Double:
@@ -590,7 +591,22 @@ Menu::prompt* ArduinoMenuUI::createNumberItem(
 {
     const double_t minimum = parameter.data.number.minimum;
     const double_t maximum = parameter.data.number.maximum;
-    const double_t step = parameter.data.number.step;
+    const double_t fineStep =
+        parameter.data.number.step;
+
+    const bool hasFineAdjustment =
+        parameter.data.number.decimals > 0 &&
+        fineStep < 1.0;
+
+    const double_t coarseStep =
+        hasFineAdjustment
+            ? 1.0
+            : fineStep;
+
+    const double_t tuneStep =
+        hasFineAdjustment
+            ? fineStep
+            : 0.0;
 
     switch (parameter.data.number.decimals)
     {
@@ -601,8 +617,8 @@ Menu::prompt* ArduinoMenuUI::createNumberItem(
             unit,
             minimum,
             maximum,
-            step,
-            step);
+            coarseStep,
+            tuneStep);
 
     case 1:
         return new Menu::decPlaces<1>::menuField<double_t>(
@@ -611,8 +627,8 @@ Menu::prompt* ArduinoMenuUI::createNumberItem(
             unit,
             minimum,
             maximum,
-            step,
-            step);
+            coarseStep,
+            tuneStep);
 
     case 2:
         return new Menu::decPlaces<2>::menuField<double_t>(
@@ -621,8 +637,8 @@ Menu::prompt* ArduinoMenuUI::createNumberItem(
             unit,
             minimum,
             maximum,
-            step,
-            step);
+            coarseStep,
+            tuneStep);
 
     default:
         return new Menu::decPlaces<3>::menuField<double_t>(
@@ -631,7 +647,7 @@ Menu::prompt* ArduinoMenuUI::createNumberItem(
             unit,
             minimum,
             maximum,
-            step,
-            step);
+            coarseStep,
+            tuneStep);
     }
 }

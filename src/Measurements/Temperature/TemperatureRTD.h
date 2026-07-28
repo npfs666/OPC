@@ -2,7 +2,8 @@
 #define RTDTEMPERATURE_h
 
 #include <Measurements/Temperature/Temperature.h>
-#include <Measurements/Resistance.h>
+
+class Resistance;
 
 class TemperatureRTD : public Temperature
 {

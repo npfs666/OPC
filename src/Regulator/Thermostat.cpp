@@ -1,6 +1,27 @@
 #include <Regulator/Thermostat.h>
 
+#include <Arduino.h>
+#include <Measurements/Temperature/Temperature.h>
+#include <hmi/ParameterList.h>
+
 #include <cmath>
+#include <cstring>
+
+namespace
+{
+    constexpr ParameterOption THERMOSTAT_MODE_OPTIONS[] = {
+        {
+            static_cast<int32_t>(
+                Thermostat::Mode::Heating),
+            "Chauffage"
+        },
+        {
+            static_cast<int32_t>(
+                Thermostat::Mode::Cooling),
+            "Refroidissement"
+        }
+    };
+}
 
 Thermostat::Thermostat()
 {
@@ -19,7 +40,8 @@ void Thermostat::begin(
     Regulator::begin(key, name);
 
     this->temperature = &temperature;
-    
+
+    settings.mode = Mode::Heating;
     settings.setpoint = 20.0;
     settings.hysteresis = 1.0;
 }
@@ -40,20 +62,37 @@ void Thermostat::update(uint32_t now)
     const double_t value =
         temperature->getValue();
 
-    if (value <= settings.setpoint - settings.hysteresis / 2.0)
+    const double_t lowerThreshold =
+        settings.setpoint -
+        settings.hysteresis / 2.0;
+
+    const double_t upperThreshold =
+        settings.setpoint +
+        settings.hysteresis / 2.0;
+
+    switch (settings.mode)
     {
-        writeCommand(1.0);
-    }
-    else if (value >= settings.setpoint + settings.hysteresis / 2.0)
-    {
-        writeCommand(0.0);
+    case Mode::Heating:
+        if (value <= lowerThreshold)
+            writeCommand(1.0);
+        else if (value >= upperThreshold)
+            writeCommand(0.0);
+        break;
+
+    case Mode::Cooling:
+        if (value >= upperThreshold)
+            writeCommand(1.0);
+        else if (value <= lowerThreshold)
+            writeCommand(0.0);
+        break;
+
+    default:
+        invalidateCommand();
+        break;
     }
 }
 
 void Thermostat::print(Stream& stream) const {
-
-    PrintSize ps;
-
     stream.print(getName());
 
     uint8_t len = strlen(getName());
@@ -80,13 +119,19 @@ void Thermostat::registerParameters(ParameterList& list) {
         getName()
     });
 
+    parameters.addSelection(
+        "mode",
+        "Mode",
+        settings.mode,
+        THERMOSTAT_MODE_OPTIONS);
+
     parameters.addDouble(
         "setpoint",
         "Consigne",
         settings.setpoint,
         0.0,
-        80.0,
-        0.5,
+        200.0,
+        0.1,
         1,
         "°C");
 

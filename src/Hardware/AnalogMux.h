@@ -1,8 +1,7 @@
 #ifndef ANALOGMUX_H
 #define ANALOGMUX_H
 
-#include <Arduino.h>
-#include <Hardware/pinout.h>
+#include <cstdint>
 
 /**
  * This class includes all the multiplexers.

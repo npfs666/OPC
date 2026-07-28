@@ -1,10 +1,9 @@
 #ifndef SOLARREGULATOR_H
 #define SOLARREGULATOR_H
 
-#include <Arduino.h>
-
-#include <Measurements/Temperature/Temperature.h>
 #include <Regulator/Regulator.h>
+
+class Temperature;
 
 class SolarRegulator : public Regulator
 {

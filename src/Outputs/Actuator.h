@@ -1,13 +1,12 @@
 #ifndef ACTUATOR_H
 #define ACTUATOR_H
 
-#include <Arduino.h>
-#include <Outputs/Output.h>
 #include <Hardware/pinout.h>
-#include <Regulator/Regulator.h>
 #include <hmi/Displayable.h>
 #include <Configurable.h>
 
+class Output;
+class Regulator;
 
 class Actuator : public Displayable, public Configurable
 {

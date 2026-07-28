@@ -1,6 +1,4 @@
-#include "Arduino.h"
 #include "Drivers/ADS1120.h"
-#include "SPI.h"
 
 ADS1120::ADS1120()
 {

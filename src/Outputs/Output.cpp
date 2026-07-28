@@ -1,5 +1,7 @@
 #include "Outputs/Output.h"
 
+#include <Arduino.h>
+
 #include <cmath>
 
 Output::Output()

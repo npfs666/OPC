@@ -1,5 +1,5 @@
 #include <Measurements/Temperature/TemperatureRTD.h>
-#include <Measurements/Measurement.h>
+#include <Measurements/Resistance.h>
 #include <Hardware/RTDSensor.h>
 
 #include <Physics/PT100.h>

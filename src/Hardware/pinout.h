@@ -1,7 +1,7 @@
 #ifndef PINOUT_h
 #define PINOUT_h
 
-#include <Arduino.h>
+#include <cstdint>
 
 /**
  * Pinout for the v0.1 OPC PCB
@@ -29,6 +29,9 @@ constexpr uint32_t MENU_PARAMETERS_APPLIED = 5;
 constexpr uint32_t PARAMETERS_READY = 6;
 constexpr uint32_t ACQUISITION_PAUSED = 7;
 constexpr uint32_t MENU_PARAMETERS_REJECTED = 8;
+constexpr uint32_t MENU_PARAMETERS_APPLIED_NOT_SAVED = 9;
+constexpr uint32_t CONTROL_CORE_READY = 10;
+constexpr uint32_t UI_CORE_READY = 11;
 
 // Ecran SPI TFT (SPI1)
 #define LCD_SCK 14

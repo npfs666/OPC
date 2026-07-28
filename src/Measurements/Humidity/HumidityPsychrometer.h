@@ -2,7 +2,8 @@
 #define HUMIDITYPSYCHROMETER_H
 
 #include <Measurements/Humidity/Humidity.h>
-#include <Measurements/Psychrometer.h>
+
+class Psychrometer;
 
 class HumidityPsychrometer : public Humidity
 {

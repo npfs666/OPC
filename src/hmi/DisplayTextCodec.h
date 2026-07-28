@@ -1,7 +1,8 @@
 #ifndef DISPLAY_TEXT_CODEC_H
 #define DISPLAY_TEXT_CODEC_H
 
-#include <Arduino.h>
+#include <cstddef>
+#include <cstdint>
 
 class DisplayTextCodec final
 {

@@ -2,13 +2,12 @@
 #define INSTALLATION_H
 
 #include <Hardware/pinout.h>
-#include <ParameterList.h>
-#include <hmi/HomeScreen.h>
+#include <hmi/ParameterList.h>
 
 class SensorBoard;
 class Adafruit_BME280;
+struct HomeScreenContext;
 class ProcessControl;
-class Storage;
 class ParameterEditor;
 class OPC;
 
@@ -51,12 +50,6 @@ public:
     virtual void onParametersApplied()
     {
     }
-
-    virtual void load(Storage& storage) = 0;
-
-    virtual void save(Storage& storage) = 0;
-
-    virtual void factoryReset() = 0;
 
     ParameterList& getParameters()
     {

@@ -2,16 +2,23 @@
 #define THERMOSTAT_H
 
 #include <Regulator/Regulator.h>
-#include <Measurements/Temperature/Temperature.h>
+
+class Temperature;
 
 class Thermostat : public Regulator
 {
 public:
+    enum class Mode : uint8_t
+    {
+        Heating,
+        Cooling
+    };
 
     struct Settings
     {
-        double_t setpoint;
-        double_t hysteresis;
+        Mode mode = Mode::Heating;
+        double_t setpoint = 20.0;
+        double_t hysteresis = 1.0;
     };
 
     Settings settings;

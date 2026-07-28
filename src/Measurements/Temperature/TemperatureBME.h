@@ -2,7 +2,8 @@
 #define TEMPERATUREBME_h
 
 #include <Measurements/Temperature/Temperature.h>
-#include <Adafruit_BME280.h>
+
+class Adafruit_BME280;
 
 class TemperatureBME : public Temperature
 {

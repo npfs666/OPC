@@ -1,10 +1,9 @@
 #ifndef PID_H
 #define PID_H
 
-#include <Arduino.h>
-
-#include <Measurements/Measurement.h>
 #include <Regulator/Regulator.h>
+
+class Measurement;
 
 class PID : public Regulator
 {

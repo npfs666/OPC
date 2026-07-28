@@ -1,7 +1,7 @@
 #ifndef PHYSICS_PSYCHROMETRICS_H
 #define PHYSICS_PSYCHROMETRICS_H
 
-#include <Arduino.h>
+#include <cmath>
 
 namespace Physics
 {

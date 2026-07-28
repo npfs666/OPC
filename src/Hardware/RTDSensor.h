@@ -2,9 +2,7 @@
 #define RTDSENSOR_H
 
 #include <Arduino.h>
-#include <Hardware/pinout.h>
 #include <Configurable.h>
-#include <hmi/Displayable.h>
 
 class RTDSensor : public Configurable
 {

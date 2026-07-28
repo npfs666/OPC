@@ -1,7 +1,8 @@
 #ifndef PARAMETER_H
 #define PARAMETER_H
 
-#include <Arduino.h>
+#include <cmath>
+#include <cstdint>
 
 struct ParameterOption
 {

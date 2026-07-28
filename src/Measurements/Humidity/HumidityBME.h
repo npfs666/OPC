@@ -1,9 +1,9 @@
 #ifndef HUMIDITYBME_H
 #define HUMIDITYBME_H
 
-#include <Adafruit_BME280.h>
-
 #include <Measurements/Humidity/Humidity.h>
+
+class Adafruit_BME280;
 
 class HumidityBME : public Humidity
 {

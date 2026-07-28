@@ -1,5 +1,8 @@
 #include <Outputs/Actuator.h>
 
+#include <Outputs/Output.h>
+#include <Regulator/Regulator.h>
+
 Actuator::Actuator()
 {
 }

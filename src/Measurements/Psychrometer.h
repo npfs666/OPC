@@ -1,8 +1,10 @@
 #ifndef PSYCHROMETER_H
 #define PSYCHROMETER_H
 
-#include <Measurements/Temperature/Temperature.h>
-#include <Measurements/Pressure/Pressure.h>
+#include <cmath>
+
+class Pressure;
+class Temperature;
 
 class Psychrometer
 {

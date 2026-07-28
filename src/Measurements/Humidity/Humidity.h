@@ -14,6 +14,8 @@ public:
     }
 
     virtual void update() = 0;
+
+    uint8_t printDecimals() const override {return 2;};
 };
 
 #endif

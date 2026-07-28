@@ -1,5 +1,7 @@
 #include <Measurements/Psychrometer.h>
 
+#include <Measurements/Pressure/Pressure.h>
+#include <Measurements/Temperature/Temperature.h>
 #include <Physics/Psychrometrics.h>
 
 #include <cmath>

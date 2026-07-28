@@ -1,5 +1,8 @@
 #include <Hardware/AnalogMux.h>
 
+#include <Arduino.h>
+#include <Hardware/pinout.h>
+
 void AnalogMux::begin()
 {
     pinMode(SW_3_WIRE, OUTPUT);

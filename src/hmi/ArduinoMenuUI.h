@@ -1,12 +1,13 @@
 #ifndef ARDUINOMENUUI_h
 #define ARDUINOMENUUI_h
 
-#include <Adafruit_ST7789.h>
-#include <MenuBuilder.h>
-#include <ParameterEditor.h>
+#include <hmi/MenuBuilder.h>
+#include <hmi/ParameterEditor.h>
 
 #include <menu.h>
 #include <menuIO/adafruitGfxOut.h>
+
+class Adafruit_ST7789;
 
 class ArduinoMenuUI
 {

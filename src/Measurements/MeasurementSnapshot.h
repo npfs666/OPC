@@ -1,9 +1,11 @@
 #ifndef MEASUREMENTSNAPSHOT_H
 #define MEASUREMENTSNAPSHOT_H
 
-#include <Arduino.h>
-
 #include <Hardware/pinout.h>
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 
 class Measurement;
 class MeasurementSnapshot;
@@ -13,6 +15,7 @@ struct MeasurementSample
 {
     double_t value = 0.0;
     const char* unit = "";
+    uint8_t decimals = 3;
     bool valid = false;
 
 private:

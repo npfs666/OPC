@@ -1,7 +1,6 @@
 #ifndef MEASUREMENT_H
 #define MEASUREMENT_H
 
-#include <Arduino.h>
 #include <hmi/Displayable.h>
 #include <Configurable.h>
 

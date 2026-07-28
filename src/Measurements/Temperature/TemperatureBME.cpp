@@ -1,5 +1,6 @@
 #include <Measurements/Temperature/TemperatureBME.h>
-#include <Measurements/Measurement.h>
+
+#include <Adafruit_BME280.h>
 
 TemperatureBME::TemperatureBME()
 {

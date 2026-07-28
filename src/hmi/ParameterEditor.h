@@ -1,7 +1,7 @@
 #ifndef PARAMETER_EDITOR_H
 #define PARAMETER_EDITOR_H
 
-#include <ParameterList.h>
+#include <hmi/ParameterList.h>
 #include <Hardware/pinout.h>
 
 struct ParameterDraft

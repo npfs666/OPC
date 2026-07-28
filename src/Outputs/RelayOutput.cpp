@@ -1,6 +1,8 @@
 #include "Outputs/RelayOutput.h"
 
+#include <Arduino.h>
 #include <Hardware/pinout.h>
+#include <hmi/ParameterList.h>
 
 namespace
 {

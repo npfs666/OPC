@@ -1,5 +1,6 @@
 #include <hmi/RotaryEncoder.h>
 
+#include <Arduino.h>
 #include <Hardware/pinout.h>
 
 namespace
@@ -33,9 +34,9 @@ void RotaryEncoder::begin()
 
 void RotaryEncoder::onButtonISR()
 {
-    const uint32_t now = micros();
+    const uint32_t now = millis();
 
-    if ((now - lastButtonTime) < BUTTON_DEBOUNCE_US)
+    if ((now - lastButtonTime) < BUTTON_DEBOUNCE_MS)
         return;
 
     lastButtonTime = now;

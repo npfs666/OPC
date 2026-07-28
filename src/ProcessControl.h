@@ -5,15 +5,13 @@
 
 #include <Hardware/pinout.h>
 
-#include <Measurements/Measurement.h>
-#include <Regulator/Regulator.h>
-#include <Outputs/Actuator.h>
-#include <Outputs/Output.h>
-
-#include <ParameterList.h>
-
+class Actuator;
+class Measurement;
 class MeasurementSnapshot;
+class Output;
 class ParameterEditor;
+class ParameterList;
+class Regulator;
 
 class ProcessControl
 {

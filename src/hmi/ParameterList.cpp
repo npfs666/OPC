@@ -1,4 +1,4 @@
-#include <ParameterList.h>
+#include <hmi/ParameterList.h>
 
 #include <cstring>
 
@@ -103,6 +103,17 @@ bool ParameterList::hasError() const
 }
 
 const Parameter* ParameterList::get(size_t index) const
+{
+    if (!isInitialized())
+        return nullptr;
+
+    if (index >= parameterCount)
+        return nullptr;
+
+    return &parameters[index];
+}
+
+Parameter* ParameterList::get(size_t index)
 {
     if (!isInitialized())
         return nullptr;

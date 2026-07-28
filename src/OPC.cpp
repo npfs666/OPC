@@ -5,13 +5,7 @@
 #include <Hardware/pinout.h>
 #include <hardware/sync.h>
 
-#include <Measurements/Resistance.h>
-#include <Measurements/Temperature/TemperatureRTD.h>
-#include <Measurements/Temperature/TemperatureBME.h>
-#include <Measurements/Humidity/HumidityBME.h>
-#include <Measurements/Pressure/PressureBME.h>
-#include <Measurements/Humidity/HumidityPsychrometer.h>
-#include <Regulator/Thermostat.h>
+#include <hmi/HomeScreen.h>
 
 namespace
 {
@@ -243,6 +237,41 @@ bool OPC::initMeasurements()
         return false;
     }
 
+    const bool storageReady =
+        storage.begin();
+
+    const Storage::RestoreResult restoreResult =
+        storage.restore(
+            userInstall.name(),
+            userInstall.getParameters(),
+            parameterEditor,
+            *this);
+
+    switch (restoreResult)
+    {
+    case Storage::RestoreResult::Restored:
+        Serial.println(
+            "Configuration restored");
+        break;
+
+    case Storage::RestoreResult::NoFile:
+        Serial.println(
+            "No saved configuration; using defaults");
+        break;
+
+    case Storage::RestoreResult::InvalidFile:
+        Serial.println(
+            "Invalid saved configuration; using defaults");
+        break;
+
+    case Storage::RestoreResult::StorageUnavailable:
+        Serial.println(
+            storageReady
+                ? "Configuration unavailable; using defaults"
+                : "Storage initialization failed; using defaults");
+        break;
+    }
+
     if (!controller.beginOutputs())
     {
         Serial.println(
@@ -263,7 +292,6 @@ void OPC::initMenu()
     if (menu.isInitialized())
         return;
 
-    parameterEditor.begin(userInstall.getParameters());
     parameterEditor.capture();
 
     if (!menuDefinition.build(
@@ -470,6 +498,11 @@ void OPC::handleControlMessage(
 
         userInstall.onParametersApplied();
 
+        const bool configurationSaved =
+            storage.save(
+                userInstall.name(),
+                userInstall.getParameters());
+
         input.resetAcquisition();
         input.startContinuous();
 
@@ -480,7 +513,9 @@ void OPC::handleControlMessage(
         __dmb();
 
         rp2040.fifo.push(
-            MENU_PARAMETERS_APPLIED);
+            configurationSaved
+                ? MENU_PARAMETERS_APPLIED
+                : MENU_PARAMETERS_APPLIED_NOT_SAVED);
         break;
     }
 }
@@ -537,6 +572,7 @@ void OPC::handleUIMessage(
         break;
 
     case MENU_PARAMETERS_APPLIED:
+    case MENU_PARAMETERS_APPLIED_NOT_SAVED:
         if (uiState !=
                 UIState::ApplyRequested)
         {
@@ -544,6 +580,13 @@ void OPC::handleUIMessage(
         }
 
         __dmb();
+
+        if (message ==
+            MENU_PARAMETERS_APPLIED_NOT_SAVED)
+        {
+            Serial.println(
+                "Parameters applied but configuration save failed");
+        }
 
         displayMeasurementSnapshot =
             MeasurementSnapshot{};
@@ -567,4 +610,13 @@ void OPC::handleUIMessage(
         uiState = UIState::Menu;
         break;
     }
+}
+
+bool OPC::validateRestoredParameters(
+    const ParameterEditor& editor) const
+{
+    return
+        input.validateParameters(editor) &&
+        controller.validateParameters(editor) &&
+        userInstall.validateParameters(editor);
 }

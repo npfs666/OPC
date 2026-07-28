@@ -1,5 +1,8 @@
 #include <Outputs/ActuatorOnOff.h>
 
+#include <Outputs/Output.h>
+#include <Regulator/Regulator.h>
+
 ActuatorOnOff::ActuatorOnOff()
 {
 

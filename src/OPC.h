@@ -11,22 +11,17 @@
 
 #include <testInstallation.h>
 
-#include <Measurements/Resistance.h>
-#include <Measurements/Temperature/TemperatureRTD.h>
-#include <Measurements/Temperature/TemperatureBME.h>
-#include <Measurements/Humidity/HumidityBME.h>
-#include <Measurements/Pressure/PressureBME.h>
-#include <Measurements/Humidity/HumidityPsychrometer.h>
+#include <Measurements/MeasurementSnapshot.h>
 
-#include <MenuBuilder.h>
-#include <ParameterEditor.h>
+#include <hmi/MenuBuilder.h>
+#include <hmi/ParameterEditor.h>
+#include <Storage.h>
 #include "hmi/RotaryEncoder.h"
 #include <hmi/ArduinoMenuUI.h>
-#include <hmi/HomeScreen.h>
 
 #include <pico/mutex.h>
 
-class OPC
+class OPC : private ParameterRestoreValidator
 {
 public:
 
@@ -92,6 +87,7 @@ private:
     };
 
     TestInstallation userInstall;
+    Storage storage;
     ParameterEditor parameterEditor;
     MenuBuilder menuDefinition;
     RotaryEncoder encoder;
@@ -118,6 +114,9 @@ private:
     void requestMenu();
 
     void requestParameterApply();
+
+    bool validateRestoredParameters(
+        const ParameterEditor& editor) const override;
 };
 
 #endif

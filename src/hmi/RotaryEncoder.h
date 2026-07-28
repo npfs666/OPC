@@ -1,7 +1,7 @@
 #ifndef ROTARYENCODER_H
 #define ROTARYENCODER_H
 
-#include <Arduino.h>
+#include <cstdint>
 
 class RotaryEncoder
 {
@@ -15,7 +15,7 @@ public:
     bool takeClick();
 
 private:
-    static constexpr uint32_t BUTTON_DEBOUNCE_US = 50000;
+    static constexpr uint32_t BUTTON_DEBOUNCE_MS = 200;
     static constexpr int8_t TRANSITIONS_PER_STEP = 4;
 
     volatile int32_t rotation = 0;

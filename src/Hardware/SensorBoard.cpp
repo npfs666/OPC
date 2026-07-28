@@ -1,5 +1,7 @@
 #include <Hardware/SensorBoard.h>
 
+#include <hmi/ParameterList.h>
+
 
 SensorBoard::SensorBoard()
 {

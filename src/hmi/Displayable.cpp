@@ -1,5 +1,10 @@
 #include <hmi/Displayable.h>
 
+#include <Arduino.h>
+#include <PrintSize.h>
+
+#include <cstring>
+
 
 Displayable::Displayable() 
 {

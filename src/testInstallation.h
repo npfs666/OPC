@@ -26,17 +26,6 @@
 class SensorBoard;
 class Adafruit_BME280;
 class ProcessControl;
-class Storage;
-
-class TemperatureBME;
-class HumidityBME;
-class PressureBME;
-
-class Resistance;
-class TemperatureRTD;
-
-class Psychrometer;
-class HumidityPsychrometer;
 
 class TestInstallation : public Installation
 {
@@ -55,13 +44,6 @@ public:
 
     void printHomeScreen(
         HomeScreenContext& context) override;
-
-    void load(Storage& storage) override;
-
-    void save(Storage& storage) override;
-
-    void factoryReset() override;
-
 
 private:
 

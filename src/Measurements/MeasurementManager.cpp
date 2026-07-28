@@ -1,5 +1,7 @@
 #include "MeasurementManager.h"
 
+#include <Measurements/Measurement.h>
+
 MeasurementManager::MeasurementManager()
 {
     count = 0;

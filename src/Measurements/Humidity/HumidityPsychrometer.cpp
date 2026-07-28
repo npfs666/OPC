@@ -1,5 +1,7 @@
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 
+#include <Measurements/Psychrometer.h>
+
 #include <cmath>
 
 HumidityPsychrometer::HumidityPsychrometer()

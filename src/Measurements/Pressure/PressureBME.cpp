@@ -1,5 +1,8 @@
 #include <Measurements/Pressure/PressureBME.h>
-#include <math.h>
+
+#include <Adafruit_BME280.h>
+
+#include <cmath>
 
 PressureBME::PressureBME()
 {

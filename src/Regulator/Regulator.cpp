@@ -1,5 +1,7 @@
 #include <Regulator/Regulator.h>
 
+#include <Arduino.h>
+
 Regulator::Regulator() 
 {
 }

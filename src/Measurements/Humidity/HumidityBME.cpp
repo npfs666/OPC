@@ -1,5 +1,7 @@
 #include <Measurements/Humidity/HumidityBME.h>
 
+#include <Adafruit_BME280.h>
+
 HumidityBME::HumidityBME()
 {
 }

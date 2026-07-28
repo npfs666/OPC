@@ -1,7 +1,6 @@
 #include <Measurements/Resistance.h>
 
 #include <Hardware/SensorBoard.h>
-#include <Hardware/RTDSensor.h>
 
 Resistance::Resistance()
 {

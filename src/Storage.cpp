@@ -1,0 +1,702 @@
+#include <Storage.h>
+
+#include <ArduinoJson.h>
+#include <LittleFS.h>
+#include <hmi/ParameterEditor.h>
+
+#include <cmath>
+#include <cstring>
+
+namespace
+{
+    bool isValidRequiredText(JsonVariantConst value)
+    {
+        return value.is<const char*>() &&
+               value.as<const char*>()[0] != '\0';
+    }
+}
+
+bool Storage::begin()
+{
+    if (mounted)
+        return true;
+
+    mounted = LittleFS.begin();
+    return mounted;
+}
+
+Storage::RestoreResult Storage::restore(
+    const char* installationName,
+    ParameterList& parameters,
+    ParameterEditor& editor,
+    const ParameterRestoreValidator& validator)
+{
+    editor.begin(parameters);
+    editor.capture();
+    clearRestoredText();
+
+    if (!mounted)
+        return RestoreResult::StorageUnavailable;
+
+    if (!LittleFS.exists(CONFIG_PATH))
+        return RestoreResult::NoFile;
+
+    if (!readConfiguration(
+            installationName,
+            parameters,
+            editor) ||
+        !editor.validate() ||
+        !validator.validateRestoredParameters(editor))
+    {
+        editor.capture();
+        clearRestoredText();
+        return RestoreResult::InvalidFile;
+    }
+
+    if (!editor.apply() ||
+        !applyRestoredText(parameters))
+    {
+        /*
+         * editor.apply() ne peut normalement plus échouer après
+         * validation. En cas d'incohérence interne, le démarrage
+         * doit néanmoins être refusé comme restauration valide.
+         */
+        clearRestoredText();
+        return RestoreResult::InvalidFile;
+    }
+
+    return RestoreResult::Restored;
+}
+
+bool Storage::save(
+    const char* installationName,
+    const ParameterList& parameters)
+{
+    if (!mounted ||
+        installationName == nullptr ||
+        installationName[0] == '\0')
+    {
+        return false;
+    }
+
+    JsonDocument document;
+    document["schema"] = SCHEMA_VERSION;
+    document["installation_name"] = installationName;
+
+    JsonArray storedParameters =
+        document["parameters"].to<JsonArray>();
+
+    for (size_t i = 0; i < parameters.count(); i++)
+    {
+        const Parameter* parameter =
+            parameters.get(i);
+
+        if (parameter == nullptr ||
+            parameter->categoryKey == nullptr ||
+            parameter->categoryName == nullptr ||
+            parameter->ownerKey == nullptr ||
+            parameter->ownerName == nullptr ||
+            parameter->key == nullptr ||
+            parameter->name == nullptr)
+        {
+            return false;
+        }
+
+        JsonObject stored =
+            storedParameters.add<JsonObject>();
+
+        stored["category_key"] =
+            parameter->categoryKey;
+        stored["category_name"] =
+            parameter->categoryName;
+        stored["owner_key"] =
+            parameter->ownerKey;
+        stored["owner_name"] =
+            parameter->ownerName;
+        stored["key"] = parameter->key;
+        stored["name"] = parameter->name;
+        stored["type"] = typeName(parameter->type);
+
+        switch (parameter->type)
+        {
+        case Parameter::Type::Bool:
+            if (parameter->value.boolean == nullptr)
+                return false;
+
+            stored["value"] =
+                *parameter->value.boolean;
+            break;
+
+        case Parameter::Type::Integer:
+            if (parameter->discrete.target == nullptr ||
+                parameter->discrete.read == nullptr)
+            {
+                return false;
+            }
+
+            stored["value"] =
+                parameter->discrete.read(
+                    parameter->discrete.target);
+            stored["unit"] =
+                parameter->data.integer.unit != nullptr
+                    ? parameter->data.integer.unit
+                    : "";
+            break;
+
+        case Parameter::Type::Double:
+            if (parameter->value.number == nullptr ||
+                !std::isfinite(*parameter->value.number))
+            {
+                return false;
+            }
+
+            stored["value"] =
+                *parameter->value.number;
+            stored["unit"] =
+                parameter->data.number.unit != nullptr
+                    ? parameter->data.number.unit
+                    : "";
+            break;
+
+        case Parameter::Type::Selection:
+        {
+            if (parameter->discrete.target == nullptr ||
+                parameter->discrete.read == nullptr ||
+                parameter->data.selection.options == nullptr ||
+                parameter->data.selection.count == 0)
+            {
+                return false;
+            }
+
+            stored["value"] =
+                parameter->discrete.read(
+                    parameter->discrete.target);
+
+            JsonArray options =
+                stored["options"].to<JsonArray>();
+
+            for (uint8_t option = 0;
+                 option < parameter->data.selection.count;
+                 option++)
+            {
+                const ParameterOption& source =
+                    parameter->data.selection.options[option];
+
+                if (source.name == nullptr ||
+                    source.name[0] == '\0')
+                {
+                    return false;
+                }
+
+                JsonObject destination =
+                    options.add<JsonObject>();
+
+                destination["value"] = source.value;
+                destination["name"] = source.name;
+            }
+
+            break;
+        }
+
+        default:
+            return false;
+        }
+    }
+
+    File temporary =
+        LittleFS.open(TEMP_PATH, "w");
+
+    if (!temporary)
+        return false;
+
+    const size_t expectedSize =
+        measureJson(document);
+    const size_t writtenSize =
+        serializeJson(document, temporary);
+
+    temporary.flush();
+    temporary.close();
+
+    if (writtenSize != expectedSize ||
+        !validateWrittenFile())
+    {
+        LittleFS.remove(TEMP_PATH);
+        return false;
+    }
+
+    /*
+     * littlefs remplace atomiquement la destination lors du rename :
+     * une coupure laisse donc soit l'ancien fichier, soit le nouveau.
+     */
+    if (!LittleFS.rename(
+            TEMP_PATH,
+            CONFIG_PATH))
+    {
+        LittleFS.remove(TEMP_PATH);
+        return false;
+    }
+
+    return true;
+}
+
+bool Storage::erase()
+{
+    if (!mounted)
+        return false;
+
+    bool success = true;
+
+    if (LittleFS.exists(TEMP_PATH))
+        success = LittleFS.remove(TEMP_PATH);
+
+    if (LittleFS.exists(CONFIG_PATH))
+    {
+        success =
+            LittleFS.remove(CONFIG_PATH) &&
+            success;
+    }
+
+    clearRestoredText();
+    return success;
+}
+
+void Storage::clearRestoredText()
+{
+    for (size_t i = 0; i < MAX_PARAMETERS; i++)
+        restoredText[i] = RestoredParameterText{};
+
+    for (size_t i = 0;
+         i < ParameterList::MAX_SELECTION_OPTIONS;
+         i++)
+    {
+        restoredOptions[i] = ParameterOption{};
+        restoredOptionNames[i][0] = '\0';
+    }
+
+    restoredOptionCount = 0;
+}
+
+bool Storage::readConfiguration(
+    const char* installationName,
+    ParameterList& parameters,
+    ParameterEditor& editor)
+{
+    File file =
+        LittleFS.open(CONFIG_PATH, "r");
+
+    if (!file)
+        return false;
+
+    JsonDocument document;
+    const DeserializationError error =
+        deserializeJson(document, file);
+
+    file.close();
+
+    if (error ||
+        installationName == nullptr ||
+        installationName[0] == '\0' ||
+        document["schema"].as<uint32_t>() !=
+            SCHEMA_VERSION ||
+        !isValidRequiredText(
+            document["installation_name"]) ||
+        strcmp(
+            installationName,
+            document["installation_name"]
+                .as<const char*>()) != 0 ||
+        !document["parameters"].is<JsonArrayConst>())
+    {
+        return false;
+    }
+
+    bool seen[MAX_PARAMETERS] = {};
+
+    for (JsonObjectConst stored :
+         document["parameters"].as<JsonArrayConst>())
+    {
+        if (!isValidRequiredText(stored["category_key"]) ||
+            !isValidRequiredText(stored["category_name"]) ||
+            !isValidRequiredText(stored["owner_key"]) ||
+            !isValidRequiredText(stored["owner_name"]) ||
+            !isValidRequiredText(stored["key"]) ||
+            !isValidRequiredText(stored["name"]) ||
+            !isValidRequiredText(stored["type"]) ||
+            stored["value"].isNull())
+        {
+            return false;
+        }
+
+        const char* ownerKey =
+            stored["owner_key"].as<const char*>();
+        const char* key =
+            stored["key"].as<const char*>();
+
+        size_t parameterIndex = parameters.count();
+
+        for (size_t i = 0; i < parameters.count(); i++)
+        {
+            const Parameter* candidate =
+                parameters.get(i);
+
+            if (candidate != nullptr &&
+                strcmp(candidate->ownerKey, ownerKey) == 0 &&
+                strcmp(candidate->key, key) == 0)
+            {
+                parameterIndex = i;
+                break;
+            }
+        }
+
+        /*
+         * Une version plus récente peut avoir supprimé un paramètre.
+         * Une entrée inconnue est donc ignorée, sans invalider les
+         * paramètres encore reconnus.
+         */
+        if (parameterIndex >= parameters.count())
+            continue;
+
+        if (seen[parameterIndex])
+            return false;
+
+        seen[parameterIndex] = true;
+
+        Parameter* parameter =
+            parameters.get(parameterIndex);
+        ParameterDraft& draft =
+            editor.get(parameterIndex);
+
+        if (parameter == nullptr ||
+            draft.parameter != parameter ||
+            strcmp(
+                parameter->categoryKey,
+                stored["category_key"].as<const char*>()) != 0 ||
+            strcmp(
+                typeName(parameter->type),
+                stored["type"].as<const char*>()) != 0)
+        {
+            return false;
+        }
+
+        RestoredParameterText& text =
+            restoredText[parameterIndex];
+
+        if (!copyRequiredText(
+                stored["category_name"].as<const char*>(),
+                text.categoryName,
+                sizeof(text.categoryName)) ||
+            !copyRequiredText(
+                stored["owner_name"].as<const char*>(),
+                text.ownerName,
+                sizeof(text.ownerName)) ||
+            !copyRequiredText(
+                stored["name"].as<const char*>(),
+                text.parameterName,
+                sizeof(text.parameterName)))
+        {
+            return false;
+        }
+
+        switch (parameter->type)
+        {
+        case Parameter::Type::Bool:
+            if (!stored["value"].is<bool>())
+                return false;
+
+            draft.booleanValue =
+                stored["value"].as<bool>();
+            break;
+
+        case Parameter::Type::Integer:
+        {
+            if (!stored["value"].is<int32_t>() ||
+                !stored["unit"].is<const char*>())
+            {
+                return false;
+            }
+
+            draft.integerValue =
+                stored["value"].as<int32_t>();
+
+            if (!copyOptionalText(
+                    stored["unit"].as<const char*>(),
+                    text.unit,
+                    sizeof(text.unit)))
+            {
+                return false;
+            }
+            break;
+        }
+
+        case Parameter::Type::Double:
+        {
+            if (!stored["value"].is<double>() ||
+                !stored["unit"].is<const char*>())
+            {
+                return false;
+            }
+
+            draft.numberValue =
+                stored["value"].as<double_t>();
+
+            if (!copyOptionalText(
+                    stored["unit"].as<const char*>(),
+                    text.unit,
+                    sizeof(text.unit)))
+            {
+                return false;
+            }
+            break;
+        }
+
+        case Parameter::Type::Selection:
+        {
+            if (!stored["value"].is<int32_t>() ||
+                !stored["options"].is<JsonArrayConst>())
+            {
+                return false;
+            }
+
+            JsonArrayConst options =
+                stored["options"].as<JsonArrayConst>();
+
+            if (options.size() !=
+                    parameter->data.selection.count ||
+                restoredOptionCount +
+                    options.size() >
+                    ParameterList::MAX_SELECTION_OPTIONS)
+            {
+                return false;
+            }
+
+            draft.selectionValue =
+                stored["value"].as<int32_t>();
+            text.optionStart = restoredOptionCount;
+            text.optionCount =
+                parameter->data.selection.count;
+
+            size_t optionIndex = 0;
+
+            for (JsonObjectConst storedOption : options)
+            {
+                if (!storedOption["value"].is<int32_t>() ||
+                    !isValidRequiredText(
+                        storedOption["name"]))
+                {
+                    return false;
+                }
+
+                const ParameterOption& currentOption =
+                    parameter->data.selection
+                        .options[optionIndex];
+
+                if (storedOption["value"].as<int32_t>() !=
+                    currentOption.value)
+                {
+                    return false;
+                }
+
+                const size_t destination =
+                    restoredOptionCount++;
+
+                if (!copyRequiredText(
+                        storedOption["name"].as<const char*>(),
+                        restoredOptionNames[destination],
+                        sizeof(restoredOptionNames[destination])))
+                {
+                    return false;
+                }
+
+                restoredOptions[destination] = {
+                    currentOption.value,
+                    restoredOptionNames[destination]
+                };
+
+                optionIndex++;
+            }
+
+            break;
+        }
+
+        default:
+            return false;
+        }
+
+        text.present = true;
+    }
+
+    /*
+     * Un même identifiant de catégorie ou de propriétaire doit
+     * toujours conduire au même libellé. Sans cette vérification,
+     * un JSON syntaxiquement valide pourrait rendre le menu
+     * impossible à construire.
+     */
+    for (size_t i = 0; i < parameters.count(); i++)
+    {
+        if (!restoredText[i].present)
+            continue;
+
+        const Parameter* left = parameters.get(i);
+
+        for (size_t j = 0; j < i; j++)
+        {
+            if (!restoredText[j].present)
+                continue;
+
+            const Parameter* right = parameters.get(j);
+
+            if (left == nullptr ||
+                right == nullptr)
+            {
+                return false;
+            }
+
+            if (strcmp(
+                    left->categoryKey,
+                    right->categoryKey) == 0 &&
+                strcmp(
+                    restoredText[i].categoryName,
+                    restoredText[j].categoryName) != 0)
+            {
+                return false;
+            }
+
+            if (strcmp(
+                    left->ownerKey,
+                    right->ownerKey) == 0 &&
+                (strcmp(
+                     left->categoryKey,
+                     right->categoryKey) != 0 ||
+                 strcmp(
+                     restoredText[i].ownerName,
+                     restoredText[j].ownerName) != 0))
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Storage::applyRestoredText(
+    ParameterList& parameters)
+{
+    for (size_t i = 0; i < parameters.count(); i++)
+    {
+        RestoredParameterText& text =
+            restoredText[i];
+
+        if (!text.present)
+            continue;
+
+        Parameter* parameter = parameters.get(i);
+
+        if (parameter == nullptr)
+            return false;
+
+        parameter->categoryName = text.categoryName;
+        parameter->ownerName = text.ownerName;
+        parameter->name = text.parameterName;
+
+        if (parameter->type == Parameter::Type::Integer)
+        {
+            parameter->data.integer.unit =
+                text.unit[0] != '\0'
+                    ? text.unit
+                    : nullptr;
+        }
+        else if (parameter->type == Parameter::Type::Double)
+        {
+            parameter->data.number.unit =
+                text.unit[0] != '\0'
+                    ? text.unit
+                    : nullptr;
+        }
+        else if (parameter->type == Parameter::Type::Selection)
+        {
+            parameter->data.selection.options =
+                &restoredOptions[text.optionStart];
+        }
+    }
+
+    return true;
+}
+
+bool Storage::validateWrittenFile() const
+{
+    File file =
+        LittleFS.open(TEMP_PATH, "r");
+
+    if (!file)
+        return false;
+
+    JsonDocument document;
+    const DeserializationError error =
+        deserializeJson(document, file);
+
+    file.close();
+
+    return
+        !error &&
+        document["schema"].as<uint32_t>() ==
+            SCHEMA_VERSION &&
+        isValidRequiredText(
+            document["installation_name"]) &&
+        document["parameters"].is<JsonArrayConst>();
+}
+
+const char* Storage::typeName(
+    Parameter::Type type)
+{
+    switch (type)
+    {
+    case Parameter::Type::Bool:
+        return "bool";
+    case Parameter::Type::Integer:
+        return "integer";
+    case Parameter::Type::Double:
+        return "double";
+    case Parameter::Type::Selection:
+        return "selection";
+    default:
+        return "invalid";
+    }
+}
+
+bool Storage::copyRequiredText(
+    const char* source,
+    char* destination,
+    size_t capacity)
+{
+    if (source == nullptr ||
+        source[0] == '\0')
+    {
+        return false;
+    }
+
+    return copyOptionalText(
+        source,
+        destination,
+        capacity);
+}
+
+bool Storage::copyOptionalText(
+    const char* source,
+    char* destination,
+    size_t capacity)
+{
+    if (source == nullptr ||
+        destination == nullptr ||
+        capacity == 0)
+    {
+        return false;
+    }
+
+    const size_t length = strlen(source);
+
+    if (length >= capacity)
+        return false;
+
+    memcpy(destination, source, length + 1);
+    return true;
+}

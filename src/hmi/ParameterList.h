@@ -1,11 +1,11 @@
 #ifndef PARAMETER_LIST_H
 #define PARAMETER_LIST_H
 
-#include <Arduino.h>
-
 #include <Hardware/pinout.h>
-#include <Parameter.h>
+#include <hmi/Parameter.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <type_traits>
 
@@ -324,6 +324,14 @@ public:
      * Retourne nullptr si l'index est invalide.
      */
     const Parameter* get(size_t index) const;
+
+    /**
+     * @brief Retourne un paramètre modifiable.
+     *
+     * Cette surcharge sert notamment à restaurer les métadonnées
+     * persistantes (noms et unités).
+     */
+    Parameter* get(size_t index);
 
     /**
      * @brief Recherche un paramètre avec son propriétaire et sa clé.

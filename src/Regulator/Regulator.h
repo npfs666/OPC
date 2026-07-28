@@ -1,7 +1,6 @@
 #ifndef REGULATOR_H
 #define REGULATOR_H
 
-#include <Arduino.h>
 #include <hmi/Displayable.h>
 #include <Configurable.h>
 

@@ -1,8 +1,9 @@
 #ifndef MEASUREMENTMANAGER_H
 #define MEASUREMENTMANAGER_H
 
-#include "Measurement.h"
 #include "Hardware/pinout.h"
+
+class Measurement;
 
 class MeasurementManager
 {

@@ -1,8 +1,12 @@
 #include <Regulator/SolarRegulator.h>
 
-#include <ParameterEditor.h>
+#include <Arduino.h>
+#include <Measurements/Temperature/Temperature.h>
+#include <hmi/ParameterEditor.h>
+#include <hmi/ParameterList.h>
 
 #include <cmath>
+#include <cstring>
 
 SolarRegulator::SolarRegulator()
 {
@@ -195,8 +199,6 @@ bool SolarRegulator::validateParameters(
 
 void SolarRegulator::print(Stream& stream) const 
 {
-    PrintSize ps;
-
     stream.print(getName());
 
     uint8_t len = strlen(getName());

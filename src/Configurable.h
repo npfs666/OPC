@@ -1,9 +1,8 @@
 #ifndef CONFIGURABLE_h
 #define CONFIGURABLE_h
 
-#include <ParameterList.h>
-
 class ParameterEditor;
+class ParameterList;
 
 class Configurable
 {

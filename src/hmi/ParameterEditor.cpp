@@ -1,4 +1,4 @@
-#include <ParameterEditor.h>
+#include <hmi/ParameterEditor.h>
 
 #include <cmath>
 #include <cstring>

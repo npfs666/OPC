@@ -1,8 +1,8 @@
 #ifndef PT100_H
 #define PT100_H
 
-#include <Arduino.h>
-
+#include <cmath>
+#include <cstdint>
 
 class PT100
 {
