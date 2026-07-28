@@ -3,6 +3,7 @@
 
 SensorBoard::SensorBoard()
 {
+    beginConfiguration("sensor_board");
     numRTDSensors = 0;
     newMeasurement = false;
     pauseInterrupts = true;
@@ -22,25 +23,6 @@ void SensorBoard::init()
 
 
 
-/**
- * @brief Adds a sensor to the list
- * 
- * @param number id
- * @param type TYPE_2WIRE TYPE_3WIRE TYPE_4WIRE
- * @param switchPin mux pin
- * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
- * @param offset Sensor offset
- */
-/*bool SensorBoard::addRTD(const char* name, RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset) {
-
-    if (numRTDSensors >= MAX_RTD)
-        return false;
-
-    //rtd[numRTDSensors] = RTDSensor(name, type, wiring, samples, offset);
-    numRTDSensors++;
-
-    return true;
-}*/
 
 bool SensorBoard::addRTD(RTDSensor& sensor) {
 
@@ -302,7 +284,7 @@ void SensorBoard::registerParameters(ParameterList& list)
     auto parameters = list.forOwner({
         "calibration",
         "Calibration",
-        "sensor_board",
+        getConfigurationKey(),
         "Carte capteurs"
     });
 

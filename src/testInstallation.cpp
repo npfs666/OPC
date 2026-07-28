@@ -127,10 +127,14 @@ bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessCo
 {
     // ----- Configuration du matériel -----
     input1.begin("input1", "Input 1", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
-    board.addRTD(input1);
+
+    if (!board.addRTD(input1))
+        return false;
 
     input2.begin("input2", "Input 2", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
-    board.addRTD(input2);
+
+    if (!board.addRTD(input2))
+        return false;
 
     // ----- Construction des objets -----
     tempBME.begin("BME", bme);
@@ -149,30 +153,54 @@ bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessCo
 
     // ----- Enregistrement dans le framework -----
 
-    controller.add(tempBME);
-    controller.add(humidityBME);
-    controller.add(pressureBME);
-
-    controller.add(rtd1Resistance);
-    controller.add(rtd1Temperature);
-
-    controller.add(rtd2Resistance);
-    controller.add(rtd2Temperature);
-
-    controller.add(psychroHumidity);
+    if (!controller.add(tempBME) ||
+        !controller.add(humidityBME) ||
+        !controller.add(pressureBME) ||
+        !controller.add(rtd1Resistance) ||
+        !controller.add(rtd1Temperature) ||
+        !controller.add(rtd2Resistance) ||
+        !controller.add(rtd2Temperature) ||
+        !controller.add(psychroHumidity))
+    {
+        return false;
+    }
 
     thermostat.begin("thermostat", "Thermostats", rtd2Temperature);
     thermostat.settings.setpoint = 25;
-    controller.add(thermostat);
 
     pid.begin("pid", "PID", rtd1Temperature);
-    controller.add(pid);
 
     solar.begin("Reg Solaire", tempBME, rtd1Temperature, rtd2Temperature);
-    controller.add(solar);
+
+    if (!controller.add(thermostat) ||
+        !controller.add(pid) ||
+        !controller.add(solar))
+    {
+        return false;
+    }
 
     heater.begin("heater", thermostat);
-    controller.add(heater);
+
+    pump.begin("pompe", thermostat, 10000);
+
+    if (!controller.add(heater) ||
+        !controller.add(pump))
+    {
+        return false;
+    }
+
+    relayHeater.begin(
+        "relay_heater",
+        "Relais chauffage",
+        RELAIS_1,
+        true,
+        false);
+
+    if (!heater.addOutput(relayHeater) ||
+        !controller.add(relayHeater))
+    {
+        return false;
+    }
 
     board.registerParameters(parameterList);
     controller.registerParameters(parameterList);

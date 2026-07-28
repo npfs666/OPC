@@ -36,8 +36,21 @@ void TimeProportionalActuator::begin(
 
 void TimeProportionalActuator::update(uint32_t now)
 {
-    if (settings.period == 0)
+    if (regulator == nullptr ||
+        !regulator->isCommandValid() ||
+        settings.period == 0)
+    {
+        relayState = false;
+
+        for (uint8_t i = 0;
+             i < outputCount;
+             i++)
+        {
+            outputs[i]->forceSafe();
+        }
+
         return;
+    }
 
     double_t command = regulator->readCommand();
 
@@ -53,18 +66,20 @@ void TimeProportionalActuator::update(uint32_t now)
 
     bool state = elapsed < (uint32_t)(command * settings.period);
 
-    if (state == relayState)
-        return;
-
     relayState = state;
 
     for (uint8_t i = 0; i < outputCount; i++)
-        outputs[i]->writeCommand(relayState);
+    {
+        outputs[i]->setCommand(
+            relayState ? 1.0 : 0.0,
+            now);
+    }
 }
 
 void TimeProportionalActuator::resume(uint32_t now)
 {
     cycleStart = now;
+    relayState = false;
 }
 
 void TimeProportionalActuator::registerParameters(
@@ -73,7 +88,7 @@ void TimeProportionalActuator::registerParameters(
     auto parameters = list.forOwner({
         "actuators",
         "Actionneurs",
-        getKey(),
+        getConfigurationKey(),
         getName()
     });
 

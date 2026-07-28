@@ -8,6 +8,7 @@
 #include <Measurements/Measurement.h>
 #include <Regulator/Regulator.h>
 #include <Outputs/Actuator.h>
+#include <Outputs/Output.h>
 
 #include <ParameterList.h>
 
@@ -20,13 +21,25 @@ public:
 
     ProcessControl();
 
-    void add(Measurement& measurement);
-    void add(Regulator& regulator);
-    void add(Actuator& actuator);
+    bool add(Measurement& measurement);
+    bool add(Regulator& regulator);
+    bool add(Actuator& actuator);
+    bool add(Output& output);
 
-    void update(uint32_t now);
+    void updateMeasurementsAndRegulators(
+        uint32_t now);
+
+    void poll(uint32_t now);
 
     void resume(uint32_t now);
+
+    bool beginOutputs();
+
+    bool applyOutputSettings();
+
+    void forceSafeOutputs();
+
+    bool outputsHealthy() const;
 
     Measurement* getMeasurement(uint8_t id);
 
@@ -53,6 +66,9 @@ private:
 
     Actuator* actuators[MAX_ACTUATORS];
     uint8_t actuatorCount;
+
+    Output* outputs[MAX_REGISTERED_OUTPUTS];
+    uint8_t outputCount;
 };
 
 #endif

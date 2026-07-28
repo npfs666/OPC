@@ -65,6 +65,8 @@ void loop()
 
     // Mettre en place le calcul des measurement, car ici on est pas dans l'ISR donc on a le temps.
     opc.newMeasurement();
+
+    opc.controlPoll();
 }
 
 
@@ -114,6 +116,5 @@ void loop1()
 
     opc.uiPoll();
 }
-
 
 

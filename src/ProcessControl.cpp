@@ -7,42 +7,98 @@ ProcessControl::ProcessControl()
     measurementCount = 0;
     regulatorCount = 0;
     actuatorCount = 0;
+    outputCount = 0;
 }
 
-void ProcessControl::add(Measurement& measurement)
+bool ProcessControl::add(Measurement& measurement)
 {
     if (measurementCount >= MAX_MEASUREMENTS)
-        return;
+        return false;
+
+    for (uint8_t i = 0;
+         i < measurementCount;
+         i++)
+    {
+        if (measurements[i] == &measurement)
+            return false;
+    }
 
     measurements[measurementCount++] = &measurement;
+
+    return true;
 }
 
-void ProcessControl::add(Regulator& regulator)
+bool ProcessControl::add(Regulator& regulator)
 {
     if (regulatorCount >= MAX_REGULATORS)
-        return;
+        return false;
+
+    for (uint8_t i = 0;
+         i < regulatorCount;
+         i++)
+    {
+        if (regulators[i] == &regulator)
+            return false;
+    }
 
     regulators[regulatorCount++] = &regulator;
+
+    return true;
 }
 
-void ProcessControl::add(Actuator& actuator)
+bool ProcessControl::add(Actuator& actuator)
 {
     if (actuatorCount >= MAX_ACTUATORS)
-        return;
+        return false;
+
+    for (uint8_t i = 0;
+         i < actuatorCount;
+         i++)
+    {
+        if (actuators[i] == &actuator)
+            return false;
+    }
 
     actuators[actuatorCount++] = &actuator;
+
+    return true;
 }
 
-void ProcessControl::update(uint32_t now)
+bool ProcessControl::add(Output& output)
+{
+    if (outputCount >= MAX_REGISTERED_OUTPUTS)
+        return false;
+
+    for (uint8_t i = 0;
+         i < outputCount;
+         i++)
+    {
+        if (outputs[i] == &output)
+            return false;
+    }
+
+    outputs[outputCount++] = &output;
+
+    return true;
+}
+
+void ProcessControl::updateMeasurementsAndRegulators(
+    uint32_t now)
 {
     for (uint8_t i = 0; i < measurementCount; i++)
         measurements[i]->update();
 
     for (uint8_t i = 0; i < regulatorCount; i++)
         regulators[i]->update(now);
+}
 
+void ProcessControl::poll(uint32_t now)
+{
     for (uint8_t i = 0; i < actuatorCount; i++)
         actuators[i]->update(now);
+
+    for (uint8_t i = 0; i < outputCount; i++)
+        outputs[i]->poll(now);
 }
 
 void ProcessControl::resume(uint32_t now)
@@ -52,6 +108,63 @@ void ProcessControl::resume(uint32_t now)
 
     for (uint8_t i = 0; i < actuatorCount; i++)
         actuators[i]->resume(now);
+}
+
+bool ProcessControl::beginOutputs()
+{
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        if (outputs[i] == nullptr ||
+            !outputs[i]->begin())
+        {
+            forceSafeOutputs();
+            return false;
+        }
+    }
+
+    forceSafeOutputs();
+
+    return true;
+}
+
+bool ProcessControl::applyOutputSettings()
+{
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        if (outputs[i] == nullptr ||
+            !outputs[i]->applySettings())
+        {
+            forceSafeOutputs();
+            return false;
+        }
+    }
+
+    forceSafeOutputs();
+
+    return true;
+}
+
+void ProcessControl::forceSafeOutputs()
+{
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        if (outputs[i] != nullptr)
+            outputs[i]->forceSafe();
+    }
+}
+
+bool ProcessControl::outputsHealthy() const
+{
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        if (outputs[i] == nullptr ||
+            !outputs[i]->isHealthy())
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void ProcessControl::captureMeasurements(
@@ -115,6 +228,16 @@ void ProcessControl::print(Stream& stream) const
         actuators[i]->print(stream);
     }
 
+    if (outputCount > 0)
+    {
+        stream.println(F("----------Outputs---------"));
+    }
+
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        outputs[i]->print(stream);
+    }
+
     stream.println(F("=========================="));
     stream.println();
 }
@@ -131,10 +254,10 @@ void ProcessControl::registerParameters(ParameterList& list)
         actuators[i]->registerParameters(list);
     }
 
-    /*for (size_t i = 0; i < outputCount; i++)
+    for (size_t i = 0; i < outputCount; i++)
     {
         outputs[i]->registerParameters(list);
-    }*/
+    }
 
     /*for (size_t i = 0; i < measurementCount; i++)
     {
@@ -159,6 +282,16 @@ bool ProcessControl::validateParameters(
     {
         if (actuators[i] != nullptr &&
             !actuators[i]->validateParameters(
+                editor))
+        {
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < outputCount; i++)
+    {
+        if (outputs[i] != nullptr &&
+            !outputs[i]->validateParameters(
                 editor))
         {
             return false;

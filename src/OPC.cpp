@@ -161,17 +161,60 @@ bool OPC::newMeasurement()
     mutex_enter_blocking(
         &processDataMutex);
 
-    controller.update(times);
+    if (!controlOutputsEnabled)
+        controller.resume(times);
+
+    controller.updateMeasurementsAndRegulators(
+        times);
 
     controller.captureMeasurements(
         sharedMeasurementSnapshot,
         times);
+
+    lastMeasurementTime = times;
+
+    controlOutputsEnabled =
+        controller.outputsHealthy();
+
+    if (!controlOutputsEnabled)
+        controller.forceSafeOutputs();
 
     mutex_exit(&processDataMutex);
 
     rp2040.fifo.push_nb(PRINT_DATA_AVAILABLE);
 
     return true;
+}
+
+void OPC::controlPoll()
+{
+    if (!controlOutputsEnabled ||
+        acquisitionPausedForMenu)
+    {
+        return;
+    }
+
+    const uint32_t now = millis();
+
+    mutex_enter_blocking(
+        &processDataMutex);
+
+    const bool measurementTimedOut =
+        (now - lastMeasurementTime) >=
+        userInstall.measurementTimeoutMs();
+
+    if (measurementTimedOut ||
+        !controller.outputsHealthy())
+    {
+        controller.forceSafeOutputs();
+        controlOutputsEnabled = false;
+    }
+    else
+    {
+        controller.poll(now);
+    }
+
+    mutex_exit(&processDataMutex);
 }
 
 bool OPC::initMeasurements()
@@ -199,6 +242,16 @@ bool OPC::initMeasurements()
             "Framework parameter registration failed");
         return false;
     }
+
+    if (!controller.beginOutputs())
+    {
+        Serial.println(
+            "Output initialization failed");
+        return false;
+    }
+
+    controlOutputsEnabled = false;
+    lastMeasurementTime = millis();
 
     input.startContinuous();
 
@@ -355,6 +408,15 @@ void OPC::handleControlMessage(
         {
             input.pause();
             input.resetAcquisition();
+
+            mutex_enter_blocking(
+                &processDataMutex);
+
+            controller.forceSafeOutputs();
+            controlOutputsEnabled = false;
+
+            mutex_exit(&processDataMutex);
+
             acquisitionPausedForMenu = true;
         }
 
@@ -391,13 +453,29 @@ void OPC::handleControlMessage(
             break;
         }
 
+        mutex_enter_blocking(
+            &processDataMutex);
+
+        const bool outputsApplied =
+            controller.applyOutputSettings();
+
+        mutex_exit(&processDataMutex);
+
+        if (!outputsApplied)
+        {
+            rp2040.fifo.push(
+                MENU_PARAMETERS_REJECTED);
+            break;
+        }
+
         userInstall.onParametersApplied();
 
         input.resetAcquisition();
-        controller.resume(millis());
         input.startContinuous();
 
         acquisitionPausedForMenu = false;
+        controlOutputsEnabled = false;
+        lastMeasurementTime = millis();
 
         __dmb();
 

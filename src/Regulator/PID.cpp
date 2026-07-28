@@ -2,6 +2,8 @@
 
 #include <ParameterEditor.h>
 
+#include <cmath>
+
 PID::PID()
 {
 }
@@ -44,15 +46,19 @@ void PID::reset()
 
     initialized = false;
 
-    writeCommand(0.0);
+    invalidateCommand();
 }
 
 void PID::update(uint32_t now)
 {
     if (measurement == nullptr ||
-        !measurement->isValid())
+        !measurement->isValid() ||
+        !std::isfinite(
+            measurement->getValue()))
     {
+        integral = 0.0;
         initialized = false;
+        invalidateCommand();
         return;
     }
 
@@ -100,8 +106,10 @@ void PID::update(uint32_t now)
 
 void PID::resume(uint32_t now)
 {
+    integral = 0.0;
     previousTime = now;
     initialized = false;
+    invalidateCommand();
 }
 
 void PID::registerParameters(ParameterList& list) {
@@ -109,7 +117,7 @@ void PID::registerParameters(ParameterList& list) {
     auto parameters = list.forOwner({
         "regulators",
         "Regulateur",
-        getKey(),
+        getConfigurationKey(),
         getName()
     });
 
@@ -177,12 +185,12 @@ bool PID::validateParameters(
 {
     const ParameterDraft* outputMin =
         editor.find(
-            getKey(),
+            getConfigurationKey(),
             "output_min");
 
     const ParameterDraft* outputMax =
         editor.find(
-            getKey(),
+            getConfigurationKey(),
             "output_max");
 
     if (outputMin == nullptr ||

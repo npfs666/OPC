@@ -9,8 +9,9 @@ public:
 
     struct Settings
     {
-        uint8_t pin;
-        bool activeHigh;
+        uint8_t pin = 0;
+        bool activeHigh = true;
+        bool safeState = false;
     };
 
     Settings settings;
@@ -20,20 +21,41 @@ public:
     void begin(
         const char* name,
         uint8_t pin,
-        bool activeHigh = true);
+        bool activeHigh = true,
+        bool safeState = false);
 
     void begin(
         const char* key,
         const char* name,
         uint8_t pin,
-        bool activeHigh = true);
+        bool activeHigh = true,
+        bool safeState = false);
 
-    void begin() override;
+    bool begin() override;
 
-    void writeCommand(double_t value) override;
+    void poll(uint32_t now) override;
+
+    void forceSafe() override;
+
+    bool applySettings() override;
+
+    bool isHealthy() const override;
 
     void registerParameters(
         ParameterList& list) override;
+
+private:
+    void applyLogicalState(bool state);
+
+    static void writePhysicalState(
+        uint8_t pin,
+        bool logicalState,
+        bool activeHigh);
+
+    bool initialized = false;
+    uint8_t configuredPin = 0;
+    bool configuredActiveHigh = true;
+    bool configuredSafeState = false;
 };
 
 #endif

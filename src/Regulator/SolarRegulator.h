@@ -38,20 +38,26 @@ public:
 
     void update(uint32_t now) override;
 
+    void resume(uint32_t now) override;
+
     void registerParameters(
         ParameterList& list) override;
+
+    bool validateParameters(
+        const ParameterEditor& editor)
+        const override;
     
     void print(Stream& stream) const override;
 
 private:
 
-    Temperature* collector;
+    Temperature* collector = nullptr;
 
-    Temperature* tankTop;
+    Temperature* tankTop = nullptr;
 
-    Temperature* tankBottom;
+    Temperature* tankBottom = nullptr;
 
-    bool running;
+    bool running = false;
 };
 
 #endif

@@ -1,5 +1,7 @@
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 
+#include <cmath>
+
 HumidityPsychrometer::HumidityPsychrometer()
 {
 }
@@ -14,7 +16,22 @@ void HumidityPsychrometer::begin(
 
 void HumidityPsychrometer::update()
 {
-    setValue(psychrometer->relativeHumidity());
+    if (psychrometer == nullptr ||
+        !psychrometer->isValid())
+    {
+        setValid(false);
+        return;
+    }
 
+    const double_t humidity =
+        psychrometer->relativeHumidity();
+
+    if (!std::isfinite(humidity))
+    {
+        setValid(false);
+        return;
+    }
+
+    setValue(humidity);
     setValid(true);
 }

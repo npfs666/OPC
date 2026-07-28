@@ -1,5 +1,8 @@
 #include <Measurements/Psychrometer.h>
-#include <math.h>
+
+#include <Physics/Psychrometrics.h>
+
+#include <cmath>
 
 Psychrometer::Psychrometer()
 {
@@ -14,6 +17,38 @@ void Psychrometer::begin(const Temperature& dryBulb,
     this->pressure = &pressure;
 }
 
+bool Psychrometer::isValid() const
+{
+    if (dryBulb == nullptr ||
+        wetBulb == nullptr ||
+        pressure == nullptr)
+    {
+        return false;
+    }
+
+    if (!dryBulb->isValid() ||
+        !wetBulb->isValid() ||
+        !pressure->isValid())
+    {
+        return false;
+    }
+
+    const double_t dryTemperature =
+        dryBulb->getValue();
+
+    const double_t wetTemperature =
+        wetBulb->getValue();
+
+    const double_t atmosphericPressure =
+        pressure->getValue();
+
+    return
+        std::isfinite(dryTemperature) &&
+        std::isfinite(wetTemperature) &&
+        std::isfinite(atmosphericPressure) &&
+        atmosphericPressure > 0.0;
+}
+
 /**
  * Calcule l'humidité relative à partir d'une température sèche et humide
  * 
@@ -25,39 +60,46 @@ void Psychrometer::begin(const Temperature& dryBulb,
  */
 double_t Psychrometer::relativeHumidity() const
 {
-    double_t dryTemperature = dryBulb->getValue();
-    double_t wetTemperature = wetBulb->getValue();
-    double_t atmPressure = pressure->getValue();
+    if (!isValid())
+        return NAN;
 
-    // 1: Calcul de la "constante" psychrométrique
-    // Capacité thermique massique de l'air [kJ/kg.°C]
-    double_t Cp = (3 * dryTemperature)/50000.0 + 1.005;
-    // Energie de vaporiation de l'eau [kJ/kg]
-    double_t lambda = -2.3664 * wetTemperature + 2501;
-    double_t A = Cp / (lambda * 0.622 ); // [1/°C]
-    
-    // Atmospheric pressure [P = kPa] [atmPressure = Pa]
-    double_t P;
-    if ( (atmPressure == NAN) || (atmPressure == 0) )
-        P = 101.3;
-	else
-        P = atmPressure / 1000.0F;
+    const double_t humidity =
+        Physics::Psychrometrics::getRH(
+            dryBulb->getValue(),
+            wetBulb->getValue(),
+            pressure->getValue());
 
-    double_t pVs = 0.6108 * exp((17.27 * wetTemperature)/(wetTemperature + 237.3)); // [kPa]
-    double_t pV = pVs - A*P*(dryTemperature-wetTemperature); // [kPa]
-    double_t pVs2 = 0.6108 * exp((17.27 * dryTemperature)/(dryTemperature + 237.3)); // [kPa]
+    if (!std::isfinite(humidity))
+        return NAN;
 
-    double_t rh = ((double_t)pV/pVs2)*100.0;
-
-    return constrain(rh, 0, 100);
+    return constrain(
+        humidity,
+        0.0,
+        100.0);
 }
 
 double_t Psychrometer::absoluteHumidity() const
 {
-    return NAN;
+    const double_t humidity =
+        relativeHumidity();
+
+    if (!std::isfinite(humidity))
+        return NAN;
+
+    return Physics::Psychrometrics::absoluteHumidity(
+        dryBulb->getValue(),
+        humidity);
 }
 
 double_t Psychrometer::dewPoint() const
 {
-    return NAN;
+    const double_t humidity =
+        relativeHumidity();
+
+    if (!std::isfinite(humidity))
+        return NAN;
+
+    return Physics::Psychrometrics::dewPoint(
+        dryBulb->getValue(),
+        humidity);
 }

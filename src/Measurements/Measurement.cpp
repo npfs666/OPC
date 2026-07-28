@@ -15,6 +15,15 @@ Measurement::Measurement()
 
 void Measurement::begin(const char* name, const char* unit)
 {
+    begin(name, name, unit);
+}
+
+void Measurement::begin(
+    const char* key,
+    const char* name,
+    const char* unit)
+{
+    beginConfiguration(key);
     Displayable::begin(name);
     this->unit = unit;
 }

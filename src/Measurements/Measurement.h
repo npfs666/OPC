@@ -17,7 +17,7 @@
  *
  * Elle ne connait pas le matériel.
  */
-class Measurement : public Displayable, Configurable
+class Measurement : public Displayable, public Configurable
 {
 public:
 
@@ -62,7 +62,12 @@ public:
 
 
 protected:
+
     void begin(const char* name,
+               const char* unit);
+
+    void begin(const char* key,
+               const char* name,
                const char* unit);
 
     void setValue(double_t value);

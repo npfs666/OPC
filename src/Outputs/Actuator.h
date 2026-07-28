@@ -26,7 +26,7 @@ public:
         
     virtual ~Actuator() = default;
 
-    void addOutput(Output& output);
+    bool addOutput(Output& output);
 
     virtual void update(uint32_t now) = 0;
 
@@ -37,12 +37,8 @@ public:
 
 protected:
 
-    const char* getKey() const;
-
     double_t printValue() const override;
     const char* getUnit() const override;
-
-    const char* key = "";
 
     Output* outputs[MAX_OUTPUTS] = {};
 

@@ -16,7 +16,8 @@
 #define MAX_MEASUREMENTS 16 // Used in ProcessControl
 #define MAX_REGULATORS 16   // Used in ProcessControl
 #define MAX_ACTUATORS 16    // Used in ProcessControl
-#define MAX_OUTPUTS 4       // Used in Actuator
+#define MAX_OUTPUTS 4       // Maximum outputs connected to one Actuator
+#define MAX_REGISTERED_OUTPUTS 16 // Outputs managed by ProcessControl
 #define MAX_PARAMETERS 64   // Used in ParameterList
 
 // Général ORDERS

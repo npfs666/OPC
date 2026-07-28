@@ -16,14 +16,6 @@ public:
      */
     static double_t getResistanceToTemperature(double_t Rrtd);
 
-    /**
-     * @brief Convertit une température en résistance PT100
-     *
-     * @param temperature Température en °C
-     * @return Résistance en Ohms
-     */
-    static double_t temperatureToResistance(double_t temperature);
-
 private:
 
     static constexpr uint16_t interpolationSize = 21;

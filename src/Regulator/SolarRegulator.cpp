@@ -1,5 +1,9 @@
 #include <Regulator/SolarRegulator.h>
 
+#include <ParameterEditor.h>
+
+#include <cmath>
+
 SolarRegulator::SolarRegulator()
 {
 }
@@ -43,9 +47,32 @@ void SolarRegulator::update(uint32_t now)
 {
     (void)now;
 
-    double_t collectorTemperature = collector->getValue();
-    double_t topTemperature       = tankTop->getValue();
-    double_t bottomTemperature    = tankBottom->getValue();
+    if (collector == nullptr ||
+        tankTop == nullptr ||
+        tankBottom == nullptr ||
+        !collector->isValid() ||
+        !tankTop->isValid() ||
+        !tankBottom->isValid() ||
+        !std::isfinite(
+            collector->getValue()) ||
+        !std::isfinite(
+            tankTop->getValue()) ||
+        !std::isfinite(
+            tankBottom->getValue()))
+    {
+        running = false;
+        invalidateCommand();
+        return;
+    }
+
+    const double_t collectorTemperature =
+        collector->getValue();
+
+    const double_t topTemperature =
+        tankTop->getValue();
+
+    const double_t bottomTemperature =
+        tankBottom->getValue();
 
     bool canRun = true;
 
@@ -80,13 +107,19 @@ void SolarRegulator::update(uint32_t now)
     writeCommand(running ? 1.0 : 0.0);
 }
 
+void SolarRegulator::resume(uint32_t now)
+{
+    running = false;
+    Regulator::resume(now);
+}
+
 void SolarRegulator::registerParameters(
     ParameterList& list)
 {
     auto parameters = list.forOwner({
         "regulators",
         "Regulateur",
-        getKey(),
+        getConfigurationKey(),
         getName()
     });
 
@@ -129,6 +162,35 @@ void SolarRegulator::registerParameters(
         0.5,
         1,
         "°C");
+}
+
+bool SolarRegulator::validateParameters(
+    const ParameterEditor& editor) const
+{
+    const ParameterDraft* startDelta =
+        editor.find(
+            getConfigurationKey(),
+            "start_delta");
+
+    const ParameterDraft* stopDelta =
+        editor.find(
+            getConfigurationKey(),
+            "stop_delta");
+
+    if (startDelta == nullptr ||
+        stopDelta == nullptr ||
+        startDelta->parameter == nullptr ||
+        stopDelta->parameter == nullptr ||
+        startDelta->parameter->type !=
+            Parameter::Type::Double ||
+        stopDelta->parameter->type !=
+            Parameter::Type::Double)
+    {
+        return false;
+    }
+
+    return stopDelta->numberValue <
+           startDelta->numberValue;
 }
 
 void SolarRegulator::print(Stream& stream) const 

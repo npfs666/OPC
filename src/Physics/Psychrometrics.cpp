@@ -1,7 +1,10 @@
-#include "Psychrometer.h"
+#include <Physics/Psychrometrics.h>
 #include <math.h>
 
-double_t Psychrometer::relativeHumidity(double_t dryBulb, double_t wetBulb, double_t pressure)
+double_t Physics::Psychrometrics::relativeHumidity(
+    double_t dryBulb,
+    double_t wetBulb,
+    double_t pressure)
 {
     const double_t es = saturationVaporPressure(dryBulb);
 
@@ -10,14 +13,18 @@ double_t Psychrometer::relativeHumidity(double_t dryBulb, double_t wetBulb, doub
     return (e / es) * 100.0;
 }
 
-double_t Psychrometer::saturationVaporPressure(double_t temperature)
+double_t Physics::Psychrometrics::saturationVaporPressure(
+    double_t temperature)
 {
     return 610.78 * exp(
                (17.2694 * temperature) /
                (temperature + 238.3));
 }
 
-double_t Psychrometer::vaporPressure(double_t dryBulb, double_t wetBulb, double_t pressure)
+double_t Physics::Psychrometrics::vaporPressure(
+    double_t dryBulb,
+    double_t wetBulb,
+    double_t pressure)
 {
     const double_t ew = saturationVaporPressure(wetBulb);
 
@@ -29,7 +36,9 @@ double_t Psychrometer::vaporPressure(double_t dryBulb, double_t wetBulb, double_
     return ew - gamma * (dryBulb - wetBulb);
 }
 
-double_t Psychrometer::dewPoint(double_t temperature, double_t humidity)
+double_t Physics::Psychrometrics::dewPoint(
+    double_t temperature,
+    double_t humidity)
 {
     const double_t a = 17.27;
     const double_t b = 237.7;
@@ -43,7 +52,9 @@ double_t Psychrometer::dewPoint(double_t temperature, double_t humidity)
            (a - alpha);
 }
 
-double_t Psychrometer::absoluteHumidity(double_t temperature, double_t humidity)
+double_t Physics::Psychrometrics::absoluteHumidity(
+    double_t temperature,
+    double_t humidity)
 {
     const double_t es = saturationVaporPressure(temperature);
 
@@ -52,7 +63,10 @@ double_t Psychrometer::absoluteHumidity(double_t temperature, double_t humidity)
     return (2.16679 * e) / (temperature + kelvin);
 }
 
-double_t Psychrometer::getRH(double_t dryBulb, double_t wetBulb, double_t pressure)
+double_t Physics::Psychrometrics::getRH(
+    double_t dryBulb,
+    double_t wetBulb,
+    double_t pressure)
 {
 
     // 1: Calcul de la "constante" psychrométrique

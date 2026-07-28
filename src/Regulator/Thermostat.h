@@ -32,7 +32,7 @@ public:
 
 private:
 
-    Temperature* temperature;
+    Temperature* temperature = nullptr;
 };
 
 #endif

@@ -50,6 +50,8 @@ public:
     // Runtime
     //-------------------------
 
+    void controlPoll();
+
     void uiPoll();
 
     void handleControlMessage(
@@ -99,6 +101,8 @@ private:
     uint32_t lastMenuActivity = 0;
 
     bool acquisitionPausedForMenu = false;
+    bool controlOutputsEnabled = false;
+    uint32_t lastMeasurementTime = 0;
 
     mutex_t processDataMutex;
     MeasurementSnapshot sharedMeasurementSnapshot;

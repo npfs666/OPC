@@ -21,7 +21,13 @@ public:
         uint32_t inactivityTimeoutSeconds = 10;
     };
 
+    struct SafetySettings
+    {
+        uint32_t measurementTimeoutSeconds = 30;
+    };
+
     MenuSettings menuSettings;
+    SafetySettings safetySettings;
 
     virtual ~Installation() = default;
 
@@ -61,6 +67,13 @@ public:
     {
         return
             menuSettings.inactivityTimeoutSeconds *
+            1000UL;
+    }
+
+    uint32_t measurementTimeoutMs() const
+    {
+        return
+            safetySettings.measurementTimeoutSeconds *
             1000UL;
     }
 

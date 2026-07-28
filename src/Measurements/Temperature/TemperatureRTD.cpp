@@ -3,6 +3,7 @@
 #include <Hardware/RTDSensor.h>
 
 #include <Physics/PT100.h>
+#include <cmath>
 //#include <Measurement/PT1000.h>
 
 TemperatureRTD::TemperatureRTD()
@@ -46,6 +47,12 @@ void TemperatureRTD::update()
     }
 
     temperature += resistance->getSensor().settings.offset;
+
+    if (!std::isfinite(temperature))
+    {
+        setValid(false);
+        return;
+    }
 
     setValue(temperature);
     setValid(true);

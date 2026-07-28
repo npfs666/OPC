@@ -1,5 +1,7 @@
 #include "Outputs/Output.h"
 
+#include <cmath>
+
 Output::Output()
 {
 }
@@ -13,29 +15,49 @@ void Output::begin(
     const char* key,
     const char* name)
 {
-    this->key = key;
+    beginConfiguration(key);
     Displayable::begin(name);
-    command = 0.0;
+    requested = 0.0;
+    applied = 0.0;
+    lastCommandTime = 0;
 }
 
-void Output::writeCommand(double_t value)
+void Output::setCommand(
+    double_t value,
+    uint32_t now)
 {
-    command = constrain(value, 0.0, 1.0);
+    if (!std::isfinite(value))
+        value = 0.0;
+
+    requested =
+        constrain(value, 0.0, 1.0);
+
+    lastCommandTime = now;
 }
 
-double_t Output::readCommand() const
+double_t Output::requestedCommand() const
 {
-    return command;
+    return requested;
 }
 
-const char* Output::getKey() const
+double_t Output::appliedCommand() const
 {
-    return key;
+    return applied;
+}
+
+uint32_t Output::lastCommandAt() const
+{
+    return lastCommandTime;
+}
+
+void Output::setAppliedCommand(double_t value)
+{
+    applied = constrain(value, 0.0, 1.0);
 }
 
 double_t Output::printValue() const
 {
-    return command;
+    return applied;
 }
 
 const char* Output::getUnit() const

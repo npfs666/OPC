@@ -20,7 +20,18 @@ void ActuatorOnOff::begin(
 
 void ActuatorOnOff::update(uint32_t now)
 {
-    (void)now;
+    if (regulator == nullptr ||
+        !regulator->isCommandValid())
+    {
+        for (uint8_t i = 0;
+             i < outputCount;
+             i++)
+        {
+            outputs[i]->forceSafe();
+        }
+
+        return;
+    }
 
     double_t outputCommand;
 
@@ -32,5 +43,9 @@ void ActuatorOnOff::update(uint32_t now)
         outputCommand = 0.0;
 
     for (uint8_t i = 0; i < outputCount; i++)
-        outputs[i]->writeCommand(outputCommand);
+    {
+        outputs[i]->setCommand(
+            outputCommand,
+            now);
+    }
 }

@@ -14,6 +14,8 @@ public:
                  const Temperature& wetBulb,
                  const Pressure& pressure);
 
+    bool isValid() const;
+
     double_t relativeHumidity() const;
 
     double_t absoluteHumidity() const;
@@ -22,9 +24,9 @@ public:
 
 private:
 
-    const Temperature* dryBulb;
-    const Temperature* wetBulb;
-    const Pressure* pressure;
+    const Temperature* dryBulb = nullptr;
+    const Temperature* wetBulb = nullptr;
+    const Pressure* pressure = nullptr;
 };
 
 #endif

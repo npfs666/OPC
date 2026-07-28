@@ -61,7 +61,6 @@ public:
 
 private:
 
-    const char* ownerKey = "";
     const char* ownerName = "";
     double_t nMinusOneValue;
     double_t sum;

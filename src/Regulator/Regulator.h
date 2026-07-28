@@ -23,6 +23,8 @@ public:
 
     double_t readCommand() const;
 
+    bool isCommandValid() const;
+
     double_t printValue() const override;
 
     const char* getUnit() const override;
@@ -31,12 +33,12 @@ public:
 
 protected:
 
-    const char* getKey() const;
-
     void writeCommand(double_t value);
 
-    const char* key = "";
+    void invalidateCommand();
+
     double_t command = 0;
+    bool commandValid = false;
 };
 
 #endif

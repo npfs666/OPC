@@ -67,6 +67,15 @@ RTDSensor::RTDSensor(
         offset);
 }
 
+/**
+ * @brief Adds a sensor to the list
+ * 
+ * @param number id
+ * @param type TYPE_2WIRE TYPE_3WIRE TYPE_4WIRE
+ * @param switchPin mux pin
+ * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
+ * @param offset Sensor offset
+ */
 void RTDSensor::begin(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
 {
     begin(
@@ -86,7 +95,7 @@ void RTDSensor::begin(
     uint16_t samples,
     float_t offset)
 {
-    ownerKey = key;
+    beginConfiguration(key);
     ownerName = name;
     settings.type = type;
     settings.wiring = wiring;
@@ -157,7 +166,7 @@ void RTDSensor::registerParameters(ParameterList& list)
     auto parameters = list.forOwner({
         "inputs",
         "Input",
-        ownerKey,
+        getConfigurationKey(),
         ownerName
     });
 

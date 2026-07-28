@@ -20,6 +20,8 @@
 #include "Regulator/SolarRegulator.h"
 
 #include <Outputs/ActuatorOnOff.h>
+#include "Outputs/TimeProportionalActuator.h"
+#include <Outputs/RelayOutput.h>
 
 class SensorBoard;
 class Adafruit_BME280;
@@ -94,11 +96,11 @@ private:
 
     ActuatorOnOff heater;
 
-    //TimeProportionalActuator pump;
+    TimeProportionalActuator pump;
 
     // ---------- Sorties ----------
 
-    //RelayOutput relayPump;
+    RelayOutput relayHeater;
 };
 
 #endif

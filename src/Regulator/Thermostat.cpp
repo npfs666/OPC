@@ -1,5 +1,7 @@
 #include <Regulator/Thermostat.h>
 
+#include <cmath>
+
 Thermostat::Thermostat()
 {
 }
@@ -25,8 +27,18 @@ void Thermostat::begin(
 void Thermostat::update(uint32_t now)
 {
     (void)now;
-    
-    double_t value = temperature->getValue();
+
+    if (temperature == nullptr ||
+        !temperature->isValid() ||
+        !std::isfinite(
+            temperature->getValue()))
+    {
+        invalidateCommand();
+        return;
+    }
+
+    const double_t value =
+        temperature->getValue();
 
     if (value <= settings.setpoint - settings.hysteresis / 2.0)
     {
@@ -64,7 +76,7 @@ void Thermostat::registerParameters(ParameterList& list) {
     auto parameters = list.forOwner({
         "regulators",
         "Regulateur",
-        getKey(),
+        getConfigurationKey(),
         getName()
     });
 

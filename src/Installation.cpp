@@ -13,19 +13,38 @@ bool Installation::prepareParameterRegistration()
 
 bool Installation::completeParameterRegistration()
 {
-    auto parameters = parameterList.forOwner({
+    auto menuParameters = parameterList.forOwner({
         "interface",
         "Interface",
         "menu",
         "Menu"
     });
 
-    return parameters.addInteger(
-        "inactivity_timeout",
-        "Timeout",
-        menuSettings.inactivityTimeoutSeconds,
+    if (!menuParameters.addInteger(
+            "inactivity_timeout",
+            "Timeout",
+            menuSettings.inactivityTimeoutSeconds,
+            1,
+            120,
+            1,
+            "s"))
+    {
+        return false;
+    }
+
+    auto safetyParameters = parameterList.forOwner({
+        "safety",
+        "Sécurité",
+        "measurement_watchdog",
+        "Surveillance mesures"
+    });
+
+    return safetyParameters.addInteger(
+        "measurement_timeout",
+        "Timeout mesures",
+        safetySettings.measurementTimeoutSeconds,
         1,
-        120,
+        300,
         1,
         "s");
 }

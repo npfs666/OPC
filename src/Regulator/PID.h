@@ -50,15 +50,15 @@ public:
 
 private:
 
-    Measurement* measurement;
+    Measurement* measurement = nullptr;
 
-    double_t integral;
+    double_t integral = 0.0;
 
-    double_t previousMeasurement;
+    double_t previousMeasurement = 0.0;
 
-    uint32_t previousTime;
+    uint32_t previousTime = 0;
 
-    bool initialized;
+    bool initialized = false;
 };
 
 #endif

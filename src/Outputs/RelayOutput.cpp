@@ -25,43 +25,123 @@ RelayOutput::RelayOutput()
 void RelayOutput::begin(
     const char* name,
     uint8_t pin,
-    bool activeHigh)
+    bool activeHigh,
+    bool safeState)
 {
     begin(
         name,
         name,
         pin,
-        activeHigh);
+        activeHigh,
+        safeState);
 }
 
 void RelayOutput::begin(
     const char* key,
     const char* name,
     uint8_t pin,
-    bool activeHigh)
+    bool activeHigh,
+    bool safeState)
 {
     Output::begin(key, name);
     
     settings.pin = pin;
     settings.activeHigh = activeHigh;
+    settings.safeState = safeState;
 }
 
-void RelayOutput::begin()
+bool RelayOutput::begin()
 {
+    if (initialized)
+    {
+        writePhysicalState(
+            configuredPin,
+            configuredSafeState,
+            configuredActiveHigh);
+    }
+
     pinMode(settings.pin, OUTPUT);
-    writeCommand(0.0);
+
+    configuredPin = settings.pin;
+    configuredActiveHigh =
+        settings.activeHigh;
+    configuredSafeState =
+        settings.safeState;
+
+    initialized = true;
+
+    forceSafe();
+
+    return true;
 }
 
-void RelayOutput::writeCommand(double_t value)
+void RelayOutput::poll(uint32_t now)
 {
-    Output::writeCommand(value);
+    (void)now;
 
-    bool level = (command >= 0.5);
+    if (!initialized)
+        return;
 
-    if (!settings.activeHigh)
-        level = !level;
+    const bool requestedState =
+        requestedCommand() >= 0.5;
 
-    digitalWrite(settings.pin, level);
+    const bool appliedState =
+        appliedCommand() >= 0.5;
+
+    if (requestedState == appliedState)
+        return;
+
+    applyLogicalState(requestedState);
+}
+
+void RelayOutput::forceSafe()
+{
+    const double_t safeCommand =
+        settings.safeState ? 1.0 : 0.0;
+
+    requested = safeCommand;
+
+    if (!initialized)
+    {
+        setAppliedCommand(safeCommand);
+        return;
+    }
+
+    applyLogicalState(settings.safeState);
+}
+
+bool RelayOutput::applySettings()
+{
+    return begin();
+}
+
+bool RelayOutput::isHealthy() const
+{
+    return initialized;
+}
+
+void RelayOutput::applyLogicalState(bool state)
+{
+    writePhysicalState(
+        configuredPin,
+        state,
+        configuredActiveHigh);
+
+    setAppliedCommand(
+        state ? 1.0 : 0.0);
+}
+
+void RelayOutput::writePhysicalState(
+    uint8_t pin,
+    bool logicalState,
+    bool activeHigh)
+{
+    const bool physicalLevel =
+        activeHigh
+            ? logicalState
+            : !logicalState;
+
+    digitalWrite(pin, physicalLevel);
 }
 
 void RelayOutput::registerParameters(
@@ -70,7 +150,7 @@ void RelayOutput::registerParameters(
     auto parameters = list.forOwner({
         "outputs",
         "Sorties",
-        getKey(),
+        getConfigurationKey(),
         getName()
     });
 
@@ -84,4 +164,9 @@ void RelayOutput::registerParameters(
         "active_high",
         "Actif à HIGH",
         settings.activeHigh);
+
+    parameters.addBool(
+        "safe_state",
+        "État de sécurité",
+        settings.safeState);
 }

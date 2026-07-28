@@ -14,7 +14,7 @@ void Actuator::begin(
     const char* name,
     Regulator& regulator)
 {
-    this->key = key;
+    beginConfiguration(key);
     Displayable::begin(name);
 
     this->regulator = &regulator;
@@ -22,22 +22,27 @@ void Actuator::begin(
     outputCount = 0;
 }
 
-void Actuator::addOutput(Output& output)
+bool Actuator::addOutput(Output& output)
 {
     if (outputCount >= MAX_OUTPUTS)
-        return;
+        return false;
+
+    for (uint8_t i = 0;
+         i < outputCount;
+         i++)
+    {
+        if (outputs[i] == &output)
+            return false;
+    }
 
     outputs[outputCount++] = &output;
+
+    return true;
 }
 
 void Actuator::resume(uint32_t now)
 {
     (void)now;
-}
-
-const char* Actuator::getKey() const
-{
-    return key;
 }
 
 double_t Actuator::printValue() const
@@ -56,9 +61,5 @@ const char* Actuator::getUnit() const
 void Actuator::registerParameters(
     ParameterList& list)
 {
-    for (uint8_t i = 0; i < outputCount; i++)
-    {
-        if (outputs[i] != nullptr)
-            outputs[i]->registerParameters(list);
-    }
+    (void)list;
 }

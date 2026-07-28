@@ -9,8 +9,11 @@ class Configurable
 {
 public:
 
+    virtual ~Configurable() = default;
+
     virtual void registerParameters(ParameterList& list)
     {
+        (void)list;
     }
 
     virtual bool validateParameters(
@@ -19,6 +22,23 @@ public:
         (void)editor;
         return true;
     }
+
+protected:
+
+    void beginConfiguration(const char* key)
+    {
+        configurationKey =
+            key != nullptr ? key : "";
+    }
+
+    const char* getConfigurationKey() const
+    {
+        return configurationKey;
+    }
+
+private:
+
+    const char* configurationKey = "";
 };
 
 #endif

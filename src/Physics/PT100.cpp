@@ -1,5 +1,5 @@
 #include "PT100.h"
-#include <math.h>
+#include <cmath>
 
 /* 
     Array of fixed values RTD interpolation
@@ -14,32 +14,84 @@ const float PT100::interpolationTable[interpolationSize] =
 /**
  * @brief Conversion d'une resistance en température via le calcul par interpolation (plus précis qu'une fonction pour une approche réelle)
  * 
- * @param id sensor index
+ * @param resistance Résistance de la PT100 en ohms
  * @return double_t temperature in °C
  */
-double_t PT100::getResistanceToTemperature(double_t Rrtd) {
+double_t PT100::getResistanceToTemperature(
+    double_t resistance)
+{
+    constexpr double_t resistanceStep = 10.0;
 
-    if(Rrtd <= 10 )
-        return -219.415f;
+    const double_t minimumResistance =
+        resistanceStep;
 
-    if(Rrtd > (interpolationSize - 1) * 10 )
-        return 300.0f;
+    const double_t maximumResistance =
+        (interpolationSize - 1) *
+        resistanceStep;
 
-    int16_t index=(int16_t) (Rrtd/10);
-    double_t frac = (double_t)(Rrtd/10.0) - index;
-    double_t a = interpolationTable[index];
-
-    double_t temperature = 0;
-
-    // Si valeur juste, on lis la case directement
-    if (index == Rrtd / 10)
+    if (!std::isfinite(resistance) ||
+        resistance < minimumResistance ||
+        resistance > maximumResistance)
     {
-        temperature = interpolationTable[index];
+        return NAN;
     }
-    // Sinon approximation par interpolation du des valeurs du tableau
-    double_t b = interpolationTable[index + 1] / 2.0;
-    double_t c = interpolationTable[index - 1] / 2.0;
-    temperature = (double_t)a + frac * (b - c + frac * (c + b - a));
 
-    return temperature;
+    const double_t tablePosition =
+        resistance / resistanceStep;
+
+    const uint16_t index =
+        static_cast<uint16_t>(
+            tablePosition);
+
+    const double_t fraction =
+        tablePosition - index;
+
+    /*
+     * Une valeur exactement présente dans la table ne doit
+     * pas être interpolée. Ce cas protège également la
+     * dernière entrée contre un accès à index + 1.
+     */
+    if (fraction == 0.0 ||
+        index >= interpolationSize - 1)
+    {
+        return interpolationTable[index];
+    }
+
+    /*
+     * La première plage utilisable n'a pas de point
+     * précédent exploitable : interpolation linéaire entre
+     * les deux premières températures valides.
+     */
+    if (index == 1)
+    {
+        const double_t lower =
+            interpolationTable[index];
+
+        const double_t upper =
+            interpolationTable[index + 1];
+
+        return lower +
+               fraction * (upper - lower);
+    }
+
+    /*
+     * Interpolation quadratique à trois points pour toutes
+     * les autres plages.
+     */
+    const double_t previous =
+        interpolationTable[index - 1];
+
+    const double_t current =
+        interpolationTable[index];
+
+    const double_t next =
+        interpolationTable[index + 1];
+
+    return current +
+           0.5 * fraction *
+               (next - previous +
+                fraction *
+                    (previous -
+                     2.0 * current +
+                     next));
 }
