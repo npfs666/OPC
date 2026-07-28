@@ -19,6 +19,8 @@ public:
 
     virtual void update(uint32_t now) = 0;
 
+    virtual void resume(uint32_t now);
+
     double_t readCommand() const;
 
     double_t printValue() const override;

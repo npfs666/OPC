@@ -362,6 +362,15 @@ void SensorBoard::resetAcquisition()
     pauseInterrupts = true;
     newMeasurement = false;
 
+    for (uint8_t i = 0; i < MAX_RTD; i++)
+        mux.disableChannel(i);
+
+    adc.setIDACcurrent(CURRENT_0_UA);
+    adc.setIDAC1routing(IDAC_DISABLED);
+    adc.setIDAC2routing(IDAC_DISABLED);
+
+    curRTDSensor = 0;
+
     for (uint8_t i = 0; i < numRTDSensors; i++)
         rtd[i]->reset();
 }

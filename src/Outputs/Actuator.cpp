@@ -30,6 +30,11 @@ void Actuator::addOutput(Output& output)
     outputs[outputCount++] = &output;
 }
 
+void Actuator::resume(uint32_t now)
+{
+    (void)now;
+}
+
 const char* Actuator::getKey() const
 {
     return key;

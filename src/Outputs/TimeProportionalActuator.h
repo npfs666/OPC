@@ -28,6 +28,8 @@ public:
 
     void update(uint32_t now) override;
 
+    void resume(uint32_t now) override;
+
     void registerParameters(
         ParameterList& list) override;
 

@@ -18,8 +18,6 @@ public:
 
     bool display = true;
 
-protected:
-
     const char* getName() const;
 
     virtual double_t printValue() const = 0;
@@ -27,6 +25,10 @@ protected:
     virtual const char* getUnit() const = 0;
 
     virtual uint8_t printDecimals() const;
+
+protected:
+
+
 
     const char* name = "";
 };

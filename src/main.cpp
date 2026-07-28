@@ -9,14 +9,8 @@
  * 
  * MIT license, all text above must be included in any redistribution 
  */
-//#include <Hardware/pinout.h>
-#include <OPC.h>
-//#include "pico/stdlib.h"
-//#include <math.h>
-//#include <EEPROM.h>
-//#include <Measurements/Resistance.h>
-//#include <Measurements/Temperature/TemperatureRTD.h>
 
+#include <OPC.h>
 
 
 namespace
@@ -39,9 +33,8 @@ void setup()
 
 	attachInterrupt(digitalPinToInterrupt(SPI_DRDY), adcInterrupt, FALLING);
     
-    opc.initMeasurements();
-
-    rp2040.fifo.push(PARAMETERS_READY);
+    if (opc.initMeasurements())
+        rp2040.fifo.push(PARAMETERS_READY);
 }
 
 
@@ -52,12 +45,10 @@ void adcInterrupt() {
 }
 
 void ISRRotenc() {
-    //Serial.println("rotenc");
     opc.handleISRRotenc();
 }
 
 void ISRButton() {
-    //Serial.println("clic");
     opc.handleISRButton();
 }
 
@@ -67,21 +58,13 @@ void ISRButton() {
  */
 void loop()
 {	
-    // opc.handleISRPause();
-    // Gestion des messages entre CPU0 et CPU1 pour la mise en pause des ISR en cas d'entrée dans le menu
-	if (rp2040.fifo.available() > 0) {
-		uint32_t val = rp2040.fifo.pop();
-		
-		// Pauses ADC IRQ while calibrating
-		if (val == PAUSE_ADC_INTERRUPTS) {
-			irq_set_enabled(13, false); // Pause IO interrupts
-		} else if (val == RESUME_ADC_INTERRUPTS) {
-			irq_set_enabled(13, true); // Resume IO interrupts
-		}
-	}
+    uint32_t message;
+
+    while (rp2040.fifo.pop_nb(&message))
+        opc.handleControlMessage(message);
 
     // Mettre en place le calcul des measurement, car ici on est pas dans l'ISR donc on a le temps.
-    if (!opc.newMeasurement())  return;
+    opc.newMeasurement();
 }
 
 
@@ -127,23 +110,10 @@ void loop1()
     uint32_t message;
 
     while (rp2040.fifo.pop_nb(&message))
-    {
-        switch (message)
-        {
-        case PARAMETERS_READY:
-            opc.initMenu();
-            break;
+        opc.handleUIMessage(message);
 
-        case PRINT_DATA_AVAILABLE:
-            opc.controller.print(Serial);
-            break;
-        }
-    }
-
-    opc.menuPoll();
+    opc.uiPoll();
 }
-
-
 
 
 

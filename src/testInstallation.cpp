@@ -2,7 +2,55 @@
 
 #include "Hardware/SensorBoard.h"
 #include "ProcessControl.h"
-#include <Adafruit_ST77xx.h>
+
+#include <Adafruit_GFX.h>
+
+#include <hmi/DisplayTextCodec.h>
+
+namespace
+{
+    constexpr uint16_t COLOR_BLACK = 0x0000;
+    constexpr uint16_t COLOR_WHITE = 0xFFFF;
+    constexpr uint16_t COLOR_CYAN = 0x07FF;
+    constexpr uint16_t COLOR_GREY = 0x8410;
+
+    void printHomeValue(
+        Adafruit_GFX& display,
+        int16_t y,
+        const MeasurementSample* sample)
+    {
+        display.fillRect(
+            55,
+            y,
+            display.width() - 55,
+            20,
+            COLOR_BLACK);
+
+        display.setCursor(60, y);
+        display.setTextColor(
+            COLOR_WHITE,
+            COLOR_BLACK);
+
+        if (sample == nullptr ||
+            !sample->valid)
+        {
+            display.print("--.-");
+            return;
+        }
+
+        display.print(sample->value, 1);
+        display.print(' ');
+
+        char unit[12] = {};
+
+        DisplayTextCodec::utf8ToCp437(
+            sample->unit,
+            unit,
+            sizeof(unit));
+
+        display.print(unit);
+    }
+}
 
 TestInstallation::TestInstallation()
 {
@@ -13,22 +61,67 @@ const char* TestInstallation::name() const
     return "Installation de test pour le développement";
 }
 
-void TestInstallation::printParameters(const ParameterList& list, Stream& stream)
+void TestInstallation::printHomeScreen(
+    HomeScreenContext& context)
 {
-    for (size_t i = 0; i < list.count(); i++)
+    Adafruit_GFX& display = context.display;
+
+    display.cp437(true);
+    display.setTextWrap(false);
+
+    if (context.fullRefresh)
     {
-        const Parameter* parameter = list.get(i);
+        display.fillScreen(COLOR_BLACK);
 
-        if (parameter == nullptr)
-            continue;
+        display.setTextSize(2);
+        display.setTextColor(
+            COLOR_CYAN,
+            COLOR_BLACK);
+        display.setCursor(8, 5);
+        display.print("OPC - Accueil");
 
-        stream.print(parameter->ownerKey);
-        stream.print('.');
-        stream.print(parameter->key);
-        stream.print(" : ");
-        stream.println(parameter->name);
+        display.drawFastHLine(
+            0,
+            25,
+            display.width(),
+            COLOR_GREY);
+
+        display.setTextColor(
+            COLOR_WHITE,
+            COLOR_BLACK);
+
+        display.setCursor(8, 38);
+        display.print("T1");
+
+        display.setCursor(8, 70);
+        display.print("T2");
+
+        display.setCursor(8, 102);
+        display.print("HR");
     }
+
+    display.setTextSize(2);
+
+    printHomeValue(
+        display,
+        38,
+        context.measurements.find(
+            rtd1Temperature));
+
+    printHomeValue(
+        display,
+        70,
+        context.measurements.find(
+            rtd2Temperature));
+
+    printHomeValue(
+        display,
+        102,
+        context.measurements.find(
+            psychroHumidity));
 }
+
+
 
 bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessControl &controller)
 {
@@ -75,8 +168,12 @@ bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessCo
     pid.begin("pid", "PID", rtd1Temperature);
     controller.add(pid);
 
-    parameterList.begin(parameterStorage, MAX_PARAMETERS);
-    parameterList.clear();
+    solar.begin("Reg Solaire", tempBME, rtd1Temperature, rtd2Temperature);
+    controller.add(solar);
+
+    heater.begin("heater", thermostat);
+    controller.add(heater);
+
     board.registerParameters(parameterList);
     controller.registerParameters(parameterList);
 
@@ -86,8 +183,6 @@ bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessCo
             "Parameter registration failed");
         return false;
     }
-
-    printParameters(parameterList, Serial);
 
     return true;
 }
@@ -103,5 +198,3 @@ void TestInstallation::save(Storage& storage)
 void TestInstallation::factoryReset()
 {
 }
-
-

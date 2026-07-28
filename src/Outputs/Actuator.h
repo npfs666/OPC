@@ -30,6 +30,8 @@ public:
 
     virtual void update(uint32_t now) = 0;
 
+    virtual void resume(uint32_t now);
+
     void registerParameters(
         ParameterList& list) override;
 

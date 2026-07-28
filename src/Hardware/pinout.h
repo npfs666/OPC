@@ -26,6 +26,8 @@ constexpr uint32_t PRINT_DATA_AVAILABLE = 3;
 constexpr uint32_t APPLY_MENU_PARAMETERS = 4;
 constexpr uint32_t MENU_PARAMETERS_APPLIED = 5;
 constexpr uint32_t PARAMETERS_READY = 6;
+constexpr uint32_t ACQUISITION_PAUSED = 7;
+constexpr uint32_t MENU_PARAMETERS_REJECTED = 8;
 
 // Ecran SPI TFT (SPI1)
 #define LCD_SCK 14

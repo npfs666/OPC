@@ -64,7 +64,9 @@ bool ArduinoMenuUI::begin(Adafruit_ST7789 &display,
     display.cp437(true);
     display.setTextSize(TEXT_SCALE);
     display.setTextWrap(false);
-    display.fillScreen(ST77XX_BLACK);
+
+    this->display = &display;
+    displayRotation = display.getRotation();
 
     screenOutput = new Menu::adaGfxOut(
         display,
@@ -86,13 +88,55 @@ bool ArduinoMenuUI::begin(Adafruit_ST7789 &display,
         input,
         *outputs);
 
-    nav->canExit = false;
+    nav->canExit = true;
 
     initialized = true;
-    nav->refresh();
-    nav->poll();
 
     return true;
+}
+
+void ArduinoMenuUI::show()
+{
+    if (!initialized ||
+        nav == nullptr ||
+        display == nullptr)
+    {
+        return;
+    }
+
+    display->setRotation(displayRotation);
+    display->setFont(nullptr);
+    display->cp437(true);
+    display->setTextSize(TEXT_SCALE);
+    display->setTextWrap(false);
+
+    if (nav->sleepTask != nullptr)
+        nav->idleOff();
+
+    nav->reset();
+
+    display->fillScreen(ST77XX_BLACK);
+
+    nav->refresh();
+    nav->poll();
+}
+
+void ArduinoMenuUI::close()
+{
+    if (!initialized || nav == nullptr)
+        return;
+
+    if (nav->sleepTask != nullptr)
+        return;
+
+    if (nav->navFocus != &nav->active())
+        nav->doNav(Menu::navCmd(Menu::escCmd));
+
+    while (nav->level > 0)
+        nav->doNav(Menu::navCmd(Menu::escCmd));
+
+    if (nav->sleepTask == nullptr)
+        nav->idleOn(nav->idleTask);
 }
 
 void ArduinoMenuUI::move(int32_t direction)
@@ -106,12 +150,19 @@ void ArduinoMenuUI::move(int32_t direction)
         nav->doNav(Menu::navCmd(Menu::upCmd));
 }
 
-void ArduinoMenuUI::enter()
+bool ArduinoMenuUI::enter()
 {
     if (!initialized || nav == nullptr)
-        return;
+        return false;
+
+    const bool exitRequested =
+        nav->level == 0 &&
+        quitItem != nullptr &&
+        &nav->selected() == quitItem;
 
     nav->doNav(Menu::navCmd(Menu::enterCmd));
+
+    return exitRequested;
 }
 
 void ArduinoMenuUI::poll()
@@ -144,6 +195,7 @@ bool ArduinoMenuUI::buildMenuTree(
     }
 
     selectionOptionsUsed = 0;
+    quitItem = nullptr;
 
     for (size_t i = 0;
          i < MAX_SELECTION_OPTIONS;
@@ -219,6 +271,19 @@ bool ArduinoMenuUI::buildMenuTree(
         menuItemCounts[group]++;
     }
 
+    const MenuBuilder::GroupId rootGroup =
+        menuDefinition.root();
+
+    if (rootGroup ==
+            MenuBuilder::INVALID_GROUP ||
+        menuDefinition.getGroup(
+            rootGroup) == nullptr)
+    {
+        return false;
+    }
+
+    menuItemCounts[rootGroup]++;
+
     for (size_t i = 1; i < groupCount; i++)
         menuItemCounts[i]++;
 
@@ -290,6 +355,15 @@ bool ArduinoMenuUI::buildMenuTree(
         }
     }
 
+    quitItem = new Menu::Exit("Quitter");
+
+    if (!appendMenuItem(
+            rootGroup,
+            quitItem))
+    {
+        return false;
+    }
+
     for (size_t i = 1; i < groupCount; i++)
     {
         backItems[i] =
@@ -314,10 +388,10 @@ bool ArduinoMenuUI::buildMenuTree(
             return false;
     }
 
-    root = menuNodes[menuDefinition.root()];
+    root = menuNodes[rootGroup];
 
     return root != nullptr &&
-           menuItemCounts[menuDefinition.root()] > 0;
+           menuItemCounts[rootGroup] > 0;
 }
 
 bool ArduinoMenuUI::appendMenuItem(

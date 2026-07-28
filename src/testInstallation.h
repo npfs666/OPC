@@ -17,6 +17,9 @@
 
 #include <Regulator/Thermostat.h>
 #include <Regulator/PID.h>
+#include "Regulator/SolarRegulator.h"
+
+#include <Outputs/ActuatorOnOff.h>
 
 class SensorBoard;
 class Adafruit_BME280;
@@ -48,7 +51,8 @@ public:
         Adafruit_BME280& bme,
         ProcessControl& process) override;
 
-    void printHomeScreen();
+    void printHomeScreen(
+        HomeScreenContext& context) override;
 
     void load(Storage& storage) override;
 
@@ -56,16 +60,8 @@ public:
 
     void factoryReset() override;
 
-    ParameterList& getParameters()
-    {
-        return parameterList;
-    }
-
-    void printParameters(const ParameterList& list,Stream& stream);
 
 private:
-
-
 
     // Entrées
 
@@ -92,11 +88,11 @@ private:
 
     PID pid;
 
-    //SolarRegulator solar;
+    SolarRegulator solar;
 
     // ---------- Actionneurs ----------
 
-    //OnOffActuator heater;
+    ActuatorOnOff heater;
 
     //TimeProportionalActuator pump;
 

@@ -18,6 +18,11 @@ void Regulator::begin(
     command = 0.0;
 }
 
+void Regulator::resume(uint32_t now)
+{
+    (void)now;
+}
+
 const char* Regulator::getKey() const
 {
     return key;

@@ -1,5 +1,7 @@
 #include <Regulator/PID.h>
 
+#include <ParameterEditor.h>
+
 PID::PID()
 {
 }
@@ -47,7 +49,17 @@ void PID::reset()
 
 void PID::update(uint32_t now)
 {
+    if (measurement == nullptr ||
+        !measurement->isValid())
+    {
+        initialized = false;
+        return;
+    }
+
     double_t pv = measurement->getValue();
+
+    if (settings.ki <= 0.0)
+        integral = 0.0;
 
     if(!initialized)
     {
@@ -84,6 +96,12 @@ void PID::update(uint32_t now)
     previousMeasurement = pv;
 
     previousTime = now;
+}
+
+void PID::resume(uint32_t now)
+{
+    previousTime = now;
+    initialized = false;
 }
 
 void PID::registerParameters(ParameterList& list) {
@@ -152,4 +170,55 @@ void PID::registerParameters(ParameterList& list) {
         1.0,
         0.01,
         2);
+}
+
+bool PID::validateParameters(
+    const ParameterEditor& editor) const
+{
+    const ParameterDraft* outputMin =
+        editor.find(
+            getKey(),
+            "output_min");
+
+    const ParameterDraft* outputMax =
+        editor.find(
+            getKey(),
+            "output_max");
+
+    if (outputMin == nullptr ||
+        outputMax == nullptr ||
+        outputMin->parameter == nullptr ||
+        outputMax->parameter == nullptr ||
+        outputMin->parameter->type !=
+            Parameter::Type::Double ||
+        outputMax->parameter->type !=
+            Parameter::Type::Double)
+    {
+        return false;
+    }
+
+    return outputMin->numberValue <=
+           outputMax->numberValue;
+}
+
+void PID::print(Stream& stream) const 
+{
+    PrintSize ps;
+
+    stream.print(getName());
+
+    uint8_t len = strlen(getName());
+    while (len++ < 16)
+        stream.print(' ');
+
+    stream.print(": ");
+
+    stream.print(command);
+    stream.print(" | Measur : ");
+    stream.print(measurement->printValue(), measurement->printDecimals());
+    stream.print(measurement->getUnit());
+    stream.print(" | SP : ");
+    stream.print(settings.setpoint, 2);
+
+    stream.println(' ');
 }

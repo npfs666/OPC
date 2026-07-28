@@ -62,6 +62,11 @@ void TimeProportionalActuator::update(uint32_t now)
         outputs[i]->writeCommand(relayState);
 }
 
+void TimeProportionalActuator::resume(uint32_t now)
+{
+    cycleStart = now;
+}
+
 void TimeProportionalActuator::registerParameters(
     ParameterList& list)
 {

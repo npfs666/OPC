@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Hardware/pinout.h>
+#include <hardware/sync.h>
 
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
@@ -12,13 +13,74 @@
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 #include <Regulator/Thermostat.h>
 
-OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
+namespace
 {
+    class FixedBufferPrint final : public Stream
+    {
+    public:
+        FixedBufferPrint(
+            uint8_t* storage,
+            size_t capacity)
+            : storage(storage),
+              capacity(capacity)
+        {
+        }
+
+        size_t write(uint8_t value) override
+        {
+            if (length < capacity)
+                storage[length++] = value;
+
+            return 1;
+        }
+
+        size_t write(
+            const uint8_t* data,
+            size_t size) override
+        {
+            for (size_t i = 0; i < size; i++)
+                write(data[i]);
+
+            return size;
+        }
+
+        size_t size() const
+        {
+            return length;
+        }
+
+        int available() override
+        {
+            return 0;
+        }
+
+        int read() override
+        {
+            return -1;
+        }
+
+        int peek() override
+        {
+            return -1;
+        }
+
+        void flush() override
+        {
+        }
+
+    private:
+        uint8_t* storage = nullptr;
+        size_t capacity = 0;
+        size_t length = 0;
+    };
 }
 
-/*OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET), userInstallation(NULL)
+OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
 {
-}*/
+    mutex_init(&processDataMutex);
+}
+
+
 
 void OPC::initSerial()
 {
@@ -28,6 +90,8 @@ void OPC::initSerial()
 
     Serial.println("Open Process Controller v0.3");
 }
+
+
 
 void OPC::initDisplay()
 {
@@ -93,15 +157,32 @@ bool OPC::newMeasurement()
     
     // Faire la MAJ des mesures (conversion data -> mesure)
     unsigned long times = millis();
+
+    mutex_enter_blocking(
+        &processDataMutex);
+
     controller.update(times);
+
+    controller.captureMeasurements(
+        sharedMeasurementSnapshot,
+        times);
+
+    mutex_exit(&processDataMutex);
 
     rp2040.fifo.push_nb(PRINT_DATA_AVAILABLE);
 
     return true;
 }
 
-void OPC::initMeasurements()
+bool OPC::initMeasurements()
 {
+    if (!userInstall.prepareParameterRegistration())
+    {
+        Serial.println(
+            "Parameter storage initialization failed");
+        return false;
+    }
+
     if (!userInstall.begin(
             input,
             bme,
@@ -109,10 +190,19 @@ void OPC::initMeasurements()
     {
         Serial.println(
             "Installation initialization failed");
-        return;
+        return false;
+    }
+
+    if (!userInstall.completeParameterRegistration())
+    {
+        Serial.println(
+            "Framework parameter registration failed");
+        return false;
     }
 
     input.startContinuous();
+
+    return true;
 }
 
 void OPC::initMenu()
@@ -140,9 +230,86 @@ void OPC::initMenu()
     }
 }
 
-void OPC::menuPoll()
+void OPC::copyMeasurementSnapshot()
 {
-    int32_t movement = encoder.takeRotation();
+    mutex_enter_blocking(
+        &processDataMutex);
+
+    displayMeasurementSnapshot =
+        sharedMeasurementSnapshot;
+
+    mutex_exit(&processDataMutex);
+}
+
+void OPC::showHomeScreen(
+    bool fullRefresh)
+{
+    HomeScreenContext context{
+        tft,
+        displayMeasurementSnapshot,
+        millis(),
+        fullRefresh
+    };
+
+    userInstall.printHomeScreen(context);
+}
+
+void OPC::requestMenu()
+{
+    if (uiState != UIState::Home ||
+        !menu.isInitialized())
+    {
+        return;
+    }
+
+    uiState = UIState::PauseRequested;
+
+    rp2040.fifo.push(
+        PAUSE_ADC_INTERRUPTS);
+}
+
+void OPC::requestParameterApply()
+{
+    if (uiState != UIState::Menu)
+        return;
+
+    menu.close();
+
+    uiState = UIState::ApplyRequested;
+
+    /*
+     * Les brouillons ont été écrits par le coeur 1.
+     * La barrière garantit leur visibilité avant
+     * l'envoi de la commande au coeur 0.
+     */
+    __dmb();
+
+    rp2040.fifo.push(
+        APPLY_MENU_PARAMETERS);
+}
+
+void OPC::uiPoll()
+{
+    int32_t movement =
+        encoder.takeRotation();
+
+    const bool clicked =
+        encoder.takeClick();
+
+    if (uiState == UIState::Home)
+    {
+        if (clicked)
+            requestMenu();
+
+        return;
+    }
+
+    if (uiState != UIState::Menu)
+        return;
+
+    const bool hadActivity =
+        movement != 0 ||
+        clicked;
 
     while (movement > 0)
     {
@@ -156,67 +323,170 @@ void OPC::menuPoll()
         movement++;
     }
 
-    if (encoder.takeClick())
-        menu.enter();
+    bool exitRequested = false;
+
+    if (clicked)
+        exitRequested = menu.enter();
 
     menu.poll();
+
+    const uint32_t now = millis();
+
+    if (hadActivity)
+        lastMenuActivity = now;
+
+    const uint32_t timeout =
+        userInstall.menuTimeoutMs();
+
+    const bool timedOut =
+        (now - lastMenuActivity) >= timeout;
+
+    if (exitRequested || timedOut)
+        requestParameterApply();
 }
 
-void OPC::handleISRPause()
+void OPC::handleControlMessage(
+    uint32_t message)
 {
-    if(!rp2040.fifo.available())
-        return;
-
-    switch(rp2040.fifo.pop())
+    switch (message)
     {
-        case PAUSE_ADC_INTERRUPTS:
+    case PAUSE_ADC_INTERRUPTS:
+        if (!acquisitionPausedForMenu)
+        {
+            input.pause();
+            input.resetAcquisition();
+            acquisitionPausedForMenu = true;
+        }
 
-            irq_set_enabled(13,false);
+        rp2040.fifo.push(
+            ACQUISITION_PAUSED);
+        break;
 
+    case APPLY_MENU_PARAMETERS:
+        if (!acquisitionPausedForMenu)
+        {
+            rp2040.fifo.push(
+                MENU_PARAMETERS_REJECTED);
             break;
+        }
 
-        case RESUME_ADC_INTERRUPTS:
+        /*
+         * La commande FIFO vient du coeur 1 :
+         * les brouillons ne seront plus modifiés tant
+         * que la réponse n'aura pas été reçue.
+         */
+        __dmb();
 
-            irq_set_enabled(13,true);
-
-            //nav.exit();
-
+        if (!parameterEditor.validate() ||
+            !input.validateParameters(
+                parameterEditor) ||
+            !controller.validateParameters(
+                parameterEditor) ||
+            !userInstall.validateParameters(
+                parameterEditor) ||
+            !parameterEditor.apply())
+        {
+            rp2040.fifo.push(
+                MENU_PARAMETERS_REJECTED);
             break;
+        }
+
+        userInstall.onParametersApplied();
+
+        input.resetAcquisition();
+        controller.resume(millis());
+        input.startContinuous();
+
+        acquisitionPausedForMenu = false;
+
+        __dmb();
+
+        rp2040.fifo.push(
+            MENU_PARAMETERS_APPLIED);
+        break;
     }
 }
 
-void OPC::displayMeasurements(Measurement* measurements, uint8_t count)
+void OPC::handleUIMessage(
+    uint32_t message)
 {
-    Serial.println("Display measurements:");
-    for(uint8_t i = 0; i < count; i++)
+    switch (message)
     {
+    case PARAMETERS_READY:
+        initMenu();
+        copyMeasurementSnapshot();
+        uiState = UIState::Home;
+        showHomeScreen(true);
+        break;
 
-        /*Serial.print(measurements[i].name);
-        Serial.print(" = ");
-        Serial.print(measurements[i].value, 2);
-        Serial.print(" ");
-        Serial.println(measurements[i].unit);*/
-    }
-}
-
-void OPC::serialMeasurements(Measurement* measurements, uint8_t count)
-{
-    Serial.println("Serial measurements:");
-    for(uint8_t i = 0; i < count; i++)
+    case PRINT_DATA_AVAILABLE:
     {
-        /*Serial.print(measurements[i].name);
-        Serial.print(": ");
-        Serial.print(measurements[i].value, 2);
-        Serial.print(" ");
-        Serial.println(measurements[i].unit);*/
+        FixedBufferPrint bufferedOutput(
+            serialPrintBuffer,
+            sizeof(serialPrintBuffer));
+
+        mutex_enter_blocking(
+            &processDataMutex);
+
+        controller.print(bufferedOutput);
+
+        mutex_exit(&processDataMutex);
+
+        if (uiState == UIState::Home)
+        {
+            copyMeasurementSnapshot();
+            showHomeScreen(false);
+        }
+
+        Serial.write(
+            serialPrintBuffer,
+            bufferedOutput.size());
+        break;
     }
-    Serial.println();
-}
 
-void OPC::printScreen(int16_t x, int16_t y, uint8_t size, uint16_t color,const char* text) {
+    case ACQUISITION_PAUSED:
+        if (uiState !=
+                UIState::PauseRequested)
+        {
+            break;
+        }
 
-    tft.setTextSize(4);
-    tft.setCursor(x, y);
-    tft.setTextColor(color, ST77XX_BLACK);
-    tft.printf(text);
+        parameterEditor.capture();
+        menu.show();
+
+        lastMenuActivity = millis();
+        uiState = UIState::Menu;
+        break;
+
+    case MENU_PARAMETERS_APPLIED:
+        if (uiState !=
+                UIState::ApplyRequested)
+        {
+            break;
+        }
+
+        __dmb();
+
+        displayMeasurementSnapshot =
+            MeasurementSnapshot{};
+
+        uiState = UIState::Home;
+        showHomeScreen(true);
+        break;
+
+    case MENU_PARAMETERS_REJECTED:
+        if (uiState !=
+                UIState::ApplyRequested)
+        {
+            break;
+        }
+
+        Serial.println(
+            "Menu parameter validation failed");
+
+        menu.show();
+        lastMenuActivity = millis();
+        uiState = UIState::Menu;
+        break;
+    }
 }

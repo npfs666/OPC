@@ -130,3 +130,26 @@ void SolarRegulator::registerParameters(
         1,
         "°C");
 }
+
+void SolarRegulator::print(Stream& stream) const 
+{
+    PrintSize ps;
+
+    stream.print(getName());
+
+    uint8_t len = strlen(getName());
+    while (len++ < 16)
+        stream.print(' ');
+
+    stream.print(": ");
+
+    stream.print((command == 0) ? "Off" : "On");
+    stream.print(" | Tcell : ");
+    stream.print(collector->printValue(), collector->printDecimals());
+    stream.print(" | Thaut : ");
+    stream.print(tankTop->printValue(), tankTop->printDecimals());
+    stream.print(" | Tbas : ");
+    stream.print(tankBottom->printValue(), tankBottom->printDecimals());
+
+    stream.println(' ');
+}

@@ -11,6 +11,9 @@
 
 #include <ParameterList.h>
 
+class MeasurementSnapshot;
+class ParameterEditor;
+
 class ProcessControl
 {
 public:
@@ -23,13 +26,22 @@ public:
 
     void update(uint32_t now);
 
+    void resume(uint32_t now);
+
     Measurement* getMeasurement(uint8_t id);
+
+    void captureMeasurements(
+        MeasurementSnapshot& destination,
+        uint32_t now) const;
 
     void print(Stream& stream) const;
 
     void printCSVPsychro(uint32_t now);
 
     void registerParameters(ParameterList& list);
+
+    bool validateParameters(
+        const ParameterEditor& editor) const;
 
 private:
 

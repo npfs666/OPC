@@ -40,6 +40,8 @@ public:
 
     void registerParameters(
         ParameterList& list) override;
+    
+    void print(Stream& stream) const override;
 
 private:
 

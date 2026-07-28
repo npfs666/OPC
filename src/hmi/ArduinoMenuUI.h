@@ -17,8 +17,10 @@ public:
         ParameterEditor& editor,
         const MenuBuilder& menuDefinition);
 
+    void show();
+    void close();
     void move(int32_t direction);
-    void enter();
+    bool enter();
     void poll();
 
     bool isInitialized() const;
@@ -33,11 +35,15 @@ private:
     static constexpr size_t MAX_GROUPS =
         MenuBuilder::MAX_GROUPS;
     static constexpr size_t MAX_MENU_ITEMS =
-        MAX_PARAMETERS + (2 * (MAX_GROUPS - 1));
+        MAX_PARAMETERS +
+        (2 * (MAX_GROUPS - 1)) +
+        1;
     static constexpr size_t MAX_SELECTION_OPTIONS =
         ParameterList::MAX_SELECTION_OPTIONS;
 
     bool initialized = false;
+    Adafruit_ST7789* display = nullptr;
+    uint8_t displayRotation = 0;
 
     Menu::prompt* parameterItems[MAX_PARAMETERS] = {};
     MenuBuilder::GroupId parameterGroups[MAX_PARAMETERS] = {};
@@ -52,6 +58,7 @@ private:
     Menu::prompt* menuItems[MAX_MENU_ITEMS] = {};
     Menu::menuNode* menuNodes[MAX_GROUPS] = {};
     Menu::Exit* backItems[MAX_GROUPS] = {};
+    Menu::Exit* quitItem = nullptr;
 
     Menu::idx_t menuItemCounts[MAX_GROUPS] = {};
     size_t menuItemOffsets[MAX_GROUPS] = {};

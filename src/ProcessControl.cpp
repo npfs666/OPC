@@ -1,5 +1,7 @@
 #include <ProcessControl.h>
 
+#include <Measurements/MeasurementSnapshot.h>
+
 ProcessControl::ProcessControl()
 {
     measurementCount = 0;
@@ -43,6 +45,28 @@ void ProcessControl::update(uint32_t now)
         actuators[i]->update(now);
 }
 
+void ProcessControl::resume(uint32_t now)
+{
+    for (uint8_t i = 0; i < regulatorCount; i++)
+        regulators[i]->resume(now);
+
+    for (uint8_t i = 0; i < actuatorCount; i++)
+        actuators[i]->resume(now);
+}
+
+void ProcessControl::captureMeasurements(
+    MeasurementSnapshot& destination,
+    uint32_t now) const
+{
+    destination.clear(now);
+
+    for (uint8_t i = 0; i < measurementCount; i++)
+    {
+        if (measurements[i] != nullptr)
+            destination.add(*measurements[i]);
+    }
+}
+
 Measurement* ProcessControl::getMeasurement(uint8_t id) {
 
     if (id >= measurementCount)
@@ -66,22 +90,16 @@ void ProcessControl::printCSVPsychro(uint32_t now) {
 void ProcessControl::print(Stream& stream) const
 {
     //stream.println();
-    //stream.println(F("===== Process Control ====="));
+    stream.println(F("===== Process Control ====="));
 
-    //stream.println(F("Measurements"));
-    stream.println(F("--------------------------"));
+    stream.println(F("-------Measurements-------"));
     for (uint8_t i = 0; i < measurementCount; i++)
     {
         measurements[i]->print(stream);
     }
-
-    //double_t deltas = measurements[3]->getValue() - measurements[5]->getValue(); 
-    //Serial.println(deltas, 3);
     
     if (regulatorCount > 0 )  {
-        stream.println();
-        stream.println(F("Regulators"));
-        stream.println(F("--------------------------"));
+        stream.println(F("--------Regulators--------"));
     }
     
     for (uint8_t i = 0; i < regulatorCount; i++)
@@ -89,14 +107,13 @@ void ProcessControl::print(Stream& stream) const
         regulators[i]->print(stream);
     }
 
-    stream.println();
-    /*
-    stream.println(F("Actuators"));
-    stream.println(F("--------------------------"));
+    if (actuatorCount > 0 )  {
+        stream.println(F("--------Actuators---------"));
+    }
     for (uint8_t i = 0; i < actuatorCount; i++)
     {
         actuators[i]->print(stream);
-    }*/
+    }
 
     stream.println(F("=========================="));
     stream.println();
@@ -123,4 +140,30 @@ void ProcessControl::registerParameters(ParameterList& list)
     {
         measurements[i]->registerParameters(list);
     }*/
+}
+
+bool ProcessControl::validateParameters(
+    const ParameterEditor& editor) const
+{
+    for (size_t i = 0; i < regulatorCount; i++)
+    {
+        if (regulators[i] != nullptr &&
+            !regulators[i]->validateParameters(
+                editor))
+        {
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < actuatorCount; i++)
+    {
+        if (actuators[i] != nullptr &&
+            !actuators[i]->validateParameters(
+                editor))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }

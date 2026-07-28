@@ -38,7 +38,15 @@ public:
 
     void update(uint32_t now) override;
 
+    void resume(uint32_t now) override;
+
     void registerParameters(ParameterList& list) override;
+
+    bool validateParameters(
+        const ParameterEditor& editor)
+        const override;
+    
+    void print(Stream& stream) const override;
 
 private:
 

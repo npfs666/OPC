@@ -19,10 +19,16 @@ class ParameterEditor
 public:
     void begin(const ParameterList& parameters);
     void capture();
+    bool validate() const;
+    bool apply();
 
     size_t count() const;
     ParameterDraft& get(size_t index);
     const ParameterDraft& get(size_t index) const;
+
+    const ParameterDraft* find(
+        const char* ownerKey,
+        const char* parameterKey) const;
 
 private:
     ParameterDraft drafts[MAX_PARAMETERS];
