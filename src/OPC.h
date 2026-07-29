@@ -10,13 +10,15 @@
 #include <Adafruit_BME280.h>
 
 #include <testInstallation.h>
+#include <Templates/SolarInstallation.h>
+#include <Templates/ThermostatInstallation.h>
 
 #include <Measurements/MeasurementSnapshot.h>
 
 #include <hmi/MenuBuilder.h>
 #include <hmi/ParameterEditor.h>
 #include <Storage.h>
-#include "hmi/RotaryEncoder.h"
+#include <hmi/RotaryEncoder.h>
 #include <hmi/ArduinoMenuUI.h>
 
 #include <pico/mutex.h>
@@ -86,7 +88,7 @@ private:
         ApplyRequested
     };
 
-    TestInstallation userInstall;
+    ThermostatInstallation userInstall;
     Storage storage;
     ParameterEditor parameterEditor;
     MenuBuilder menuDefinition;

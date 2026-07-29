@@ -47,7 +47,7 @@ public:
 
     void print(Stream& stream) const;
 
-    void printCSVPsychro(uint32_t now);
+    void printCSVPsychro(Stream& stream) const;
 
     void registerParameters(ParameterList& list);
 

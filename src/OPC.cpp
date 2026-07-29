@@ -182,6 +182,8 @@ bool OPC::newMeasurement()
 
 void OPC::controlPoll()
 {
+    storage.poll();
+
     if (!controlOutputsEnabled ||
         acquisitionPausedForMenu)
     {
@@ -541,7 +543,8 @@ void OPC::handleUIMessage(
         mutex_enter_blocking(
             &processDataMutex);
 
-        controller.print(bufferedOutput);
+        //controller.print(bufferedOutput);
+        controller.printCSVPsychro(bufferedOutput);
 
         mutex_exit(&processDataMutex);
 

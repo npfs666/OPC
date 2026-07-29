@@ -2,6 +2,7 @@
 
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <SingleFileDrive.h>
 #include <hmi/ParameterEditor.h>
 
 #include <cmath>
@@ -9,6 +10,20 @@
 
 namespace
 {
+    class InterruptGuard final
+    {
+    public:
+        InterruptGuard()
+        {
+            noInterrupts();
+        }
+
+        ~InterruptGuard()
+        {
+            interrupts();
+        }
+    };
+
     bool isValidRequiredText(JsonVariantConst value)
     {
         return value.is<const char*>() &&
@@ -16,13 +31,38 @@ namespace
     }
 }
 
+Storage* Storage::usbOwner = nullptr;
+
 bool Storage::begin()
 {
-    if (mounted)
-        return true;
+    if (!mounted)
+        mounted = LittleFS.begin();
 
-    mounted = LittleFS.begin();
+    if (mounted &&
+        !usbExportStarted)
+    {
+        startUsbExport();
+    }
+
     return mounted;
+}
+
+void Storage::poll()
+{
+    if (!mounted ||
+        !usbExportStarted ||
+        !usbExportPending)
+    {
+        return;
+    }
+
+    InterruptGuard interruptGuard;
+
+    if (usbDriveMounted)
+        return;
+
+    usbExportPending =
+        !refreshUsbExport();
 }
 
 Storage::RestoreResult Storage::restore(
@@ -31,6 +71,8 @@ Storage::RestoreResult Storage::restore(
     ParameterEditor& editor,
     const ParameterRestoreValidator& validator)
 {
+    InterruptGuard interruptGuard;
+
     editor.begin(parameters);
     editor.capture();
     clearRestoredText();
@@ -203,6 +245,8 @@ bool Storage::save(
         }
     }
 
+    InterruptGuard interruptGuard;
+
     File temporary =
         LittleFS.open(TEMP_PATH, "w");
 
@@ -236,6 +280,15 @@ bool Storage::save(
         return false;
     }
 
+    usbExportPending = true;
+
+    if (usbExportStarted &&
+        !usbDriveMounted)
+    {
+        usbExportPending =
+            !refreshUsbExport();
+    }
+
     return true;
 }
 
@@ -243,6 +296,8 @@ bool Storage::erase()
 {
     if (!mounted)
         return false;
+
+    InterruptGuard interruptGuard;
 
     bool success = true;
 
@@ -256,8 +311,162 @@ bool Storage::erase()
             success;
     }
 
+    usbExportPending = true;
+
+    if (usbExportStarted &&
+        !usbDriveMounted)
+    {
+        usbExportPending =
+            !refreshUsbExport();
+    }
+
     clearRestoredText();
     return success;
+}
+
+void Storage::handleUsbPlug(uint32_t data)
+{
+    (void)data;
+
+    if (usbOwner != nullptr)
+        usbOwner->usbDriveMounted = true;
+}
+
+void Storage::handleUsbUnplug(uint32_t data)
+{
+    (void)data;
+
+    if (usbOwner == nullptr)
+        return;
+
+    usbOwner->usbDriveMounted = false;
+    usbOwner->usbExportPending = true;
+}
+
+bool Storage::startUsbExport()
+{
+    if (!mounted)
+        return false;
+
+    usbExportPending =
+        !refreshUsbExport();
+
+    usbOwner = this;
+
+    singleFileDrive.onPlug(
+        handleUsbPlug);
+
+    singleFileDrive.onUnplug(
+        handleUsbUnplug);
+
+    usbExportStarted =
+        singleFileDrive.begin(
+            USB_EXPORT_PATH,
+            USB_VISIBLE_NAME);
+
+    if (!usbExportStarted)
+    {
+        usbOwner = nullptr;
+        return false;
+    }
+
+    /*
+     * La pile USB se déconnecte puis se reconnecte pour ajouter
+     * l'interface MSC à l'interface série CDC déjà présente.
+     */
+    delay(2000);
+
+    return true;
+}
+
+bool Storage::refreshUsbExport()
+{
+    if (!mounted ||
+        usbDriveMounted)
+    {
+        return false;
+    }
+
+    File destination =
+        LittleFS.open(
+            USB_EXPORT_TEMP_PATH,
+            "w");
+
+    if (!destination)
+        return false;
+
+    bool success = true;
+
+    if (LittleFS.exists(CONFIG_PATH))
+    {
+        File source =
+            LittleFS.open(CONFIG_PATH, "r");
+
+        if (!source)
+        {
+            destination.close();
+            LittleFS.remove(
+                USB_EXPORT_TEMP_PATH);
+            return false;
+        }
+
+        uint8_t buffer[256];
+
+        while (source.available())
+        {
+            const size_t bytesRead =
+                source.read(
+                    buffer,
+                    sizeof(buffer));
+
+            if (bytesRead == 0 ||
+                destination.write(
+                    buffer,
+                    bytesRead) != bytesRead)
+            {
+                success = false;
+                break;
+            }
+        }
+
+        source.close();
+    }
+    else
+    {
+        static constexpr char NO_CONFIGURATION[] =
+            "{\n"
+            "  \"status\": \"no_saved_configuration\"\n"
+            "}\n";
+
+        success =
+            destination.write(
+                reinterpret_cast<
+                    const uint8_t*>(
+                    NO_CONFIGURATION),
+                sizeof(NO_CONFIGURATION) - 1) ==
+            sizeof(NO_CONFIGURATION) - 1;
+    }
+
+    destination.flush();
+    destination.close();
+
+    if (!success)
+    {
+        LittleFS.remove(
+            USB_EXPORT_TEMP_PATH);
+        return false;
+    }
+
+    if (!LittleFS.rename(
+            USB_EXPORT_TEMP_PATH,
+            USB_EXPORT_PATH))
+    {
+        LittleFS.remove(
+            USB_EXPORT_TEMP_PATH);
+        return false;
+    }
+
+    return true;
 }
 
 void Storage::clearRestoredText()

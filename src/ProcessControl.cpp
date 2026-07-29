@@ -196,13 +196,11 @@ Measurement* ProcessControl::getMeasurement(uint8_t id) {
 /**
  * Only for testing hardware, do not correct
  */
-void ProcessControl::printCSVPsychro(uint32_t now) {
+void ProcessControl::printCSVPsychro(Stream& stream) const {
 
-    Serial.print(now/1000.0,1);
-    Serial.print(" ; ");
-    Serial.print(getMeasurement(4)->getValue());
-    Serial.print(" ; ");
-    Serial.println(getMeasurement(7)->getValue());
+    stream.print(measurements[4]->getValue());
+    stream.print(";");
+    stream.println(measurements[7]->getValue());
 }
 
 void ProcessControl::print(Stream& stream) const

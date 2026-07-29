@@ -28,6 +28,8 @@ public:
 
     bool begin();
 
+    void poll();
+
     RestoreResult restore(
         const char* installationName,
         ParameterList& parameters,
@@ -50,6 +52,18 @@ private:
     static constexpr const char* TEMP_PATH =
         "/config.tmp";
 
+    /*
+     * Le PC lit une copie stable de la configuration. CONFIG_PATH
+     * reste ainsi modifiable par save() même lorsque le volume USB
+     * est monté.
+     */
+    static constexpr const char* USB_EXPORT_PATH =
+        "/config.usb.json";
+    static constexpr const char* USB_EXPORT_TEMP_PATH =
+        "/config.usb.tmp";
+    static constexpr const char* USB_VISIBLE_NAME =
+        "config.json";
+
     struct RestoredParameterText
     {
         bool present = false;
@@ -70,6 +84,17 @@ private:
 
     size_t restoredOptionCount = 0;
     bool mounted = false;
+    bool usbExportStarted = false;
+    volatile bool usbDriveMounted = false;
+    volatile bool usbExportPending = false;
+
+    static Storage* usbOwner;
+
+    static void handleUsbPlug(uint32_t data);
+    static void handleUsbUnplug(uint32_t data);
+
+    bool startUsbExport();
+    bool refreshUsbExport();
 
     void clearRestoredText();
 

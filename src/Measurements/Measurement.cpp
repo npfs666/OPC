@@ -1,13 +1,5 @@
 #include "Measurements/Measurement.h"
 
-/*Measurement::Measurement(const char* name,
-                         const char* unit)
-    :
-    Displayable(name),
-    unit(unit)
-{
-}*/
-
 Measurement::Measurement()
 {
 }
