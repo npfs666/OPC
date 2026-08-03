@@ -11,7 +11,9 @@ public:
 
     HumidityBME();
 
-    void begin(const char* name, Adafruit_BME280& bme);
+    void begin(
+        const char* name,
+        Adafruit_BME280& bme);
 
     void update() override;
 

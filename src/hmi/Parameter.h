@@ -88,6 +88,7 @@ struct Parameter
     const char* name = nullptr;
 
     Type type = Type::Bool;
+    bool readOnly = false;
 
     union Value
     {

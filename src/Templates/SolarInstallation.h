@@ -42,6 +42,7 @@ private:
     public:
         void begin(RelayOutput& relay);
         void update() override;
+        UpdatePhase updatePhase() const override;
         uint8_t printDecimals() const override;
 
     private:

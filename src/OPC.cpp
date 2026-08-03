@@ -69,9 +69,12 @@ namespace
     };
 }
 
-OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
+OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, -1)
 {
     mutex_init(&processDataMutex);
+    pinMode(LCD_RESET, OUTPUT);
+    digitalWrite(LCD_RESET, 1);
+
 }
 
 
@@ -105,7 +108,14 @@ void OPC::initBME280()
     Wire.setSDA(BME_SDA);
     Wire.setSCL(BME_SCL);
 
-    bme.begin(0x76,&Wire);
+    bmeInitialized =
+        bme.begin(0x76, &Wire);
+
+    if (!bmeInitialized)
+    {
+        Serial.println("BME280 initialization failed");
+        return;
+    }
 
     bme.setSampling(
         Adafruit_BME280::MODE_NORMAL,
@@ -215,6 +225,14 @@ void OPC::controlPoll()
 
 bool OPC::initMeasurements()
 {
+    if (userInstall.requiresBME280() &&
+        !bmeInitialized)
+    {
+        Serial.println(
+            "BME280 required by installation but unavailable");
+        return false;
+    }
+
     if (!userInstall.prepareParameterRegistration())
     {
         Serial.println(
@@ -543,8 +561,8 @@ void OPC::handleUIMessage(
         mutex_enter_blocking(
             &processDataMutex);
 
-        //controller.print(bufferedOutput);
-        controller.printCSVPsychro(bufferedOutput);
+        controller.print(bufferedOutput);
+        //controller.printCSVPsychro(bufferedOutput);
 
         mutex_exit(&processDataMutex);
 

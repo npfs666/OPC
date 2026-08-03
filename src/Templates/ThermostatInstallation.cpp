@@ -219,6 +219,12 @@ void ThermostatInstallation::
     setValid(true);
 }
 
+Measurement::UpdatePhase ThermostatInstallation::
+    RelayStateMeasurement::updatePhase() const
+{
+    return UpdatePhase::AfterOutputs;
+}
+
 uint8_t ThermostatInstallation::
     RelayStateMeasurement::printDecimals() const
 {

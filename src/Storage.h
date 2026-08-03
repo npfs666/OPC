@@ -44,8 +44,6 @@ public:
 
 private:
     static constexpr uint32_t SCHEMA_VERSION = 1;
-    static constexpr size_t MAX_LABEL_LENGTH = 64;
-    static constexpr size_t MAX_UNIT_LENGTH = 24;
 
     static constexpr const char* CONFIG_PATH =
         "/config.json";
@@ -64,25 +62,6 @@ private:
     static constexpr const char* USB_VISIBLE_NAME =
         "config.json";
 
-    struct RestoredParameterText
-    {
-        bool present = false;
-        char categoryName[MAX_LABEL_LENGTH] = {};
-        char ownerName[MAX_LABEL_LENGTH] = {};
-        char parameterName[MAX_LABEL_LENGTH] = {};
-        char unit[MAX_UNIT_LENGTH] = {};
-        size_t optionStart = 0;
-        uint8_t optionCount = 0;
-    };
-
-    RestoredParameterText restoredText[MAX_PARAMETERS];
-    ParameterOption restoredOptions[
-        ParameterList::MAX_SELECTION_OPTIONS];
-    char restoredOptionNames[
-        ParameterList::MAX_SELECTION_OPTIONS]
-        [MAX_LABEL_LENGTH] = {};
-
-    size_t restoredOptionCount = 0;
     bool mounted = false;
     bool usbExportStarted = false;
     volatile bool usbDriveMounted = false;
@@ -96,30 +75,15 @@ private:
     bool startUsbExport();
     bool refreshUsbExport();
 
-    void clearRestoredText();
-
     bool readConfiguration(
         const char* installationName,
         ParameterList& parameters,
         ParameterEditor& editor);
 
-    bool applyRestoredText(
-        ParameterList& parameters);
-
     bool validateWrittenFile() const;
 
     static const char* typeName(
         Parameter::Type type);
-
-    static bool copyRequiredText(
-        const char* source,
-        char* destination,
-        size_t capacity);
-
-    static bool copyOptionalText(
-        const char* source,
-        char* destination,
-        size_t capacity);
 };
 
 #endif

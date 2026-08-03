@@ -28,7 +28,11 @@ public:
 
     const char* getUnit() const override;
 
-    void registerParameters(ParameterList& list) override {};
+    void registerParameters(
+        ParameterList& list) override
+    {
+        (void)list;
+    }
 
 protected:
 

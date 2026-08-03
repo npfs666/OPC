@@ -13,7 +13,8 @@ ParameterList::Writer::Writer(
 bool ParameterList::Writer::addBool(
     const char* key,
     const char* name,
-    bool& value)
+    bool& value,
+    bool readOnly)
 {
     return list != nullptr &&
            list->remember(
@@ -21,7 +22,8 @@ bool ParameterList::Writer::addBool(
                    owner,
                    key,
                    name,
-                   value));
+                   value,
+                   readOnly));
 }
 
 bool ParameterList::Writer::addDouble(
@@ -32,7 +34,8 @@ bool ParameterList::Writer::addDouble(
     double_t maximum,
     double_t step,
     uint8_t decimals,
-    const char* unit)
+    const char* unit,
+    bool readOnly)
 {
     return list != nullptr &&
            list->remember(
@@ -45,7 +48,39 @@ bool ParameterList::Writer::addDouble(
                    maximum,
                    step,
                    decimals,
-                   unit));
+                   unit,
+                   readOnly));
+}
+
+bool ParameterList::Writer::addDouble(
+    const char* key,
+    const char* name,
+    double_t& value,
+    const char* unit,
+    bool readOnly,
+    uint8_t decimals)
+{
+    if (list == nullptr)
+        return false;
+
+    if (!readOnly)
+        return list->remember(false);
+
+    const double_t limit =
+        std::numeric_limits<double_t>::max();
+
+    return list->remember(
+        list->addDouble(
+            owner,
+            key,
+            name,
+            value,
+            -limit,
+            limit,
+            1.0,
+            decimals,
+            unit,
+            true));
 }
 
 void ParameterList::begin(
@@ -169,13 +204,15 @@ bool ParameterList::addBool(
     const ParameterOwner& owner,
     const char* key,
     const char* name,
-    bool& value)
+    bool& value,
+    bool readOnly)
 {
     Parameter* parameter = create(
         owner,
         key,
         name,
-        Parameter::Type::Bool);
+        Parameter::Type::Bool,
+        readOnly);
 
     if (parameter == nullptr)
         return false;
@@ -193,7 +230,8 @@ bool ParameterList::addInteger(
     int32_t minimum,
     int32_t maximum,
     int32_t step,
-    const char* unit)
+    const char* unit,
+    bool readOnly)
 {
     if (binding.target == nullptr ||
         binding.read == nullptr ||
@@ -212,7 +250,8 @@ bool ParameterList::addInteger(
         owner,
         key,
         name,
-        Parameter::Type::Integer);
+        Parameter::Type::Integer,
+        readOnly);
 
     if (parameter == nullptr)
         return false;
@@ -236,7 +275,8 @@ bool ParameterList::addDouble(
     double_t maximum,
     double_t step,
     uint8_t decimals,
-    const char* unit)
+    const char* unit,
+    bool readOnly)
 {
     if (!(minimum <= maximum))
         return false;
@@ -257,7 +297,8 @@ bool ParameterList::addDouble(
         owner,
         key,
         name,
-        Parameter::Type::Double);
+        Parameter::Type::Double,
+        readOnly);
 
     if (parameter == nullptr)
         return false;
@@ -279,7 +320,8 @@ bool ParameterList::addSelection(
     const char* name,
     const ParameterDiscreteBinding& binding,
     const ParameterOption* options,
-    uint8_t optionCount)
+    uint8_t optionCount,
+    bool readOnly)
 {
     if (binding.target == nullptr ||
         binding.read == nullptr ||
@@ -331,7 +373,8 @@ bool ParameterList::addSelection(
         owner,
         key,
         name,
-        Parameter::Type::Selection);
+        Parameter::Type::Selection,
+        readOnly);
 
     if (parameter == nullptr)
         return false;
@@ -350,7 +393,8 @@ Parameter* ParameterList::create(
     const ParameterOwner& owner,
     const char* key,
     const char* name,
-    Parameter::Type type)
+    Parameter::Type type,
+    bool readOnly)
 {
     if (!isInitialized())
         return nullptr;
@@ -390,6 +434,7 @@ Parameter* ParameterList::create(
     parameter.key = key;
     parameter.name = name;
     parameter.type = type;
+    parameter.readOnly = readOnly;
 
     parameterCount++;
 

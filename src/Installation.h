@@ -37,6 +37,11 @@ public:
         Adafruit_BME280& bme,
         ProcessControl& process) = 0;
 
+    virtual bool requiresBME280() const
+    {
+        return false;
+    }
+
     virtual void printHomeScreen(
         HomeScreenContext& context) = 0;
 

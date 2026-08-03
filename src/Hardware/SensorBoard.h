@@ -14,11 +14,10 @@ public:
 
     struct Settings
     {
-        double_t refResistanceValue   = 1649.819; // Value of Rref after calibration
-        double_t refResistanceCoeff   = 0;        // Coefficient of Rref °C/K (maybe measure the whole system to be more precise)
-        double_t calResistanceValue   = 100.056;  // Value of calibration resistance used.
-        double_t calTemperatureADC    = 22.12;    // ADC calibration temperature (°C)
-        double_t calTemperatureBME    = 23.12;    // BME280 calibration temperature (°C)
+        double_t refResistanceValue   = 1649.819;   // Value of Rref after calibration (Ohm)
+        double_t systemPPMCoeff       = 7.5;        // Coefficient of system °C/K
+        double_t calResistanceValue   = 100.056;    // Value of calibration resistance used.
+        double_t calTemperatureADC    = 22.12;      // ADC calibration temperature (°C)
     };
 
     Settings settings;
@@ -31,7 +30,6 @@ public:
     
     SensorBoard();
     void init();
-    //bool addRTD(const char* name, RTDSensor::RTDType type, RTDSensor::RTDWiring wiring, uint16_t samples, float_t offset);
     bool addRTD(RTDSensor& sensor);
     void startContinuous();
     void pause();
@@ -52,6 +50,7 @@ private:
     uint8_t curRTDSensor;   // cur sensor index
     uint8_t numRTDSensors;  // number of RTD sensors in rtd array[]
     volatile bool pauseInterrupts = true;
+    double_t adcTemperature;
   };
 
 #endif

@@ -27,8 +27,6 @@ class OPC : private ParameterRestoreValidator
 {
 public:
 
-    #define MEASURE_SIZE 10
-
     OPC();
 
     //-------------------------
@@ -88,7 +86,7 @@ private:
         ApplyRequested
     };
 
-    ThermostatInstallation userInstall;
+    TestInstallation userInstall;
     Storage storage;
     ParameterEditor parameterEditor;
     MenuBuilder menuDefinition;
@@ -100,6 +98,7 @@ private:
 
     bool acquisitionPausedForMenu = false;
     bool controlOutputsEnabled = false;
+    bool bmeInitialized = false;
     uint32_t lastMeasurementTime = 0;
 
     mutex_t processDataMutex;

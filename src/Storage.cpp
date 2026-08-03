@@ -75,7 +75,6 @@ Storage::RestoreResult Storage::restore(
 
     editor.begin(parameters);
     editor.capture();
-    clearRestoredText();
 
     if (!mounted)
         return RestoreResult::StorageUnavailable;
@@ -91,19 +90,16 @@ Storage::RestoreResult Storage::restore(
         !validator.validateRestoredParameters(editor))
     {
         editor.capture();
-        clearRestoredText();
         return RestoreResult::InvalidFile;
     }
 
-    if (!editor.apply() ||
-        !applyRestoredText(parameters))
+    if (!editor.apply())
     {
         /*
          * editor.apply() ne peut normalement plus échouer après
          * validation. En cas d'incohérence interne, le démarrage
          * doit néanmoins être refusé comme restauration valide.
          */
-        clearRestoredText();
         return RestoreResult::InvalidFile;
     }
 
@@ -320,7 +316,6 @@ bool Storage::erase()
             !refreshUsbExport();
     }
 
-    clearRestoredText();
     return success;
 }
 
@@ -469,22 +464,6 @@ bool Storage::refreshUsbExport()
     return true;
 }
 
-void Storage::clearRestoredText()
-{
-    for (size_t i = 0; i < MAX_PARAMETERS; i++)
-        restoredText[i] = RestoredParameterText{};
-
-    for (size_t i = 0;
-         i < ParameterList::MAX_SELECTION_OPTIONS;
-         i++)
-    {
-        restoredOptions[i] = ParameterOption{};
-        restoredOptionNames[i][0] = '\0';
-    }
-
-    restoredOptionCount = 0;
-}
-
 bool Storage::readConfiguration(
     const char* installationName,
     ParameterList& parameters,
@@ -586,25 +565,6 @@ bool Storage::readConfiguration(
             return false;
         }
 
-        RestoredParameterText& text =
-            restoredText[parameterIndex];
-
-        if (!copyRequiredText(
-                stored["category_name"].as<const char*>(),
-                text.categoryName,
-                sizeof(text.categoryName)) ||
-            !copyRequiredText(
-                stored["owner_name"].as<const char*>(),
-                text.ownerName,
-                sizeof(text.ownerName)) ||
-            !copyRequiredText(
-                stored["name"].as<const char*>(),
-                text.parameterName,
-                sizeof(text.parameterName)))
-        {
-            return false;
-        }
-
         switch (parameter->type)
         {
         case Parameter::Type::Bool:
@@ -625,14 +585,6 @@ bool Storage::readConfiguration(
 
             draft.integerValue =
                 stored["value"].as<int32_t>();
-
-            if (!copyOptionalText(
-                    stored["unit"].as<const char*>(),
-                    text.unit,
-                    sizeof(text.unit)))
-            {
-                return false;
-            }
             break;
         }
 
@@ -646,14 +598,6 @@ bool Storage::readConfiguration(
 
             draft.numberValue =
                 stored["value"].as<double_t>();
-
-            if (!copyOptionalText(
-                    stored["unit"].as<const char*>(),
-                    text.unit,
-                    sizeof(text.unit)))
-            {
-                return false;
-            }
             break;
         }
 
@@ -669,19 +613,13 @@ bool Storage::readConfiguration(
                 stored["options"].as<JsonArrayConst>();
 
             if (options.size() !=
-                    parameter->data.selection.count ||
-                restoredOptionCount +
-                    options.size() >
-                    ParameterList::MAX_SELECTION_OPTIONS)
+                    parameter->data.selection.count)
             {
                 return false;
             }
 
             draft.selectionValue =
                 stored["value"].as<int32_t>();
-            text.optionStart = restoredOptionCount;
-            text.optionCount =
-                parameter->data.selection.count;
 
             size_t optionIndex = 0;
 
@@ -704,22 +642,6 @@ bool Storage::readConfiguration(
                     return false;
                 }
 
-                const size_t destination =
-                    restoredOptionCount++;
-
-                if (!copyRequiredText(
-                        storedOption["name"].as<const char*>(),
-                        restoredOptionNames[destination],
-                        sizeof(restoredOptionNames[destination])))
-                {
-                    return false;
-                }
-
-                restoredOptions[destination] = {
-                    currentOption.value,
-                    restoredOptionNames[destination]
-                };
-
                 optionIndex++;
             }
 
@@ -730,102 +652,6 @@ bool Storage::readConfiguration(
             return false;
         }
 
-        text.present = true;
-    }
-
-    /*
-     * Un même identifiant de catégorie ou de propriétaire doit
-     * toujours conduire au même libellé. Sans cette vérification,
-     * un JSON syntaxiquement valide pourrait rendre le menu
-     * impossible à construire.
-     */
-    for (size_t i = 0; i < parameters.count(); i++)
-    {
-        if (!restoredText[i].present)
-            continue;
-
-        const Parameter* left = parameters.get(i);
-
-        for (size_t j = 0; j < i; j++)
-        {
-            if (!restoredText[j].present)
-                continue;
-
-            const Parameter* right = parameters.get(j);
-
-            if (left == nullptr ||
-                right == nullptr)
-            {
-                return false;
-            }
-
-            if (strcmp(
-                    left->categoryKey,
-                    right->categoryKey) == 0 &&
-                strcmp(
-                    restoredText[i].categoryName,
-                    restoredText[j].categoryName) != 0)
-            {
-                return false;
-            }
-
-            if (strcmp(
-                    left->ownerKey,
-                    right->ownerKey) == 0 &&
-                (strcmp(
-                     left->categoryKey,
-                     right->categoryKey) != 0 ||
-                 strcmp(
-                     restoredText[i].ownerName,
-                     restoredText[j].ownerName) != 0))
-            {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-bool Storage::applyRestoredText(
-    ParameterList& parameters)
-{
-    for (size_t i = 0; i < parameters.count(); i++)
-    {
-        RestoredParameterText& text =
-            restoredText[i];
-
-        if (!text.present)
-            continue;
-
-        Parameter* parameter = parameters.get(i);
-
-        if (parameter == nullptr)
-            return false;
-
-        parameter->categoryName = text.categoryName;
-        parameter->ownerName = text.ownerName;
-        parameter->name = text.parameterName;
-
-        if (parameter->type == Parameter::Type::Integer)
-        {
-            parameter->data.integer.unit =
-                text.unit[0] != '\0'
-                    ? text.unit
-                    : nullptr;
-        }
-        else if (parameter->type == Parameter::Type::Double)
-        {
-            parameter->data.number.unit =
-                text.unit[0] != '\0'
-                    ? text.unit
-                    : nullptr;
-        }
-        else if (parameter->type == Parameter::Type::Selection)
-        {
-            parameter->data.selection.options =
-                &restoredOptions[text.optionStart];
-        }
     }
 
     return true;
@@ -870,42 +696,4 @@ const char* Storage::typeName(
     default:
         return "invalid";
     }
-}
-
-bool Storage::copyRequiredText(
-    const char* source,
-    char* destination,
-    size_t capacity)
-{
-    if (source == nullptr ||
-        source[0] == '\0')
-    {
-        return false;
-    }
-
-    return copyOptionalText(
-        source,
-        destination,
-        capacity);
-}
-
-bool Storage::copyOptionalText(
-    const char* source,
-    char* destination,
-    size_t capacity)
-{
-    if (source == nullptr ||
-        destination == nullptr ||
-        capacity == 0)
-    {
-        return false;
-    }
-
-    const size_t length = strlen(source);
-
-    if (length >= capacity)
-        return false;
-
-    memcpy(destination, source, length + 1);
-    return true;
 }

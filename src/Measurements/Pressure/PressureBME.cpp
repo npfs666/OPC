@@ -4,11 +4,22 @@
 
 #include <cmath>
 
+namespace
+{
+    constexpr double_t MIN_TEMPERATURE = -40.0;
+    constexpr double_t MAX_TEMPERATURE = 85.0;
+
+    constexpr double_t MIN_PRESSURE = 30000.0;
+    constexpr double_t MAX_PRESSURE = 110000.0;
+}
+
 PressureBME::PressureBME()
 {
 }
 
-void PressureBME::begin(const char* name, Adafruit_BME280& bme)
+void PressureBME::begin(
+    const char* name,
+    Adafruit_BME280& bme)
 {
     Pressure::begin(name);
     this->bme = &bme;
@@ -16,9 +27,32 @@ void PressureBME::begin(const char* name, Adafruit_BME280& bme)
 
 double_t PressureBME::pressureSeaLevel(int16_t altitude) {
 
-    double_t pressure = (double_t)(bme->readPressure() / pow(1.0 - ((0.0065 * altitude) / (bme->readTemperature() + 273.14)), 5.255));
+    if (bme == nullptr)
+        return NAN;
 
-    return pressure;
+    const double_t pressure =
+        bme->readPressure();
+
+    const double_t temperature =
+        bme->readTemperature();
+
+    if (!std::isfinite(pressure) ||
+        pressure < MIN_PRESSURE ||
+        pressure > MAX_PRESSURE ||
+        !std::isfinite(temperature) ||
+        temperature < MIN_TEMPERATURE ||
+        temperature > MAX_TEMPERATURE)
+    {
+        return NAN;
+    }
+
+    return
+        pressure /
+        pow(
+            1.0 -
+                ((0.0065 * altitude) /
+                 (temperature + 273.14)),
+            5.255);
 }
 
 double_t PressureBME::printValue() const {
@@ -31,10 +65,23 @@ uint8_t PressureBME::printDecimals() const {
 
 void PressureBME::update()
 {
-    //m_bme.takeForcedMeasurement();
+    if (bme == nullptr)
+    {
+        setValid(false);
+        return;
+    }
 
-    //setValue(pressureSeaLevel(27));
-    setValue(bme->readPressure());
+    const double_t value =
+        bme->readPressure();
 
+    if (!std::isfinite(value) ||
+        value < MIN_PRESSURE ||
+        value > MAX_PRESSURE)
+    {
+        setValid(false);
+        return;
+    }
+
+    setValue(value);
     setValid(true);
 }

@@ -43,7 +43,7 @@ bool Installation::completeParameterRegistration()
         "measurement_timeout",
         "Timeout mesures",
         safetySettings.measurementTimeoutSeconds,
-        1,
+        10,
         300,
         1,
         "s");

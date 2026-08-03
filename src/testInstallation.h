@@ -42,6 +42,8 @@ public:
         Adafruit_BME280& bme,
         ProcessControl& process) override;
 
+    bool requiresBME280() const override;
+
     void printHomeScreen(
         HomeScreenContext& context) override;
 

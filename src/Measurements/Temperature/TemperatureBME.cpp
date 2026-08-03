@@ -2,12 +2,22 @@
 
 #include <Adafruit_BME280.h>
 
+#include <cmath>
+
+namespace
+{
+    constexpr double_t MIN_TEMPERATURE = -40.0;
+    constexpr double_t MAX_TEMPERATURE = 85.0;
+}
+
 TemperatureBME::TemperatureBME()
 {
 }
 
 
-void TemperatureBME::begin(const char* name, Adafruit_BME280& bme)
+void TemperatureBME::begin(
+    const char* name,
+    Adafruit_BME280& bme)
 {
     Temperature::begin(name);
     this->bme = &bme;
@@ -15,9 +25,23 @@ void TemperatureBME::begin(const char* name, Adafruit_BME280& bme)
 
 void TemperatureBME::update()
 {
-    //m_bme.takeForcedMeasurement();
+    if (bme == nullptr)
+    {
+        setValid(false);
+        return;
+    }
 
-    setValue(bme->readTemperature());
+    const double_t value =
+        bme->readTemperature();
 
+    if (!std::isfinite(value) ||
+        value < MIN_TEMPERATURE ||
+        value > MAX_TEMPERATURE)
+    {
+        setValid(false);
+        return;
+    }
+
+    setValue(value);
     setValid(true);
 }

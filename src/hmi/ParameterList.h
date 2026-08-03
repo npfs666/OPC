@@ -35,7 +35,8 @@ public:
         bool addBool(
             const char* key,
             const char* name,
-            bool& value);
+            bool& value,
+            bool readOnly = false);
 
         template<typename Integer>
         bool addInteger(
@@ -45,7 +46,8 @@ public:
             int32_t minimum,
             int32_t maximum,
             int32_t step,
-            const char* unit = nullptr)
+            const char* unit = nullptr,
+            bool readOnly = false)
         {
             static_assert(
                 std::is_integral<Integer>::value &&
@@ -87,7 +89,8 @@ public:
                     minimum,
                     maximum,
                     step,
-                    unit));
+                    unit,
+                    readOnly));
         }
 
         bool addDouble(
@@ -98,14 +101,24 @@ public:
             double_t maximum,
             double_t step,
             uint8_t decimals,
-            const char* unit = nullptr);
+            const char* unit = nullptr,
+            bool readOnly = false);
+
+        bool addDouble(
+            const char* key,
+            const char* name,
+            double_t& value,
+            const char* unit,
+            bool readOnly,
+            uint8_t decimals = 3);
 
         template<typename Discrete, size_t OptionCount>
         bool addSelection(
             const char* key,
             const char* name,
             Discrete& value,
-            const ParameterOption (&options)[OptionCount])
+            const ParameterOption (&options)[OptionCount],
+            bool readOnly = false)
         {
             static_assert(
                 (std::is_enum<Discrete>::value ||
@@ -151,7 +164,8 @@ public:
                     binding,
                     options,
                     static_cast<uint8_t>(
-                        OptionCount)));
+                        OptionCount),
+                    readOnly));
         }
 
     private:
@@ -348,7 +362,8 @@ private:
         const ParameterOwner& owner,
         const char* key,
         const char* name,
-        bool& value);
+        bool& value,
+        bool readOnly);
 
     bool addInteger(
         const ParameterOwner& owner,
@@ -358,7 +373,8 @@ private:
         int32_t minimum,
         int32_t maximum,
         int32_t step,
-        const char* unit = nullptr);
+        const char* unit,
+        bool readOnly);
 
     bool addDouble(
         const ParameterOwner& owner,
@@ -369,7 +385,8 @@ private:
         double_t maximum,
         double_t step,
         uint8_t decimals,
-        const char* unit = nullptr);
+        const char* unit,
+        bool readOnly);
 
     bool addSelection(
         const ParameterOwner& owner,
@@ -377,7 +394,8 @@ private:
         const char* name,
         const ParameterDiscreteBinding& binding,
         const ParameterOption* options,
-        uint8_t optionCount);
+        uint8_t optionCount,
+        bool readOnly);
 
     /**
      * @brief Crée la partie commune d'un Parameter.
@@ -392,7 +410,8 @@ private:
         const ParameterOwner& owner,
         const char* key,
         const char* name,
-        Parameter::Type type);
+        Parameter::Type type,
+        bool readOnly);
 
     static bool isValidText(const char* text);
     static bool isValidOwner(

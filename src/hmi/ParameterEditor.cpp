@@ -171,6 +171,9 @@ bool ParameterEditor::apply()
         const Parameter& parameter =
             *draft.parameter;
 
+        if (parameter.readOnly)
+            continue;
+
         switch (parameter.type)
         {
         case Parameter::Type::Bool:

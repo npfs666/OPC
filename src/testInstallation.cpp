@@ -65,6 +65,11 @@ const char* TestInstallation::name() const
     return "Installation de test pour le développement";
 }
 
+bool TestInstallation::requiresBME280() const
+{
+    return true;
+}
+
 void TestInstallation::printHomeScreen(
     HomeScreenContext& context)
 {
@@ -127,7 +132,10 @@ void TestInstallation::printHomeScreen(
 
 
 
-bool TestInstallation::begin(SensorBoard &board, Adafruit_BME280 &bme, ProcessControl &controller)
+bool TestInstallation::begin(
+    SensorBoard& board,
+    Adafruit_BME280& bme,
+    ProcessControl& controller)
 {
     // ----- Configuration du matériel -----
     input1.begin("input1", "Input 1", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);

@@ -91,10 +91,19 @@ void ProcessControl::updateMeasurementsAndRegulators(
     uint32_t now)
 {
     for (uint8_t i = 0; i < measurementCount; i++)
-        measurements[i]->update();
+    {
+        if (measurements[i] != nullptr &&
+            measurements[i]->updatePhase() ==
+                Measurement::UpdatePhase::BeforeRegulation)
+        {
+            measurements[i]->update();
+        }
+    }
 
     for (uint8_t i = 0; i < regulatorCount; i++)
         regulators[i]->update(now);
+
+    poll(now);
 }
 
 void ProcessControl::poll(uint32_t now)
@@ -104,6 +113,16 @@ void ProcessControl::poll(uint32_t now)
 
     for (uint8_t i = 0; i < outputCount; i++)
         outputs[i]->poll(now);
+
+    for (uint8_t i = 0; i < measurementCount; i++)
+    {
+        if (measurements[i] != nullptr &&
+            measurements[i]->updatePhase() ==
+                Measurement::UpdatePhase::AfterOutputs)
+        {
+            measurements[i]->update();
+        }
+    }
 }
 
 void ProcessControl::resume(uint32_t now)

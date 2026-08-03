@@ -17,11 +17,11 @@ namespace
             {ST77XX_WHITE, ST77XX_WHITE, ST77XX_WHITE}
         },
         {
-            {ST77XX_WHITE, ST77XX_BLACK},
+            {ST77XX_WHITE, ST77XX_WHITE},
             {ST77XX_YELLOW, ST77XX_YELLOW, ST77XX_RED}
         },
         {
-            {ST77XX_WHITE, ST77XX_BLACK},
+            {ST77XX_WHITE, ST77XX_WHITE},
             {ST77XX_WHITE, ST77XX_YELLOW, ST77XX_YELLOW}
         },
         {
@@ -266,6 +266,9 @@ bool ArduinoMenuUI::buildMenuTree(
 
         if (item == nullptr)
             return false;
+
+        if (draft.parameter->readOnly)
+            item->disable();
 
         parameterItems[i] = item;
         parameterGroups[i] = group;

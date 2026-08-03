@@ -147,6 +147,12 @@ void SolarInstallation::PumpStateMeasurement::update()
     setValid(true);
 }
 
+Measurement::UpdatePhase SolarInstallation::
+    PumpStateMeasurement::updatePhase() const
+{
+    return UpdatePhase::AfterOutputs;
+}
+
 uint8_t SolarInstallation::
     PumpStateMeasurement::printDecimals() const
 {

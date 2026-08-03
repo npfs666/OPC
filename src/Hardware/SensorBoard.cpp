@@ -230,6 +230,7 @@ void SensorBoard::adcInterrupt() {
             curRTDSensor = 0;
 			newMeasurement = true;
             //return; // when all measurement are done, we pause and wait for UI update to restart them.
+            adcTemperature = adc.readInternalTemp();
         }
 
         setWiringRoute(rtd[curRTDSensor]->settings);
@@ -256,6 +257,7 @@ double_t SensorBoard::computeResistance(RTDSensor& rtdSensor) {
 
     #define TEMPERATURE_COEFFICIENT_PPM_C 7.5 // ancien calcul 7.5
     //#define TEMPERATURE_AT_CALIBRATION 25.4
+        // 7.5ppm mesuré (système entier) avec la diff entre la plage 24°C et 12°C
 
     double_t gain = 8.0;
     /*if( rtdSensor.settings.wiring == RTDSensor::RTDWiring::ThreeWire ) {
@@ -267,11 +269,10 @@ double_t SensorBoard::computeResistance(RTDSensor& rtdSensor) {
     }*/
 
     double_t Rrtd = (rtdSensor.readValue() * settings.refResistanceValue) / (32768.0 * gain);
-
-    // Compensation de la mesure 
-    // 7.5ppm mesuré (système entier) avec la diff entre la plage 24°C et 12°C
-    //double_t ppm = (systemTemperature - calTemperature) * TEMPERATURE_COEFFICIENT_PPM_C;
-    //Rrtd = Rrtd * (1 + ppm/1000000.0);
+    
+    // Compensation de la mesure en fonction de la température
+    double_t ppm = (adcTemperature - settings.calTemperatureADC) * settings.systemPPMCoeff;
+    Rrtd = Rrtd * (1 + ppm/1000000.0);
 
     return Rrtd;
 }
@@ -292,27 +293,24 @@ void SensorBoard::registerParameters(ParameterList& list)
 
     parameters.addDouble(
         "reference_resistance",
-        "Résistance réf.",
+        "Rref",
         settings.refResistanceValue,
-        1500.0,
-        1800.0,
-        0.001,
-        3,
-        "Ω");
+        "Ω",
+        true);
 
     parameters.addDouble(
         "reference_coefficient",
-        "Coeff. réf.",
-        settings.refResistanceCoeff,
-        -100.0,
-        100.0,
+        "Coeff",
+        settings.systemPPMCoeff,
+        -50.0,
+        50.0,
         0.1,
         1,
         "ppm/°C");
 
     parameters.addDouble(
         "calibration_resistance",
-        "Résistance cal.",
+        "Rcal.",
         settings.calResistanceValue,
         99.0,
         101.0,
@@ -322,23 +320,11 @@ void SensorBoard::registerParameters(ParameterList& list)
 
     parameters.addDouble(
         "adc_calibration_temperature",
-        "Température ADC",
+        "adcCalTemp",
         settings.calTemperatureADC,
-        -40.0,
-        125.0,
-        0.01,
-        2,
-        "°C");
-
-    parameters.addDouble(
-        "bme_calibration_temperature",
-        "Température BME",
-        settings.calTemperatureBME,
-        -40.0,
-        85.0,
-        0.01,
-        2,
-        "°C");
+        "°C",
+        true,
+        2);
 }
 
 void SensorBoard::resetAcquisition()
