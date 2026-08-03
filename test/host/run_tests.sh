@@ -24,6 +24,7 @@ fi
     -std=c++17 \
     -Wall \
     -Wextra \
+    -DOPC_HOST_TEST \
     -I"${project_dir}/test/host/fakes" \
     -I"${project_dir}/test/host" \
     -I"${project_dir}/src" \
@@ -35,7 +36,7 @@ fi
     "${project_dir}/src/hmi/ParameterList.cpp" \
     "${project_dir}/src/Measurements/Humidity/HumidityBME.cpp" \
     "${project_dir}/src/Measurements/Measurement.cpp" \
-    "${project_dir}/src/Measurements/MeasurementSnapshot.cpp" \
+    "${project_dir}/src/ProcessSnapshot.cpp" \
     "${project_dir}/src/Measurements/Pressure/PressureBME.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureBME.cpp" \
     "${project_dir}/src/Outputs/Actuator.cpp" \
@@ -47,6 +48,7 @@ fi
     "${project_dir}/src/Regulator/Regulator.cpp" \
     "${project_dir}/src/Regulator/SolarRegulator.cpp" \
     "${project_dir}/src/Regulator/Thermostat.cpp" \
+    "${project_dir}/src/SystemWatchdog.cpp" \
     -o "${binary}"
 
 "${binary}"

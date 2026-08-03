@@ -1,8 +1,6 @@
 #ifndef PINOUT_h
 #define PINOUT_h
 
-#include <cstdint>
-
 /**
  * Pinout for the v0.1 OPC PCB
  * Global settings
@@ -19,19 +17,6 @@
 #define MAX_OUTPUTS 4       // Maximum outputs connected to one Actuator
 #define MAX_REGISTERED_OUTPUTS 16 // Outputs managed by ProcessControl
 #define MAX_PARAMETERS 64   // Used in ParameterList
-
-// Général ORDERS
-#define PAUSE_ADC_INTERRUPTS 1
-#define RESUME_ADC_INTERRUPTS 2
-constexpr uint32_t PRINT_DATA_AVAILABLE = 3;
-constexpr uint32_t APPLY_MENU_PARAMETERS = 4;
-constexpr uint32_t MENU_PARAMETERS_APPLIED = 5;
-constexpr uint32_t PARAMETERS_READY = 6;
-constexpr uint32_t ACQUISITION_PAUSED = 7;
-constexpr uint32_t MENU_PARAMETERS_REJECTED = 8;
-constexpr uint32_t MENU_PARAMETERS_APPLIED_NOT_SAVED = 9;
-constexpr uint32_t CONTROL_CORE_READY = 10;
-constexpr uint32_t UI_CORE_READY = 11;
 
 // Ecran SPI TFT (SPI1)
 #define LCD_SCK 14

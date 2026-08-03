@@ -38,18 +38,6 @@ public:
         HomeScreenContext& context) override;
 
 private:
-    class RelayStateMeasurement final : public Measurement
-    {
-    public:
-        void begin(RelayOutput& relay);
-        void update() override;
-        UpdatePhase updatePhase() const override;
-        uint8_t printDecimals() const override;
-
-    private:
-        RelayOutput* relay = nullptr;
-    };
-
     // Entrée physique
     RTDSensor temperatureInput;
 
@@ -63,7 +51,6 @@ private:
     // Commande du relais
     ActuatorOnOff relayActuator;
     RelayOutput relayOutput;
-    RelayStateMeasurement relayState;
 };
 
 #endif

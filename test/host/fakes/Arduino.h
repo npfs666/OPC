@@ -24,11 +24,77 @@ public:
     size_t print(double, int) { return 0; }
 
     size_t println() { return 0; }
-    size_t println(const char*) { return 0; }
+    size_t println(const char*)
+    {
+        printedLineCount++;
+        return 0;
+    }
     size_t println(char) { return 0; }
     size_t println(double) { return 0; }
     size_t println(double, int) { return 0; }
+
+    size_t printedLineCount = 0;
 };
+
+class RP2040
+{
+public:
+    enum resetReason_t
+    {
+        UNKNOWN_RESET,
+        PWRON_RESET,
+        RUN_PIN_RESET,
+        SOFT_RESET,
+        WDT_RESET
+    };
+
+    void wdt_begin(uint32_t delayMs)
+    {
+        watchdogTimeoutMs = delayMs;
+        watchdogStarted = true;
+    }
+
+    void wdt_reset()
+    {
+        watchdogResetCount++;
+    }
+
+    resetReason_t getResetReason() const
+    {
+        return resetReason;
+    }
+
+    void resetFakeState()
+    {
+        resetReason = PWRON_RESET;
+        watchdogTimeoutMs = 0;
+        watchdogResetCount = 0;
+        watchdogStarted = false;
+    }
+
+    resetReason_t resetReason = PWRON_RESET;
+    uint32_t watchdogTimeoutMs = 0;
+    uint32_t watchdogResetCount = 0;
+    bool watchdogStarted = false;
+};
+
+inline RP2040 rp2040;
+
+struct mutex_t
+{
+};
+
+inline void mutex_init(mutex_t*)
+{
+}
+
+inline void mutex_enter_blocking(mutex_t*)
+{
+}
+
+inline void mutex_exit(mutex_t*)
+{
+}
 
 template<typename Value>
 constexpr Value constrain(

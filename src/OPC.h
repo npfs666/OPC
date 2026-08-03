@@ -3,13 +3,14 @@
 
 #include <Arduino.h>
 
+#include <InterCoreMessages.h>
 #include "Hardware/SensorBoard.h"
 #include <ProcessControl.h>
 
 #include <Adafruit_ST7789.h>
 #include <Adafruit_BME280.h>
 
-#include <Measurements/MeasurementSnapshot.h>
+#include <ProcessSnapshot.h>
 
 #include <hmi/MenuBuilder.h>
 #include <hmi/ParameterEditor.h>
@@ -48,10 +49,10 @@ public:
     void uiPoll();
 
     void handleControlMessage(
-        uint32_t message);
+        InterCoreMessage message);
 
     void handleUIMessage(
-        uint32_t message);
+        InterCoreMessage message);
 
     bool newMeasurement();
 
@@ -100,12 +101,12 @@ private:
     uint32_t lastMeasurementTime = 0;
 
     mutex_t processDataMutex;
-    MeasurementSnapshot sharedMeasurementSnapshot;
-    MeasurementSnapshot displayMeasurementSnapshot;
+    ProcessSnapshot sharedProcessSnapshot;
+    ProcessSnapshot displayProcessSnapshot;
     uint8_t serialPrintBuffer[
         SERIAL_PRINT_BUFFER_SIZE] = {};
 
-    void copyMeasurementSnapshot();
+    void copyProcessSnapshot();
 
     void showHomeScreen(
         bool fullRefresh);

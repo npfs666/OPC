@@ -3,7 +3,7 @@
 #include <Adafruit_BME280.h>
 #include <Installation.h>
 #include <Measurements/Humidity/HumidityBME.h>
-#include <Measurements/MeasurementSnapshot.h>
+#include <ProcessSnapshot.h>
 #include <Measurements/Pressure/PressureBME.h>
 #include <Measurements/Temperature/Temperature.h>
 #include <Measurements/Temperature/TemperatureBME.h>
@@ -15,6 +15,7 @@
 #include <Regulator/PID.h>
 #include <Regulator/SolarRegulator.h>
 #include <Regulator/Thermostat.h>
+#include <SystemWatchdog.h>
 #include <hmi/MenuBuilder.h>
 #include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
@@ -280,39 +281,6 @@ namespace
                     now);
             }
         }
-    };
-
-    class OutputStateMeasurement final :
-        public Measurement
-    {
-    public:
-        explicit OutputStateMeasurement(
-            Output& output)
-            : output(output)
-        {
-            Measurement::begin(
-                "output_state",
-                "");
-        }
-
-        void update() override
-        {
-            setValue(
-                output.appliedCommand());
-
-            setValid(
-                output.isHealthy());
-        }
-
-        UpdatePhase updatePhase()
-            const override
-        {
-            return
-                UpdatePhase::AfterOutputs;
-        }
-
-    private:
-        Output& output;
     };
 
     void testBMEMeasurementPropagation()
@@ -836,8 +804,6 @@ namespace
         FakeRegulator regulator;
         FakeOutput output;
         FakeActuator actuator(regulator);
-        OutputStateMeasurement outputState(
-            output);
 
         CHECK_TRUE(process.add(input));
         CHECK_TRUE(process.add(regulator));
@@ -845,7 +811,18 @@ namespace
         CHECK_TRUE(process.connect(
             actuator,
             output));
-        CHECK_TRUE(process.add(outputState));
+
+        ProcessSnapshot initialSnapshot;
+        process.captureSnapshot(
+            initialSnapshot,
+            500);
+
+        const OutputSample* initialState =
+            initialSnapshot.find(output);
+
+        CHECK_TRUE(initialState != nullptr);
+        CHECK_FALSE(initialState->healthy);
+
         CHECK_TRUE(process.beginOutputs());
 
         input.nextValue = 12.0;
@@ -854,18 +831,30 @@ namespace
         process.updateMeasurementsAndRegulators(
             1000);
 
-        MeasurementSnapshot snapshot;
-        process.captureMeasurements(
+        ProcessSnapshot snapshot;
+        process.captureSnapshot(
             snapshot,
             1000);
 
-        const MeasurementSample* state =
-            snapshot.find(outputState);
+        const OutputSample* state =
+            snapshot.find(output);
 
-        CHECK_TRUE(state != nullptr);
-        CHECK_TRUE(state->valid);
+        const MeasurementSample* measurement =
+            snapshot.find(input);
+
+        CHECK_TRUE(snapshot.measurementCount() == 1);
+        CHECK_TRUE(snapshot.outputCount() == 1);
+        CHECK_TRUE(snapshot.capturedAt() == 1000);
+        CHECK_TRUE(measurement != nullptr);
+        CHECK_TRUE(measurement->valid);
         CHECK_NEAR(
-            state->value,
+            measurement->value,
+            12.0,
+            0.0);
+        CHECK_TRUE(state != nullptr);
+        CHECK_TRUE(state->healthy);
+        CHECK_NEAR(
+            state->appliedCommand,
             1.0,
             0.0);
         CHECK_NEAR(
@@ -905,6 +894,51 @@ namespace
         CHECK_TRUE(process.connect(
             secondActuator,
             secondOutput));
+    }
+
+    void testSystemWatchdogRequiresBothCores()
+    {
+        rp2040.resetFakeState();
+        rp2040.resetReason =
+            RP2040::WDT_RESET;
+
+        Stream diagnosticOutput;
+        SystemWatchdog watchdog;
+
+        watchdog.checkInUiCore();
+        watchdog.checkInControlCore();
+
+        CHECK_FALSE(rp2040.watchdogStarted);
+        CHECK_TRUE(rp2040.watchdogResetCount == 0);
+
+        watchdog.begin();
+        watchdog.printLastResetDiagnostic(
+            diagnosticOutput);
+
+        CHECK_TRUE(rp2040.watchdogStarted);
+        CHECK_TRUE(
+            diagnosticOutput.printedLineCount == 1);
+        CHECK_TRUE(
+            rp2040.watchdogTimeoutMs ==
+                SystemWatchdog::TIMEOUT_MS);
+
+        watchdog.checkInControlCore();
+
+        CHECK_TRUE(rp2040.watchdogResetCount == 0);
+
+        watchdog.checkInUiCore();
+        watchdog.checkInControlCore();
+
+        CHECK_TRUE(rp2040.watchdogResetCount == 1);
+
+        watchdog.checkInControlCore();
+
+        CHECK_TRUE(rp2040.watchdogResetCount == 1);
+
+        watchdog.checkInUiCore();
+        watchdog.checkInControlCore();
+
+        CHECK_TRUE(rp2040.watchdogResetCount == 2);
     }
 }
 
@@ -957,6 +991,10 @@ int main()
     TestHarness::run(
         "connexion des sorties",
         testOutputConnections);
+
+    TestHarness::run(
+        "watchdog des deux coeurs",
+        testSystemWatchdogRequiresBothCores);
 
     return TestHarness::finish();
 }

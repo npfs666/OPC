@@ -8,7 +8,7 @@
 
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
-#include <Measurements/MeasurementSnapshot.h>
+#include <ProcessSnapshot.h>
 
 #include <cmath>
 #include <cstdio>
@@ -193,49 +193,6 @@ const char* ThermostatInstallation::configurationKey() const
     return "thermostat";
 }
 
-void ThermostatInstallation::
-    RelayStateMeasurement::begin(
-        RelayOutput& relay)
-{
-    Measurement::begin(
-        "thermostat_relay_state",
-        "Etat Output 1",
-        "");
-
-    this->relay = &relay;
-    display = false;
-}
-
-void ThermostatInstallation::
-    RelayStateMeasurement::update()
-{
-    if (relay == nullptr ||
-        !relay->isHealthy())
-    {
-        setValid(false);
-        return;
-    }
-
-    setValue(
-        relay->appliedCommand() >= 0.5
-            ? 1.0
-            : 0.0);
-
-    setValid(true);
-}
-
-Measurement::UpdatePhase ThermostatInstallation::
-    RelayStateMeasurement::updatePhase() const
-{
-    return UpdatePhase::AfterOutputs;
-}
-
-uint8_t ThermostatInstallation::
-    RelayStateMeasurement::printDecimals() const
-{
-    return 0;
-}
-
 bool ThermostatInstallation::begin(
     SensorBoard& board,
     Adafruit_BME280& bme,
@@ -304,11 +261,6 @@ bool ThermostatInstallation::begin(
         return false;
     }
 
-    relayState.begin(relayOutput);
-
-    if (!process.add(relayState))
-        return false;
-
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
@@ -351,21 +303,21 @@ void ThermostatInstallation::printHomeScreen(
 
     printActualTemperature(
         display,
-        context.measurements.find(
+        context.snapshot.find(
             temperature));
 
     printSetpoint(
         display,
         thermostat.settings.setpoint);
 
-    const MeasurementSample* relaySample =
-        context.measurements.find(
-            relayState);
+    const OutputSample* relaySample =
+        context.snapshot.find(
+            relayOutput);
 
     const bool outputIsOn =
         relaySample != nullptr &&
-        relaySample->valid &&
-        relaySample->value >= 0.5;
+        relaySample->healthy &&
+        relaySample->appliedCommand >= 0.5;
 
     printOutputState(
         display,

@@ -7,7 +7,7 @@
 
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
-#include <Measurements/MeasurementSnapshot.h>
+#include <ProcessSnapshot.h>
 
 namespace
 {
@@ -119,19 +119,19 @@ void TestInstallation::printHomeScreen(
     printHomeValue(
         display,
         38,
-        context.measurements.find(
+        context.snapshot.find(
             rtd1Temperature));
 
     printHomeValue(
         display,
         70,
-        context.measurements.find(
+        context.snapshot.find(
             rtd2Temperature));
 
     printHomeValue(
         display,
         102,
-        context.measurements.find(
+        context.snapshot.find(
             psychroHumidity));
 }
 

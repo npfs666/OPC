@@ -1,5 +1,6 @@
 #include <Hardware/SensorBoard.h>
 
+#include <hardware/gpio.h>
 #include <hmi/ParameterList.h>
 
 
@@ -128,14 +129,19 @@ void SensorBoard::startContinuous()
     if (numRTDSensors == 0 || rtd[0] == nullptr) 
         return;
 
+    pauseInterrupts = true;
+
     // Init first read
     curRTDSensor = 0;
 
     setWiringRoute(rtd[curRTDSensor]->settings);
 
     adc.setConversionMode(CONVERSION_CONTINUOUS);
-    pauseInterrupts = false;
     adc.startSync();
+
+    gpio_acknowledge_irq(SPI_DRDY, GPIO_IRQ_EDGE_FALL);
+
+    pauseInterrupts = false;
 }
 
 
@@ -150,16 +156,20 @@ void SensorBoard::pause() {
 
 // Restarts conversion
 void SensorBoard::restart() {
-    
+    pauseInterrupts = true;
+
     adc.setConversionMode(CONVERSION_CONTINUOUS);
+
     /**
-     * When in pause(), any write to a registry starts a single shot conversion (and triggers interrupt), and we write many
-     * so before restarting we need to clear any previous "random" measurement
+     * Une conversion synchrone, notamment la température interne de l'ADC,
+     * peut laisser un front DRDY en attente. Il doit être acquitté avant
+     * d'accepter les mesures du canal suivant.
      */
-    //rtd[curRTDSensor].reset();
-    pauseInterrupts = false;
     adc.startSync();
-    
+
+    gpio_acknowledge_irq(SPI_DRDY, GPIO_IRQ_EDGE_FALL);
+
+    pauseInterrupts = false;
 }
 
 

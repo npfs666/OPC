@@ -8,7 +8,7 @@
 
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
-#include <Measurements/MeasurementSnapshot.h>
+#include <ProcessSnapshot.h>
 
 #include <cstring>
 
@@ -123,47 +123,6 @@ const char* SolarInstallation::configurationKey() const
     return "solar_regulator";
 }
 
-void SolarInstallation::PumpStateMeasurement::begin(
-    RelayOutput& relay)
-{
-    Measurement::begin(
-        "solar_pump_state",
-        "Etat pompe",
-        "");
-
-    this->relay = &relay;
-    display = false;
-}
-
-void SolarInstallation::PumpStateMeasurement::update()
-{
-    if (relay == nullptr ||
-        !relay->isHealthy())
-    {
-        setValid(false);
-        return;
-    }
-
-    setValue(
-        relay->appliedCommand() >= 0.5
-            ? 1.0
-            : 0.0);
-
-    setValid(true);
-}
-
-Measurement::UpdatePhase SolarInstallation::
-    PumpStateMeasurement::updatePhase() const
-{
-    return UpdatePhase::AfterOutputs;
-}
-
-uint8_t SolarInstallation::
-    PumpStateMeasurement::printDecimals() const
-{
-    return 0;
-}
-
 bool SolarInstallation::begin(
     SensorBoard& board,
     Adafruit_BME280& bme,
@@ -271,11 +230,6 @@ bool SolarInstallation::begin(
         return false;
     }
 
-    pumpState.begin(pumpRelay);
-
-    if (!process.add(pumpState))
-        return false;
-
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
@@ -339,29 +293,29 @@ void SolarInstallation::printHomeScreen(
     printTemperature(
         display,
         COLLECTOR_Y,
-        context.measurements.find(
+        context.snapshot.find(
             collectorTemperature));
 
     printTemperature(
         display,
         TANK_TOP_Y,
-        context.measurements.find(
+        context.snapshot.find(
             tankTopTemperature));
 
     printTemperature(
         display,
         TANK_BOTTOM_Y,
-        context.measurements.find(
+        context.snapshot.find(
             tankBottomTemperature));
 
-    const MeasurementSample* pumpSample =
-        context.measurements.find(
-            pumpState);
+    const OutputSample* pumpSample =
+        context.snapshot.find(
+            pumpRelay);
 
     const bool pumpIsOn =
         pumpSample != nullptr &&
-        pumpSample->valid &&
-        pumpSample->value >= 0.5;
+        pumpSample->healthy &&
+        pumpSample->appliedCommand >= 0.5;
 
     printPumpState(
         display,

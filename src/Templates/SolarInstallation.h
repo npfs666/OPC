@@ -38,18 +38,6 @@ public:
         HomeScreenContext& context) override;
 
 private:
-    class PumpStateMeasurement final : public Measurement
-    {
-    public:
-        void begin(RelayOutput& relay);
-        void update() override;
-        UpdatePhase updatePhase() const override;
-        uint8_t printDecimals() const override;
-
-    private:
-        RelayOutput* relay = nullptr;
-    };
-
     // Entrées physiques
     RTDSensor collectorInput;
     RTDSensor tankTopInput;
@@ -70,7 +58,6 @@ private:
     // Commande de la pompe
     ActuatorOnOff pump;
     RelayOutput pumpRelay;
-    PumpStateMeasurement pumpState;
 };
 
 #endif

@@ -5,7 +5,7 @@
 
 #include <Adafruit_GFX.h>
 
-#include <Measurements/MeasurementSnapshot.h>
+#include <ProcessSnapshot.h>
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
 
@@ -98,7 +98,7 @@ void MinimalInstallation::printHomeScreen(
         COLOR_BLACK);
 
     const MeasurementSample* sample =
-        context.measurements.find(temperature);
+        context.snapshot.find(temperature);
 
     if (sample == nullptr ||
         !sample->valid)

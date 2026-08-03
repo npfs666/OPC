@@ -1,9 +1,9 @@
 #include <ProcessControl.h>
 
 #include <Measurements/Measurement.h>
-#include <Measurements/MeasurementSnapshot.h>
 #include <Outputs/Actuator.h>
 #include <Outputs/Output.h>
+#include <ProcessSnapshot.h>
 #include <Regulator/Regulator.h>
 #include <hmi/ParameterList.h>
 
@@ -113,12 +113,8 @@ void ProcessControl::updateMeasurementsAndRegulators(
 {
     for (uint8_t i = 0; i < measurementCount; i++)
     {
-        if (measurements[i] != nullptr &&
-            measurements[i]->updatePhase() ==
-                Measurement::UpdatePhase::BeforeRegulation)
-        {
+        if (measurements[i] != nullptr)
             measurements[i]->update();
-        }
     }
 
     for (uint8_t i = 0; i < regulatorCount; i++)
@@ -134,16 +130,6 @@ void ProcessControl::poll(uint32_t now)
 
     for (uint8_t i = 0; i < outputCount; i++)
         outputs[i]->poll(now);
-
-    for (uint8_t i = 0; i < measurementCount; i++)
-    {
-        if (measurements[i] != nullptr &&
-            measurements[i]->updatePhase() ==
-                Measurement::UpdatePhase::AfterOutputs)
-        {
-            measurements[i]->update();
-        }
-    }
 }
 
 void ProcessControl::resume(uint32_t now)
@@ -212,8 +198,8 @@ bool ProcessControl::outputsHealthy() const
     return true;
 }
 
-void ProcessControl::captureMeasurements(
-    MeasurementSnapshot& destination,
+void ProcessControl::captureSnapshot(
+    ProcessSnapshot& destination,
     uint32_t now) const
 {
     destination.clear(now);
@@ -222,6 +208,12 @@ void ProcessControl::captureMeasurements(
     {
         if (measurements[i] != nullptr)
             destination.add(*measurements[i]);
+    }
+
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        if (outputs[i] != nullptr)
+            destination.add(*outputs[i]);
     }
 }
 

@@ -11,6 +11,7 @@
  */
 
 #include <OPC.h>
+#include <SystemWatchdog.h>
 #include <testInstallation.h>
 #include <hardware/sync.h>
 
@@ -19,10 +20,15 @@ namespace
 {
     TestInstallation installation;
     OPC opc(installation);
+    SystemWatchdog systemWatchdog;
 
-    void synchronizeStartup(uint32_t localCoreReady,uint32_t remoteCoreReady)
+    void synchronizeStartup(
+        InterCoreMessage localCoreReady,
+        InterCoreMessage remoteCoreReady)
     {
-        rp2040.fifo.push(localCoreReady);
+        rp2040.fifo.push(
+            interCoreMessageValue(
+                localCoreReady));
 
         uint32_t message;
 
@@ -30,7 +36,9 @@ namespace
         {
             message = rp2040.fifo.pop();
         }
-        while (message != remoteCoreReady);
+        while (message !=
+            interCoreMessageValue(
+                remoteCoreReady));
 
         /*
          * Toutes les initialisations effectuées avant
@@ -63,16 +71,25 @@ namespace
  */
 void setup()
 {
+	systemWatchdog.begin();
+
 	opc.initSensorBoard();
 
     synchronizeStartup(
-        CONTROL_CORE_READY,
-        UI_CORE_READY);
+        InterCoreMessage::ControlCoreReady,
+        InterCoreMessage::UiCoreReady);
+
+    systemWatchdog.printLastResetDiagnostic(Serial);
 
 	attachInterrupt(digitalPinToInterrupt(SPI_DRDY), adcInterrupt, FALLING);
-    
-    if (opc.initMeasurements())
-        rp2040.fifo.push(PARAMETERS_READY);
+
+    const bool measurementsReady =
+        opc.initMeasurements();
+
+    if (measurementsReady)
+        rp2040.fifo.push(
+            interCoreMessageValue(
+                InterCoreMessage::ParametersReady));
 }
 
 
@@ -85,12 +102,15 @@ void loop()
     uint32_t message;
 
     while (rp2040.fifo.pop_nb(&message))
-        opc.handleControlMessage(message);
+        opc.handleControlMessage(
+            static_cast<InterCoreMessage>(message));
 
     // Mettre en place le calcul des measurement, car ici on est pas dans l'ISR donc on a le temps.
     opc.newMeasurement();
 
     opc.controlPoll();
+
+    systemWatchdog.checkInControlCore();
 }
 
 
@@ -109,8 +129,8 @@ void setup1()
 	opc.initBME280();
 
     synchronizeStartup(
-        UI_CORE_READY,
-        CONTROL_CORE_READY);
+        InterCoreMessage::UiCoreReady,
+        InterCoreMessage::ControlCoreReady);
 }
 
 
@@ -135,11 +155,13 @@ void setup1()
  */
 void loop1()
 {
-
     uint32_t message;
 
     while (rp2040.fifo.pop_nb(&message))
-        opc.handleUIMessage(message);
+        opc.handleUIMessage(
+            static_cast<InterCoreMessage>(message));
 
     opc.uiPoll();
+
+    systemWatchdog.checkInUiCore();
 }

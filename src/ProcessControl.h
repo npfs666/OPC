@@ -7,10 +7,10 @@
 
 class Actuator;
 class Measurement;
-class MeasurementSnapshot;
 class Output;
 class ParameterEditor;
 class ParameterList;
+class ProcessSnapshot;
 class Regulator;
 
 class ProcessControl
@@ -48,8 +48,8 @@ public:
 
     //Measurement* getMeasurement(uint8_t id);
 
-    void captureMeasurements(
-        MeasurementSnapshot& destination,
+    void captureSnapshot(
+        ProcessSnapshot& destination,
         uint32_t now) const;
 
     void print(Stream& stream) const;

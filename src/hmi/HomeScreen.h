@@ -4,12 +4,12 @@
 #include <cstdint>
 
 class Adafruit_GFX;
-class MeasurementSnapshot;
+class ProcessSnapshot;
 
 struct HomeScreenContext
 {
     Adafruit_GFX& display;
-    const MeasurementSnapshot& measurements;
+    const ProcessSnapshot& snapshot;
     uint32_t now;
     bool fullRefresh;
 };

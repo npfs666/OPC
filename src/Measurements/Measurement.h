@@ -20,18 +20,6 @@ class Measurement : public Displayable, public Configurable
 {
 public:
     /**
-     * @brief Moment auquel la mesure doit être mise à jour.
-     */
-    enum class UpdatePhase : uint8_t
-    {
-        // Avant la mise à jour des régulateurs.
-        BeforeRegulation,
-
-        // Après l'application des sorties.
-        AfterOutputs
-    };
-
-    /**
      * @brief Construit une mesure non initialisée.
      */
     Measurement();
@@ -49,14 +37,6 @@ public:
      * l'implémentation vide.
      */
     virtual void update() = 0;
-
-    /**
-     * @return Phase de mise à jour (UpdatePhase).
-     */
-    virtual UpdatePhase updatePhase() const
-    {
-        return UpdatePhase::BeforeRegulation;
-    }
 
     /**
      * @return Dernière valeur mesurée (double_t).

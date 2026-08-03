@@ -174,8 +174,8 @@ bool OPC::newMeasurement()
     controller.updateMeasurementsAndRegulators(
         times);
 
-    controller.captureMeasurements(
-        sharedMeasurementSnapshot,
+    controller.captureSnapshot(
+        sharedProcessSnapshot,
         times);
 
     lastMeasurementTime = times;
@@ -188,7 +188,9 @@ bool OPC::newMeasurement()
 
     mutex_exit(&processDataMutex);
 
-    rp2040.fifo.push_nb(PRINT_DATA_AVAILABLE);
+    rp2040.fifo.push_nb(
+        interCoreMessageValue(
+            InterCoreMessage::PrintDataAvailable));
 
     return true;
 }
@@ -333,13 +335,13 @@ void OPC::initMenu()
     }
 }
 
-void OPC::copyMeasurementSnapshot()
+void OPC::copyProcessSnapshot()
 {
     mutex_enter_blocking(
         &processDataMutex);
 
-    displayMeasurementSnapshot =
-        sharedMeasurementSnapshot;
+    displayProcessSnapshot =
+        sharedProcessSnapshot;
 
     mutex_exit(&processDataMutex);
 }
@@ -349,7 +351,7 @@ void OPC::showHomeScreen(
 {
     HomeScreenContext context{
         tft,
-        displayMeasurementSnapshot,
+        displayProcessSnapshot,
         millis(),
         fullRefresh
     };
@@ -368,7 +370,8 @@ void OPC::requestMenu()
     uiState = UIState::PauseRequested;
 
     rp2040.fifo.push(
-        PAUSE_ADC_INTERRUPTS);
+        interCoreMessageValue(
+            InterCoreMessage::PauseAcquisition));
 }
 
 void OPC::requestParameterApply()
@@ -388,7 +391,8 @@ void OPC::requestParameterApply()
     __dmb();
 
     rp2040.fifo.push(
-        APPLY_MENU_PARAMETERS);
+        interCoreMessageValue(
+            InterCoreMessage::ApplyMenuParameters));
 }
 
 void OPC::uiPoll()
@@ -449,11 +453,11 @@ void OPC::uiPoll()
 }
 
 void OPC::handleControlMessage(
-    uint32_t message)
+    InterCoreMessage message)
 {
     switch (message)
     {
-    case PAUSE_ADC_INTERRUPTS:
+    case InterCoreMessage::PauseAcquisition:
         if (!acquisitionPausedForMenu)
         {
             input.pause();
@@ -471,14 +475,17 @@ void OPC::handleControlMessage(
         }
 
         rp2040.fifo.push(
-            ACQUISITION_PAUSED);
+            interCoreMessageValue(
+                InterCoreMessage::AcquisitionPaused));
         break;
 
-    case APPLY_MENU_PARAMETERS:
+    case InterCoreMessage::ApplyMenuParameters:
+    {
         if (!acquisitionPausedForMenu)
         {
             rp2040.fifo.push(
-                MENU_PARAMETERS_REJECTED);
+                interCoreMessageValue(
+                    InterCoreMessage::MenuParametersRejected));
             break;
         }
 
@@ -499,7 +506,8 @@ void OPC::handleControlMessage(
             !parameterEditor.apply())
         {
             rp2040.fifo.push(
-                MENU_PARAMETERS_REJECTED);
+                interCoreMessageValue(
+                    InterCoreMessage::MenuParametersRejected));
             break;
         }
 
@@ -514,7 +522,8 @@ void OPC::handleControlMessage(
         if (!outputsApplied)
         {
             rp2040.fifo.push(
-                MENU_PARAMETERS_REJECTED);
+                interCoreMessageValue(
+                    InterCoreMessage::MenuParametersRejected));
             break;
         }
 
@@ -535,26 +544,31 @@ void OPC::handleControlMessage(
         __dmb();
 
         rp2040.fifo.push(
-            configurationSaved
-                ? MENU_PARAMETERS_APPLIED
-                : MENU_PARAMETERS_APPLIED_NOT_SAVED);
+            interCoreMessageValue(
+                configurationSaved
+                    ? InterCoreMessage::MenuParametersApplied
+                    : InterCoreMessage::MenuParametersAppliedNotSaved));
+        break;
+    }
+
+    default:
         break;
     }
 }
 
 void OPC::handleUIMessage(
-    uint32_t message)
+    InterCoreMessage message)
 {
     switch (message)
     {
-    case PARAMETERS_READY:
+    case InterCoreMessage::ParametersReady:
         initMenu();
-        copyMeasurementSnapshot();
+        copyProcessSnapshot();
         uiState = UIState::Home;
         showHomeScreen(true);
         break;
 
-    case PRINT_DATA_AVAILABLE:
+    case InterCoreMessage::PrintDataAvailable:
     {
         FixedBufferPrint bufferedOutput(
             serialPrintBuffer,
@@ -570,7 +584,7 @@ void OPC::handleUIMessage(
 
         if (uiState == UIState::Home)
         {
-            copyMeasurementSnapshot();
+            copyProcessSnapshot();
             showHomeScreen(false);
         }
 
@@ -580,7 +594,7 @@ void OPC::handleUIMessage(
         break;
     }
 
-    case ACQUISITION_PAUSED:
+    case InterCoreMessage::AcquisitionPaused:
         if (uiState !=
                 UIState::PauseRequested)
         {
@@ -594,8 +608,8 @@ void OPC::handleUIMessage(
         uiState = UIState::Menu;
         break;
 
-    case MENU_PARAMETERS_APPLIED:
-    case MENU_PARAMETERS_APPLIED_NOT_SAVED:
+    case InterCoreMessage::MenuParametersApplied:
+    case InterCoreMessage::MenuParametersAppliedNotSaved:
         if (uiState !=
                 UIState::ApplyRequested)
         {
@@ -605,20 +619,20 @@ void OPC::handleUIMessage(
         __dmb();
 
         if (message ==
-            MENU_PARAMETERS_APPLIED_NOT_SAVED)
+            InterCoreMessage::MenuParametersAppliedNotSaved)
         {
             Serial.println(
                 "Parameters applied but configuration save failed");
         }
 
-        displayMeasurementSnapshot =
-            MeasurementSnapshot{};
+        displayProcessSnapshot =
+            ProcessSnapshot{};
 
         uiState = UIState::Home;
         showHomeScreen(true);
         break;
 
-    case MENU_PARAMETERS_REJECTED:
+    case InterCoreMessage::MenuParametersRejected:
         if (uiState !=
                 UIState::ApplyRequested)
         {
@@ -631,6 +645,9 @@ void OPC::handleUIMessage(
         menu.show();
         lastMenuActivity = millis();
         uiState = UIState::Menu;
+        break;
+
+    default:
         break;
     }
 }
