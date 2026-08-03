@@ -66,7 +66,7 @@ void Storage::poll()
 }
 
 Storage::RestoreResult Storage::restore(
-    const char* installationName,
+    const char* installationId,
     ParameterList& parameters,
     ParameterEditor& editor,
     const ParameterRestoreValidator& validator)
@@ -83,7 +83,7 @@ Storage::RestoreResult Storage::restore(
         return RestoreResult::NoFile;
 
     if (!readConfiguration(
-            installationName,
+            installationId,
             parameters,
             editor) ||
         !editor.validate() ||
@@ -107,19 +107,19 @@ Storage::RestoreResult Storage::restore(
 }
 
 bool Storage::save(
-    const char* installationName,
+    const char* installationId,
     const ParameterList& parameters)
 {
     if (!mounted ||
-        installationName == nullptr ||
-        installationName[0] == '\0')
+        installationId == nullptr ||
+        installationId[0] == '\0')
     {
         return false;
     }
 
     JsonDocument document;
     document["schema"] = SCHEMA_VERSION;
-    document["installation_name"] = installationName;
+    document["installation_id"] = installationId;
 
     JsonArray storedParameters =
         document["parameters"].to<JsonArray>();
@@ -465,7 +465,7 @@ bool Storage::refreshUsbExport()
 }
 
 bool Storage::readConfiguration(
-    const char* installationName,
+    const char* installationId,
     ParameterList& parameters,
     ParameterEditor& editor)
 {
@@ -482,15 +482,15 @@ bool Storage::readConfiguration(
     file.close();
 
     if (error ||
-        installationName == nullptr ||
-        installationName[0] == '\0' ||
+        installationId == nullptr ||
+        installationId[0] == '\0' ||
         document["schema"].as<uint32_t>() !=
             SCHEMA_VERSION ||
         !isValidRequiredText(
-            document["installation_name"]) ||
+            document["installation_id"]) ||
         strcmp(
-            installationName,
-            document["installation_name"]
+            installationId,
+            document["installation_id"]
                 .as<const char*>()) != 0 ||
         !document["parameters"].is<JsonArrayConst>())
     {
@@ -676,7 +676,7 @@ bool Storage::validateWrittenFile() const
         document["schema"].as<uint32_t>() ==
             SCHEMA_VERSION &&
         isValidRequiredText(
-            document["installation_name"]) &&
+            document["installation_id"]) &&
         document["parameters"].is<JsonArrayConst>();
 }
 

@@ -9,6 +9,7 @@ class Adafruit_BME280;
 struct HomeScreenContext;
 class ProcessControl;
 class ParameterEditor;
+class MenuBuilder;
 class OPC;
 
 class Installation
@@ -30,6 +31,10 @@ public:
 
     virtual ~Installation() = default;
 
+    // Identifiant persistant, stable et non traduit.
+    virtual const char* configurationKey() const = 0;
+
+    // Nom lisible destiné à l'utilisateur.
     virtual const char* name() const = 0;
 
     virtual bool begin(
@@ -60,6 +65,9 @@ public:
     {
         return parameterList;
     }
+
+    bool buildMenu(
+        MenuBuilder& menu) const;
 
     uint32_t menuTimeoutMs() const
     {

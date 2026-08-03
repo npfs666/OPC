@@ -62,7 +62,7 @@ private:
     const char* ownerName = "";
     double_t nMinusOneValue;
     double_t sum;
-    double_t resistance;
+    //double_t resistance;
     uint16_t sampleCount;
     double_t avgValue;
 };

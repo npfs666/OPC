@@ -36,6 +36,7 @@ public:
     TestInstallation();
 
     const char* name() const override;
+    const char* configurationKey() const override;
 
     bool begin(
         SensorBoard& board,

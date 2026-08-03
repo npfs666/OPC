@@ -1,6 +1,7 @@
 #include "TestHarness.h"
 
 #include <Adafruit_BME280.h>
+#include <Installation.h>
 #include <Measurements/Humidity/HumidityBME.h>
 #include <Measurements/MeasurementSnapshot.h>
 #include <Measurements/Pressure/PressureBME.h>
@@ -14,13 +15,132 @@
 #include <Regulator/PID.h>
 #include <Regulator/SolarRegulator.h>
 #include <Regulator/Thermostat.h>
+#include <hmi/MenuBuilder.h>
 #include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
 
+#include <cstring>
 #include <limits>
 
 namespace
 {
+    class MenuTestInstallation final :
+        public Installation
+    {
+    public:
+        const char* name() const override
+        {
+            return "Menu test";
+        }
+
+        const char* configurationKey() const override
+        {
+            return "test_installation";
+        }
+
+        bool begin(
+            SensorBoard&,
+            Adafruit_BME280&,
+            ProcessControl&) override
+        {
+            return true;
+        }
+
+        void printHomeScreen(
+            HomeScreenContext&) override
+        {
+        }
+
+        bool registerTestParameters()
+        {
+            parameterList.begin(
+                parameterStorage,
+                MAX_PARAMETERS);
+
+            auto input = parameterList.forOwner({
+                "inputs",
+                "Input",
+                "input_1",
+                "Input 1"
+            });
+
+            auto calibration = parameterList.forOwner({
+                "calibration",
+                "Calibration",
+                "sensor_board",
+                "Carte capteurs"
+            });
+
+            auto regulator = parameterList.forOwner({
+                "regulators",
+                "Regulateur",
+                "thermostat",
+                "Thermostat"
+            });
+
+            auto menu = parameterList.forOwner({
+                "interface",
+                "Interface",
+                "menu",
+                "Menu"
+            });
+
+            auto watchdog = parameterList.forOwner({
+                "safety",
+                "Sécurité",
+                "measurement_watchdog",
+                "Surveillance mesures"
+            });
+
+            return
+                input.addInteger(
+                    "samples",
+                    "Samples",
+                    samples,
+                    1,
+                    128,
+                    1) &&
+                calibration.addDouble(
+                    "reference",
+                    "Rref",
+                    reference,
+                    "Ω",
+                    true) &&
+                regulator.addDouble(
+                    "setpoint",
+                    "Consigne",
+                    setpoint,
+                    0.0,
+                    100.0,
+                    0.1,
+                    1,
+                    "°C") &&
+                menu.addInteger(
+                    "timeout",
+                    "Timeout",
+                    menuTimeout,
+                    1,
+                    120,
+                    1,
+                    "s") &&
+                watchdog.addInteger(
+                    "timeout",
+                    "Timeout mesures",
+                    measurementTimeout,
+                    10,
+                    300,
+                    1,
+                    "s");
+        }
+
+    private:
+        uint16_t samples = 16;
+        double_t reference = 1649.819;
+        double_t setpoint = 20.0;
+        uint32_t menuTimeout = 10;
+        uint32_t measurementTimeout = 30;
+    };
+
     class FakeTemperature final :
         public Temperature
     {
@@ -129,14 +249,11 @@ namespace
     {
     public:
         FakeActuator(
-            Regulator& regulator,
-            Output& output)
+            Regulator& regulator)
         {
             Actuator::begin(
                 "actuator",
                 regulator);
-
-            addOutput(output);
         }
 
         void update(uint32_t now) override
@@ -591,6 +708,8 @@ namespace
         editor.get(0).booleanValue = true;
         editor.get(1).integerValue = 10;
         editor.get(2).numberValue = 25.5;
+
+        // readOnly bloque le menu, pas le logiciel ni la restauration.
         editor.get(3).numberValue = 99.0;
 
         CHECK_TRUE(editor.validate());
@@ -603,12 +722,111 @@ namespace
             0.0001);
         CHECK_NEAR(
             displayedValue,
-            42.0,
+            99.0,
             0.0001);
 
         editor.capture();
         editor.get(1).integerValue = 9;
         CHECK_FALSE(editor.validate());
+    }
+
+    void testMenuStructure()
+    {
+        MenuTestInstallation installation;
+        MenuBuilder menu;
+
+        CHECK_TRUE(
+            installation.registerTestParameters());
+        CHECK_TRUE(
+            installation.buildMenu(menu));
+
+        const MenuBuilder::GroupId root =
+            menu.root();
+
+        const MenuBuilder::GroupId inputs =
+            menu.findSubmenu(
+                root,
+                "inputs");
+
+        const MenuBuilder::GroupId miscellaneous =
+            menu.findSubmenu(
+                root,
+                "miscellaneous");
+
+        CHECK_TRUE(
+            inputs != MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            miscellaneous !=
+                MenuBuilder::INVALID_GROUP);
+
+        const MenuBuilder::GroupId inputOne =
+            menu.findGroupForOwner(
+                "input_1");
+
+        CHECK_TRUE(
+            inputOne != MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            menu.getGroup(inputOne)->parent ==
+                inputs);
+        CHECK_TRUE(
+            menu.findGroupForOwner(
+                "measurement_watchdog") ==
+                inputs);
+
+        const MenuBuilder::GroupId calibration =
+            menu.findSubmenu(
+                miscellaneous,
+                "calibration");
+
+        const MenuBuilder::GroupId menuSettings =
+            menu.findSubmenu(
+                miscellaneous,
+                "menu");
+
+        CHECK_TRUE(
+            calibration !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            menuSettings !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            menu.findGroupForOwner(
+                "sensor_board") ==
+                calibration);
+        CHECK_TRUE(
+            menu.findGroupForOwner(
+                "menu") ==
+                menuSettings);
+
+        CHECK_TRUE(
+            menu.findSubmenu(
+                root,
+                "calibration") ==
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            menu.findSubmenu(
+                root,
+                "interface") ==
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            menu.findSubmenu(
+                root,
+                "safety") ==
+                MenuBuilder::INVALID_GROUP);
+    }
+
+    void testInstallationIdentity()
+    {
+        MenuTestInstallation installation;
+
+        CHECK_TRUE(
+            strcmp(
+                installation.configurationKey(),
+                "test_installation") == 0);
+        CHECK_TRUE(
+            strcmp(
+                installation.name(),
+                installation.configurationKey()) != 0);
     }
 
     void testOutputStateUpdatedBeforeSnapshot()
@@ -617,16 +835,16 @@ namespace
         FakeInputMeasurement input;
         FakeRegulator regulator;
         FakeOutput output;
-        FakeActuator actuator(
-            regulator,
-            output);
+        FakeActuator actuator(regulator);
         OutputStateMeasurement outputState(
             output);
 
         CHECK_TRUE(process.add(input));
         CHECK_TRUE(process.add(regulator));
         CHECK_TRUE(process.add(actuator));
-        CHECK_TRUE(process.add(output));
+        CHECK_TRUE(process.connect(
+            actuator,
+            output));
         CHECK_TRUE(process.add(outputState));
         CHECK_TRUE(process.beginOutputs());
 
@@ -654,6 +872,39 @@ namespace
             output.appliedCommand(),
             1.0,
             0.0);
+    }
+
+    void testOutputConnections()
+    {
+        ProcessControl process;
+        FakeRegulator regulator;
+        FakeActuator firstActuator(regulator);
+        FakeActuator secondActuator(regulator);
+        FakeActuator unregisteredActuator(
+            regulator);
+        FakeOutput output;
+        FakeOutput secondOutput;
+
+        CHECK_TRUE(process.add(firstActuator));
+        CHECK_TRUE(process.add(secondActuator));
+
+        CHECK_FALSE(process.connect(
+            unregisteredActuator,
+            output));
+
+        CHECK_TRUE(process.connect(
+            firstActuator,
+            output));
+        CHECK_FALSE(process.connect(
+            firstActuator,
+            output));
+        CHECK_FALSE(process.connect(
+            secondActuator,
+            output));
+
+        CHECK_TRUE(process.connect(
+            secondActuator,
+            secondOutput));
     }
 }
 
@@ -692,8 +943,20 @@ int main()
         testParameterEditor);
 
     TestHarness::run(
+        "structure du menu",
+        testMenuStructure);
+
+    TestHarness::run(
+        "identité de l'installation",
+        testInstallationIdentity);
+
+    TestHarness::run(
         "état sortie avant snapshot",
         testOutputStateUpdatedBeforeSnapshot);
+
+    TestHarness::run(
+        "connexion des sorties",
+        testOutputConnections);
 
     return TestHarness::finish();
 }

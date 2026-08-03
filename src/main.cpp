@@ -11,16 +11,16 @@
  */
 
 #include <OPC.h>
+#include <testInstallation.h>
 #include <hardware/sync.h>
 
 
 namespace
 {
-    OPC opc;
+    TestInstallation installation;
+    OPC opc(installation);
 
-    void synchronizeStartup(
-        uint32_t localCoreReady,
-        uint32_t remoteCoreReady)
+    void synchronizeStartup(uint32_t localCoreReady,uint32_t remoteCoreReady)
     {
         rp2040.fifo.push(localCoreReady);
 
@@ -39,11 +39,24 @@ namespace
          */
         __dmb();
     }
+
+    void adcInterrupt()
+    {
+        opc.input.adcInterrupt();
+    }
+
+    void ISRRotenc()
+    {
+        opc.handleISRRotenc();
+    }
+
+    void ISRButton()
+    {
+        opc.handleISRButton();
+    }
 }
 
-void adcInterrupt();
-void ISRRotenc();
-void ISRButton();
+
 
 /**
  * CPU0 : contrôle de la mesure ADC et de la régulation
@@ -64,21 +77,8 @@ void setup()
 
 
 
-void adcInterrupt() {
-	opc.input.adcInterrupt();
-}
-
-void ISRRotenc() {
-    opc.handleISRRotenc();
-}
-
-void ISRButton() {
-    opc.handleISRButton();
-}
-
-
 /**
- * CPU0 : contrôle de la mesure ADC et de la régulation
+ * CPU0
  */
 void loop()
 {	
@@ -131,7 +131,7 @@ void setup1()
     }
 */
 /**
- * Cpu1 : contrôle des IT utilisateur et écran
+ * Cpu1
  */
 void loop1()
 {

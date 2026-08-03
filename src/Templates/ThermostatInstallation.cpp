@@ -188,6 +188,11 @@ const char* ThermostatInstallation::name() const
     return "Thermostat";
 }
 
+const char* ThermostatInstallation::configurationKey() const
+{
+    return "thermostat";
+}
+
 void ThermostatInstallation::
     RelayStateMeasurement::begin(
         RelayOutput& relay)
@@ -292,9 +297,9 @@ bool ThermostatInstallation::begin(
         true,
         false);
 
-    if (!relayActuator.addOutput(
-            relayOutput) ||
-        !process.add(relayOutput))
+    if (!process.connect(
+            relayActuator,
+            relayOutput))
     {
         return false;
     }

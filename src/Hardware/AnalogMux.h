@@ -20,7 +20,7 @@ public:
     void set4Wire();
 
 private:
-    void selectChannel(uint8_t channel);
+    //void selectChannel(uint8_t channel);
 };
 
  #endif

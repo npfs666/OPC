@@ -9,10 +9,6 @@
 #include <Adafruit_ST7789.h>
 #include <Adafruit_BME280.h>
 
-#include <testInstallation.h>
-#include <Templates/SolarInstallation.h>
-#include <Templates/ThermostatInstallation.h>
-
 #include <Measurements/MeasurementSnapshot.h>
 
 #include <hmi/MenuBuilder.h>
@@ -23,11 +19,13 @@
 
 #include <pico/mutex.h>
 
+class Installation;
+
 class OPC : private ParameterRestoreValidator
 {
 public:
 
-    OPC();
+    explicit OPC(Installation& installation);
 
     //-------------------------
     // Initialisation
@@ -86,7 +84,7 @@ private:
         ApplyRequested
     };
 
-    TestInstallation userInstall;
+    Installation& userInstall;
     Storage storage;
     ParameterEditor parameterEditor;
     MenuBuilder menuDefinition;

@@ -56,7 +56,7 @@ double_t PressureBME::pressureSeaLevel(int16_t altitude) {
 }
 
 double_t PressureBME::printValue() const {
-    return getValue() / 100.0;
+    return getValue();
 }
 
 uint8_t PressureBME::printDecimals() const {

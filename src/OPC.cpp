@@ -1,5 +1,6 @@
 #include "OPC.h"
 
+#include <Installation.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Hardware/pinout.h>
@@ -69,7 +70,9 @@ namespace
     };
 }
 
-OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, -1)
+OPC::OPC(Installation& installation)
+    : tft(&SPI1, LCD_CS, LCD_DC, -1),
+      userInstall(installation)
 {
     mutex_init(&processDataMutex);
     pinMode(LCD_RESET, OUTPUT);
@@ -262,7 +265,7 @@ bool OPC::initMeasurements()
 
     const Storage::RestoreResult restoreResult =
         storage.restore(
-            userInstall.name(),
+            userInstall.configurationKey(),
             userInstall.getParameters(),
             parameterEditor,
             *this);
@@ -314,11 +317,10 @@ void OPC::initMenu()
 
     parameterEditor.capture();
 
-    if (!menuDefinition.build(
-            userInstall.getParameters(),
-            "Parametres"))
+    if (!userInstall.buildMenu(
+            menuDefinition))
     {
-        Serial.println("Automatic menu generation failed");
+        Serial.println("Menu generation failed");
         return;
     }
 
@@ -520,7 +522,7 @@ void OPC::handleControlMessage(
 
         const bool configurationSaved =
             storage.save(
-                userInstall.name(),
+                userInstall.configurationKey(),
                 userInstall.getParameters());
 
         input.resetAcquisition();

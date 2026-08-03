@@ -69,8 +69,26 @@ bool ProcessControl::add(Actuator& actuator)
     return true;
 }
 
-bool ProcessControl::add(Output& output)
+bool ProcessControl::connect(
+    Actuator& actuator,
+    Output& output)
 {
+    bool actuatorRegistered = false;
+
+    for (uint8_t i = 0;
+         i < actuatorCount;
+         i++)
+    {
+        if (actuators[i] == &actuator)
+        {
+            actuatorRegistered = true;
+            break;
+        }
+    }
+
+    if (!actuatorRegistered)
+        return false;
+
     if (outputCount >= MAX_REGISTERED_OUTPUTS)
         return false;
 
@@ -81,6 +99,9 @@ bool ProcessControl::add(Output& output)
         if (outputs[i] == &output)
             return false;
     }
+
+    if (!actuator.addOutput(output))
+        return false;
 
     outputs[outputCount++] = &output;
 
@@ -204,13 +225,13 @@ void ProcessControl::captureMeasurements(
     }
 }
 
-Measurement* ProcessControl::getMeasurement(uint8_t id) {
+/*Measurement* ProcessControl::getMeasurement(uint8_t id) {
 
     if (id >= measurementCount)
         return nullptr;
 
     return measurements[id];
-}
+}*/
 
 /**
  * Only for testing hardware, do not correct

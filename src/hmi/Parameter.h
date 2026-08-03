@@ -88,6 +88,11 @@ struct Parameter
     const char* name = nullptr;
 
     Type type = Type::Bool;
+
+    /*
+     * Interdit uniquement l'édition par l'utilisateur dans le menu.
+     * Le logiciel et la restauration peuvent toujours modifier la valeur.
+     */
     bool readOnly = false;
 
     union Value

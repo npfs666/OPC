@@ -31,19 +31,19 @@ public:
     void poll();
 
     RestoreResult restore(
-        const char* installationName,
+        const char* installationId,
         ParameterList& parameters,
         ParameterEditor& editor,
         const ParameterRestoreValidator& validator);
 
     bool save(
-        const char* installationName,
+        const char* installationId,
         const ParameterList& parameters);
 
     bool erase();
 
 private:
-    static constexpr uint32_t SCHEMA_VERSION = 1;
+    static constexpr uint32_t SCHEMA_VERSION = 2;
 
     static constexpr const char* CONFIG_PATH =
         "/config.json";
@@ -76,7 +76,7 @@ private:
     bool refreshUsbExport();
 
     bool readConfiguration(
-        const char* installationName,
+        const char* installationId,
         ParameterList& parameters,
         ParameterEditor& editor);
 

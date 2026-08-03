@@ -65,6 +65,11 @@ const char* TestInstallation::name() const
     return "Installation de test pour le développement";
 }
 
+const char* TestInstallation::configurationKey() const
+{
+    return "test_installation";
+}
+
 bool TestInstallation::requiresBME280() const
 {
     return true;
@@ -208,8 +213,9 @@ bool TestInstallation::begin(
         true,
         false);
 
-    if (!heater.addOutput(relayHeater) ||
-        !controller.add(relayHeater))
+    if (!controller.connect(
+            heater,
+            relayHeater))
     {
         return false;
     }

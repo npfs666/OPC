@@ -22,7 +22,14 @@ public:
     bool add(Measurement& measurement);
     bool add(Regulator& regulator);
     bool add(Actuator& actuator);
-    bool add(Output& output);
+
+    /**
+     * Relie une sortie à un actionneur déjà enregistré.
+     * Une même sortie ne peut être reliée qu'une seule fois.
+     */
+    bool connect(
+        Actuator& actuator,
+        Output& output);
 
     void updateMeasurementsAndRegulators(
         uint32_t now);
@@ -39,7 +46,7 @@ public:
 
     bool outputsHealthy() const;
 
-    Measurement* getMeasurement(uint8_t id);
+    //Measurement* getMeasurement(uint8_t id);
 
     void captureMeasurements(
         MeasurementSnapshot& destination,

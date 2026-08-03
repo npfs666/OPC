@@ -6,6 +6,7 @@
 #include <Configurable.h>
 
 class Output;
+class ProcessControl;
 class Regulator;
 
 class Actuator : public Displayable, public Configurable
@@ -25,8 +26,6 @@ public:
         
     virtual ~Actuator() = default;
 
-    bool addOutput(Output& output);
-
     virtual void update(uint32_t now) = 0;
 
     virtual void resume(uint32_t now);
@@ -44,6 +43,12 @@ protected:
     uint8_t outputCount = 0;
 
     Regulator* regulator = nullptr;
+
+private:
+
+    friend class ProcessControl;
+
+    bool addOutput(Output& output);
 };
 
 #endif

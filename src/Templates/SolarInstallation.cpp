@@ -118,6 +118,11 @@ const char* SolarInstallation::name() const
     return "Regulateur solaire";
 }
 
+const char* SolarInstallation::configurationKey() const
+{
+    return "solar_regulator";
+}
+
 void SolarInstallation::PumpStateMeasurement::begin(
     RelayOutput& relay)
 {
@@ -259,8 +264,9 @@ bool SolarInstallation::begin(
         true,
         false);
 
-    if (!pump.addOutput(pumpRelay) ||
-        !process.add(pumpRelay))
+    if (!process.connect(
+            pump,
+            pumpRelay))
     {
         return false;
     }

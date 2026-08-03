@@ -6,8 +6,6 @@
 #include <cstddef>
 #include <cstdint>
 
-class ParameterList;
-
 class MenuBuilder
 {
 public:
@@ -34,10 +32,6 @@ public:
         const char* ownerKey = nullptr;
         GroupId group = INVALID_GROUP;
     };
-
-    bool build(
-        const ParameterList& parameters,
-        const char* rootName = "Parametres");
 
     bool begin(const char* rootName);
 
@@ -77,10 +71,6 @@ private:
     void reset();
 
     static bool isValidText(const char* text);
-    static bool haveSameText(
-        const char* first,
-        const char* second);
-
     Group groups[MAX_GROUPS] = {};
     OwnerBinding ownerBindings[MAX_OWNER_BINDINGS] = {};
 

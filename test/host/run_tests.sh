@@ -28,7 +28,9 @@ fi
     -I"${project_dir}/test/host" \
     -I"${project_dir}/src" \
     "${project_dir}/test/host/test_main.cpp" \
+    "${project_dir}/src/Installation.cpp" \
     "${project_dir}/src/hmi/Displayable.cpp" \
+    "${project_dir}/src/hmi/MenuBuilder.cpp" \
     "${project_dir}/src/hmi/ParameterEditor.cpp" \
     "${project_dir}/src/hmi/ParameterList.cpp" \
     "${project_dir}/src/Measurements/Humidity/HumidityBME.cpp" \
