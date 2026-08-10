@@ -5,13 +5,14 @@
 #include <ProcessControl.h>
 
 #include <Adafruit_GFX.h>
+#include <PrintSize.h>
 
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
 #include <ProcessSnapshot.h>
 
 #include <cmath>
-#include <cstdio>
+#include <cstring>
 
 namespace
 {
@@ -62,9 +63,11 @@ namespace
         display.print(text);
     }
 
-    void formatTemperature(
-        char* destination,
-        size_t capacity,
+    void printCenteredTemperature(
+        Adafruit_GFX& display,
+        int16_t y,
+        uint8_t textSize,
+        uint16_t color,
         double_t value,
         uint8_t decimals,
         bool valid)
@@ -76,24 +79,48 @@ namespace
             unit,
             sizeof(unit));
 
-        if (!valid ||
-            !std::isfinite(value))
-        {
-            std::snprintf(
-                destination,
-                capacity,
-                "--.- %s",
-                unit);
-            return;
-        }
+        const bool valueIsValid =
+            valid &&
+            std::isfinite(value);
 
-        std::snprintf(
-            destination,
-            capacity,
-            "%.*f %s",
-            static_cast<int>(decimals),
-            value,
-            unit);
+        PrintSize printSize;
+
+        const size_t valueLength =
+            valueIsValid
+                ? printSize.print(value, decimals)
+                : std::strlen("--.-");
+
+        const size_t textLength =
+            valueLength +
+            1 +
+            std::strlen(unit);
+
+        constexpr int16_t CHARACTER_WIDTH = 6;
+
+        const int16_t textWidth =
+            static_cast<int16_t>(
+                textLength *
+                CHARACTER_WIDTH *
+                textSize);
+
+        const int16_t x =
+            textWidth < display.width()
+                ? (display.width() - textWidth) / 2
+                : 0;
+
+        display.setCursor(x, y);
+        display.setTextSize(textSize);
+        display.setTextColor(
+            color,
+            COLOR_BLACK);
+
+        if (valueIsValid)
+            display.print(value, decimals);
+        else
+            display.print("--.-");
+
+        display.print(' ');
+        display.print(unit);
     }
 
     void printActualTemperature(
@@ -108,11 +135,11 @@ namespace
             30,
             COLOR_BLACK);
 
-        char text[32] = {};
-
-        formatTemperature(
-            text,
-            sizeof(text),
+        printCenteredTemperature(
+            display,
+            ACTUAL_TEMPERATURE_Y,
+            3,
+            COLOR_RED,
             sample != nullptr
                 ? sample->value
                 : 0.0,
@@ -121,13 +148,6 @@ namespace
                 : 1,
             sample != nullptr &&
                 sample->valid);
-
-        printCenteredText(
-            display,
-            ACTUAL_TEMPERATURE_Y,
-            3,
-            COLOR_RED,
-            text);
     }
 
     void printSetpoint(
@@ -142,21 +162,14 @@ namespace
             30,
             COLOR_BLACK);
 
-        char text[32] = {};
-
-        formatTemperature(
-            text,
-            sizeof(text),
-            setpoint,
-            1,
-            std::isfinite(setpoint));
-
-        printCenteredText(
+        printCenteredTemperature(
             display,
             SETPOINT_Y,
             3,
             COLOR_GREEN,
-            text);
+            setpoint,
+            1,
+            std::isfinite(setpoint));
     }
 
     void printOutputState(

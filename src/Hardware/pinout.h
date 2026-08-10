@@ -49,8 +49,8 @@
 #define BME_SCL 9
 
 // Sorties
-#define RELAIS_1 6
-#define RELAIS_2 7
+#define RELAIS_1 4
+#define RELAIS_2 5
 
 
 #endif
