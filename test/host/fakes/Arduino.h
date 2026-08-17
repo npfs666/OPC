@@ -7,6 +7,16 @@
 
 using byte = uint8_t;
 
+constexpr uint8_t OUTPUT = 1;
+
+inline void pinMode(uint8_t, uint8_t)
+{
+}
+
+inline void digitalWrite(uint8_t, bool)
+{
+}
+
 class Stream
 {
 public:

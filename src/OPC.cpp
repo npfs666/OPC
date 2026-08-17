@@ -178,6 +178,9 @@ bool OPC::newMeasurement()
         sharedProcessSnapshot,
         times);
 
+    const bool configurationSaveRequested =
+        userInstall.takeConfigurationSaveRequest();
+
     lastMeasurementTime = times;
 
     controlOutputsEnabled =
@@ -186,7 +189,16 @@ bool OPC::newMeasurement()
     if (!controlOutputsEnabled)
         controller.forceSafeOutputs();
 
+    if (configurationSaveRequested)
+    {
+        controller.forceSafeOutputs();
+        controlOutputsEnabled = false;
+    }
+
     mutex_exit(&processDataMutex);
+
+    if (configurationSaveRequested)
+        configurationSavePending = true;
 
     rp2040.fifo.push_nb(
         interCoreMessageValue(
@@ -198,6 +210,22 @@ bool OPC::newMeasurement()
 void OPC::controlPoll()
 {
     storage.poll();
+
+    if (configurationSavePending &&
+        !acquisitionPausedForMenu)
+    {
+        configurationSavePending = false;
+
+        if (!storage.save(
+                userInstall.configurationKey(),
+                userInstall.getParameters()))
+        {
+            Serial.println(
+                "Automatic configuration save failed");
+        }
+
+        return;
+    }
 
     if (!controlOutputsEnabled ||
         acquisitionPausedForMenu)
@@ -343,6 +371,8 @@ void OPC::copyProcessSnapshot()
     displayProcessSnapshot =
         sharedProcessSnapshot;
 
+    userInstall.captureHomeScreenState();
+
     mutex_exit(&processDataMutex);
 }
 
@@ -367,6 +397,9 @@ void OPC::requestMenu()
         return;
     }
 
+    pendingMenuAction =
+        MenuBuilder::NO_ACTION;
+
     uiState = UIState::PauseRequested;
 
     rp2040.fifo.push(
@@ -374,12 +407,21 @@ void OPC::requestMenu()
             InterCoreMessage::PauseAcquisition));
 }
 
-void OPC::requestParameterApply()
+void OPC::requestParameterApply(
+    MenuBuilder::ActionId actionId)
 {
     if (uiState != UIState::Menu)
         return;
 
+    if (actionId != MenuBuilder::NO_ACTION &&
+        menuDefinition.findAction(actionId) == nullptr)
+    {
+        return;
+    }
+
     menu.close();
+
+    pendingMenuAction = actionId;
 
     uiState = UIState::ApplyRequested;
 
@@ -430,10 +472,10 @@ void OPC::uiPoll()
         movement++;
     }
 
-    bool exitRequested = false;
+    ArduinoMenuUI::EnterResult enterResult;
 
     if (clicked)
-        exitRequested = menu.enter();
+        enterResult = menu.enter();
 
     menu.poll();
 
@@ -448,8 +490,18 @@ void OPC::uiPoll()
     const bool timedOut =
         (now - lastMenuActivity) >= timeout;
 
-    if (exitRequested || timedOut)
+    if (enterResult.type ==
+        ArduinoMenuUI::EnterResult::Type::Action)
+    {
+        requestParameterApply(
+            enterResult.actionId);
+    }
+    else if (enterResult.type ==
+                 ArduinoMenuUI::EnterResult::Type::Exit ||
+             timedOut)
+    {
         requestParameterApply();
+    }
 }
 
 void OPC::handleControlMessage(
@@ -469,10 +521,15 @@ void OPC::handleControlMessage(
             controller.forceSafeOutputs();
             controlOutputsEnabled = false;
 
+            userInstall.onMenuOpened();
+
             mutex_exit(&processDataMutex);
 
             acquisitionPausedForMenu = true;
         }
+
+        /* Rend les valeurs préparées visibles avant la capture du menu. */
+        __dmb();
 
         rp2040.fifo.push(
             interCoreMessageValue(
@@ -481,6 +538,19 @@ void OPC::handleControlMessage(
 
     case InterCoreMessage::ApplyMenuParameters:
     {
+        /*
+         * La commande FIFO vient du coeur 1 :
+         * les brouillons ne seront plus modifiés tant
+         * que la réponse n'aura pas été reçue.
+         */
+        __dmb();
+
+        const MenuBuilder::ActionId actionId =
+            pendingMenuAction;
+
+        pendingMenuAction =
+            MenuBuilder::NO_ACTION;
+
         if (!acquisitionPausedForMenu)
         {
             rp2040.fifo.push(
@@ -488,13 +558,6 @@ void OPC::handleControlMessage(
                     InterCoreMessage::MenuParametersRejected));
             break;
         }
-
-        /*
-         * La commande FIFO vient du coeur 1 :
-         * les brouillons ne seront plus modifiés tant
-         * que la réponse n'aura pas été reçue.
-         */
-        __dmb();
 
         if (!parameterEditor.validate() ||
             !input.validateParameters(
@@ -529,10 +592,52 @@ void OPC::handleControlMessage(
 
         userInstall.onParametersApplied();
 
+        bool actionSucceeded = true;
+
+        if (actionId != MenuBuilder::NO_ACTION)
+        {
+            mutex_enter_blocking(
+                &processDataMutex);
+
+            actionSucceeded =
+                userInstall.executeMenuAction(
+                    actionId);
+
+            controller.forceSafeOutputs();
+
+            mutex_exit(&processDataMutex);
+        }
+
         const bool configurationSaved =
             storage.save(
                 userInstall.configurationKey(),
                 userInstall.getParameters());
+
+        if (actionSucceeded &&
+            actionId != MenuBuilder::NO_ACTION &&
+            !configurationSaved)
+        {
+            mutex_enter_blocking(
+                &processDataMutex);
+
+            userInstall.onMenuActionSaveFailed(
+                actionId);
+
+            controller.forceSafeOutputs();
+
+            mutex_exit(&processDataMutex);
+
+            Serial.println(
+                "Menu action cancelled because configuration save failed");
+        }
+
+        configurationSavePending = false;
+
+        if (!actionSucceeded)
+        {
+            Serial.println(
+                "Menu action rejected");
+        }
 
         input.resetAcquisition();
         input.startContinuous();
@@ -601,6 +706,9 @@ void OPC::handleUIMessage(
             break;
         }
 
+        /* Le cœur contrôle a préparé l'état avant son acquittement. */
+        __dmb();
+
         parameterEditor.capture();
         menu.show();
 
@@ -624,6 +732,8 @@ void OPC::handleUIMessage(
             Serial.println(
                 "Parameters applied but configuration save failed");
         }
+
+        copyProcessSnapshot();
 
         displayProcessSnapshot =
             ProcessSnapshot{};

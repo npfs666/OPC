@@ -228,7 +228,7 @@ bool Installation::buildMenu(
         }
     }
 
-    return true;
+    return addMenuActions(menu);
 }
 
 bool Installation::prepareParameterRegistration()

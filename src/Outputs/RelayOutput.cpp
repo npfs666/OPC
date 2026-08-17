@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <Hardware/pinout.h>
+#include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
 
 namespace
@@ -54,6 +55,9 @@ void RelayOutput::begin(
 
 bool RelayOutput::begin()
 {
+    if (safeStateLocked)
+        settings.safeState = lockedSafeState;
+
     if (initialized)
     {
         writePhysicalState(
@@ -98,6 +102,9 @@ void RelayOutput::poll(uint32_t now)
 
 void RelayOutput::forceSafe()
 {
+    if (safeStateLocked)
+        settings.safeState = lockedSafeState;
+
     const double_t safeCommand =
         settings.safeState ? 1.0 : 0.0;
 
@@ -114,12 +121,25 @@ void RelayOutput::forceSafe()
 
 bool RelayOutput::applySettings()
 {
+    if (safeStateLocked)
+        settings.safeState = lockedSafeState;
+
     return begin();
 }
 
 bool RelayOutput::isHealthy() const
 {
     return initialized;
+}
+
+void RelayOutput::lockSafeState(bool safeState)
+{
+    safeStateLocked = true;
+    lockedSafeState = safeState;
+    settings.safeState = safeState;
+
+    if (initialized)
+        forceSafe();
 }
 
 void RelayOutput::applyLogicalState(bool state)
@@ -170,5 +190,26 @@ void RelayOutput::registerParameters(
     parameters.addBool(
         "safe_state",
         "État de sécurité",
-        settings.safeState);
+        settings.safeState,
+        safeStateLocked);
+}
+
+bool RelayOutput::validateParameters(
+    const ParameterEditor& editor) const
+{
+    if (!safeStateLocked)
+        return true;
+
+    const ParameterDraft* safeState =
+        editor.find(
+            getConfigurationKey(),
+            "safe_state");
+
+    return
+        safeState != nullptr &&
+        safeState->parameter != nullptr &&
+        safeState->parameter->type ==
+            Parameter::Type::Bool &&
+        safeState->booleanValue ==
+            lockedSafeState;
 }

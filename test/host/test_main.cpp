@@ -9,6 +9,7 @@
 #include <Measurements/Temperature/TemperatureBME.h>
 #include <Outputs/Actuator.h>
 #include <Outputs/Output.h>
+#include <Outputs/RelayOutput.h>
 #include <Physics/PT100.h>
 #include <Physics/Psychrometrics.h>
 #include <ProcessControl.h>
@@ -75,8 +76,15 @@ namespace
             auto regulator = parameterList.forOwner({
                 "regulators",
                 "Regulateur",
-                "thermostat",
-                "Thermostat"
+                "pid",
+                "PID"
+            });
+
+            auto autoTune = parameterList.forOwner({
+                "regulators",
+                "Regulateur",
+                "pid.autotune",
+                "PID autotune"
             });
 
             auto menu = parameterList.forOwner({
@@ -116,6 +124,15 @@ namespace
                     0.1,
                     1,
                     "°C") &&
+                autoTune.addDouble(
+                    "noise_band",
+                    "Demi-bande",
+                    noiseBand,
+                    0.05,
+                    10.0,
+                    0.05,
+                    2,
+                    "°C") &&
                 menu.addInteger(
                     "timeout",
                     "Timeout",
@@ -134,10 +151,32 @@ namespace
                     "s");
         }
 
+        bool addMenuActions(
+            MenuBuilder& menu) const override
+        {
+            const MenuBuilder::GroupId group =
+                menu.findGroupForOwner(
+                    "pid.autotune");
+
+            return
+                group != MenuBuilder::INVALID_GROUP &&
+                menu.addAction(
+                    group,
+                    1,
+                    "pid_autotune_start",
+                    "Lancer autotune") &&
+                menu.addAction(
+                    group,
+                    2,
+                    "pid_autotune_cancel",
+                    "Annuler autotune");
+        }
+
     private:
         uint16_t samples = 16;
         double_t reference = 1649.819;
         double_t setpoint = 20.0;
+        double_t noiseBand = 0.5;
         uint32_t menuTimeout = 10;
         uint32_t measurementTimeout = 30;
     };
@@ -582,6 +621,9 @@ namespace
         PID pid;
 
         pid.begin("pid", measurement);
+        CHECK_TRUE(
+            pid.settings.mode ==
+                PID::Mode::Heating);
         pid.settings.setpoint = 10.0;
         pid.settings.kp = 0.1;
         pid.settings.ki = 0.0;
@@ -608,6 +650,798 @@ namespace
         measurement.setReading(0.0, false);
         pid.update(3000);
         CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testCoolingPID()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        CHECK_TRUE(
+            pid.setMode(PID::Mode::Cooling));
+
+        pid.settings.setpoint = 10.0;
+        pid.settings.kp = 0.1;
+        pid.settings.ki = 0.0;
+        pid.settings.kd = 0.0;
+
+        measurement.setReading(15.0);
+        pid.update(0);
+        CHECK_FALSE(pid.isCommandValid());
+
+        pid.update(1000);
+        CHECK_NEAR(
+            pid.readCommand(),
+            0.5,
+            0.0001);
+
+        measurement.setReading(100.0);
+        pid.update(2000);
+        CHECK_NEAR(
+            pid.readCommand(),
+            1.0,
+            0.0001);
+
+        measurement.setReading(5.0);
+        pid.update(3000);
+        CHECK_NEAR(
+            pid.readCommand(),
+            0.0,
+            0.0001);
+
+        measurement.setReading(0.0, false);
+        pid.update(4000);
+        CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testPIDModeChangeResetsController()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 10.0;
+        pid.settings.kp = 0.1;
+
+        measurement.setReading(5.0);
+        pid.update(0);
+        pid.update(1000);
+        CHECK_TRUE(pid.isCommandValid());
+        CHECK_NEAR(pid.readCommand(), 0.5, 0.0001);
+
+        CHECK_TRUE(
+            pid.setMode(PID::Mode::Cooling));
+        CHECK_FALSE(pid.isCommandValid());
+
+        pid.update(2000);
+        CHECK_FALSE(pid.isCommandValid());
+
+        pid.update(3000);
+        CHECK_TRUE(pid.isCommandValid());
+        CHECK_NEAR(pid.readCommand(), 0.0, 0.0001);
+    }
+
+    void testCoolingPIDDerivative()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        CHECK_TRUE(
+            pid.setMode(PID::Mode::Cooling));
+
+        pid.settings.setpoint = 10.0;
+        pid.settings.kp = 0.0;
+        pid.settings.ki = 0.0;
+        pid.settings.kd = 1.0;
+
+        measurement.setReading(10.0);
+        pid.update(0);
+
+        measurement.setReading(11.0);
+        pid.update(1000);
+        CHECK_NEAR(
+            pid.readCommand(),
+            1.0,
+            0.0001);
+
+        measurement.setReading(10.5);
+        pid.update(2000);
+        CHECK_NEAR(
+            pid.readCommand(),
+            0.0,
+            0.0001);
+    }
+
+    void testCoolingPIDAntiWindup()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        CHECK_TRUE(
+            pid.setMode(PID::Mode::Cooling));
+
+        pid.settings.setpoint = 10.0;
+        pid.settings.kp = 0.0;
+        pid.settings.ki = 0.1;
+        pid.settings.kd = 0.0;
+
+        measurement.setReading(15.0);
+        pid.update(0);
+
+        pid.update(1000);
+        CHECK_NEAR(pid.readCommand(), 0.5, 0.0001);
+
+        pid.update(2000);
+        CHECK_NEAR(pid.readCommand(), 1.0, 0.0001);
+
+        pid.update(3000);
+        CHECK_NEAR(pid.readCommand(), 1.0, 0.0001);
+
+        measurement.setReading(5.0);
+        pid.update(4000);
+        CHECK_NEAR(pid.readCommand(), 0.5, 0.0001);
+    }
+
+    void testPIDRejectsInvalidMode()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+
+        CHECK_FALSE(
+            pid.setMode(
+                static_cast<PID::Mode>(99)));
+        CHECK_TRUE(
+            pid.settings.mode ==
+                PID::Mode::Heating);
+
+        pid.settings.setpoint = 10.0;
+        pid.settings.kp = 0.1;
+
+        measurement.setReading(5.0);
+        pid.update(0);
+        pid.update(1000);
+        CHECK_TRUE(pid.isCommandValid());
+
+        pid.settings.mode =
+            static_cast<PID::Mode>(99);
+
+        pid.update(2000);
+        CHECK_FALSE(pid.isCommandValid());
+
+        CHECK_FALSE(pid.startAutoTune(3000));
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Failed);
+        CHECK_TRUE(
+            pid.getAutoTuneError() ==
+                PID::AutoTuneError::InvalidSettings);
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testPIDAutoTuneRejectsInvalidDirection()
+    {
+        PIDAutoTune autoTune;
+        PIDAutoTune::Settings settings;
+
+        CHECK_FALSE(
+            autoTune.start(
+                0,
+                settings,
+                10.0,
+                0.0,
+                1.0,
+                static_cast<
+                    PIDAutoTune::ProcessDirection>(99)));
+
+        CHECK_TRUE(
+            autoTune.getStatus() ==
+                PIDAutoTune::Status::Failed);
+        CHECK_TRUE(
+            autoTune.getError() ==
+                PIDAutoTune::Error::InvalidSettings);
+        CHECK_FALSE(autoTune.hasCommand());
+    }
+
+    void testPIDAutotune()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 10.0;
+        pid.autoTuneSettings.outputLow = 0.0;
+        pid.autoTuneSettings.outputHigh = 1.0;
+        pid.autoTuneSettings.noiseBand = 0.5;
+        pid.autoTuneSettings.inputMin = 0.0;
+        pid.autoTuneSettings.inputMax = 20.0;
+        pid.autoTuneSettings.timeoutSeconds = 300;
+        pid.autoTuneSettings.cycles = 2;
+
+        pid.stop();
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+
+        CHECK_TRUE(pid.startAutoTune(0));
+        CHECK_TRUE(pid.isEnabled());
+        CHECK_FALSE(pid.settings.enabled);
+        CHECK_TRUE(pid.isAutoTuneActive());
+        CHECK_FALSE(
+            pid.setMode(PID::Mode::Cooling));
+        CHECK_TRUE(
+            pid.settings.mode ==
+                PID::Mode::Heating);
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::WaitingForMeasurement);
+
+        measurement.setReading(10.0);
+        pid.update(0);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Running);
+        CHECK_NEAR(pid.readCommand(), 1.0, 0.0);
+
+        const double_t readings[] = {
+            9.0,
+            10.6,
+            11.0,
+            9.4,
+            9.0,
+            10.6,
+            11.0,
+            9.4,
+            9.0,
+            10.6,
+            11.0,
+            9.4
+        };
+
+        for (size_t i = 0;
+             i < sizeof(readings) /
+                     sizeof(readings[0]);
+             i++)
+        {
+            measurement.setReading(
+                readings[i]);
+
+            pid.update(
+                static_cast<uint32_t>(
+                    (i + 1) * 5000UL));
+        }
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Succeeded);
+        CHECK_FALSE(pid.isAutoTuneActive());
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+        CHECK_TRUE(
+            pid.getAutoTuneCompletedCycles() == 2);
+
+        const PID::AutoTuneResult& result =
+            pid.getAutoTuneResult();
+
+        CHECK_TRUE(result.ultimateGain > 0.0);
+        CHECK_NEAR(
+            result.ultimatePeriodSeconds,
+            20.0,
+            0.001);
+        CHECK_NEAR(pid.settings.kp, result.kp, 0.0);
+        CHECK_NEAR(pid.settings.ki, result.ki, 0.0);
+        CHECK_NEAR(pid.settings.kd, result.kd, 0.0);
+        CHECK_TRUE(
+            pid.takeAutoTuneTuningsApplied());
+        CHECK_FALSE(
+            pid.takeAutoTuneTuningsApplied());
+
+        pid.start();
+        CHECK_TRUE(pid.isEnabled());
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Idle);
+
+        CHECK_FALSE(pid.setTunings(-1.0, 0.0, 0.0));
+        CHECK_TRUE(pid.setTunings(1.0, 0.01, 2.0));
+        CHECK_TRUE(pid.setOutputLimits(0.1, 0.9));
+        CHECK_FALSE(pid.setOutputLimits(0.9, 0.1));
+    }
+
+    void testCoolingPIDAutotune()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        CHECK_TRUE(
+            pid.setMode(PID::Mode::Cooling));
+
+        pid.settings.setpoint = 10.0;
+        pid.autoTuneSettings.outputLow = 0.2;
+        pid.autoTuneSettings.outputHigh = 0.8;
+        pid.autoTuneSettings.noiseBand = 0.5;
+        pid.autoTuneSettings.inputMin = 0.0;
+        pid.autoTuneSettings.inputMax = 20.0;
+        pid.autoTuneSettings.timeoutSeconds = 300;
+        pid.autoTuneSettings.cycles = 2;
+
+        CHECK_TRUE(pid.startAutoTune(0));
+
+        measurement.setReading(10.0);
+        pid.update(0);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Running);
+        CHECK_NEAR(pid.readCommand(), 0.8, 0.0);
+
+        const double_t readings[] = {
+            11.0,
+            9.4,
+            9.0,
+            10.6,
+            11.0,
+            9.4,
+            9.0,
+            10.6,
+            11.0,
+            9.4,
+            9.0,
+            10.6
+        };
+
+        for (size_t i = 0;
+             i < sizeof(readings) /
+                     sizeof(readings[0]);
+             i++)
+        {
+            measurement.setReading(readings[i]);
+            pid.update(
+                static_cast<uint32_t>(
+                    (i + 1) * 5000UL));
+
+            if (i == 0)
+                CHECK_NEAR(pid.readCommand(), 0.8, 0.0);
+            else if (i == 1)
+                CHECK_NEAR(pid.readCommand(), 0.2, 0.0);
+            else if (i == 3)
+                CHECK_NEAR(pid.readCommand(), 0.8, 0.0);
+        }
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Succeeded);
+        CHECK_FALSE(pid.isAutoTuneActive());
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+        CHECK_TRUE(
+            pid.getAutoTuneCompletedCycles() == 2);
+
+        const PID::AutoTuneResult& result =
+            pid.getAutoTuneResult();
+
+        CHECK_NEAR(
+            result.ultimateGain,
+            0.4410631163,
+            0.000001);
+        CHECK_NEAR(
+            result.ultimatePeriodSeconds,
+            20.0,
+            0.001);
+        CHECK_NEAR(
+            result.kp,
+            0.2646378698,
+            0.000001);
+        CHECK_NEAR(
+            result.ki,
+            0.0264637870,
+            0.000001);
+        CHECK_NEAR(
+            result.kd,
+            0.6615946745,
+            0.000001);
+        CHECK_NEAR(
+            pid.settings.kp,
+            result.kp,
+            0.0);
+        CHECK_NEAR(
+            pid.settings.ki,
+            result.ki,
+            0.0);
+        CHECK_NEAR(
+            pid.settings.kd,
+            result.kd,
+            0.0);
+    }
+
+    void testCoolingPIDAutotuneUsesPhysicalLimits()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        CHECK_TRUE(
+            pid.setMode(PID::Mode::Cooling));
+
+        pid.settings.setpoint = 10.0;
+        pid.autoTuneSettings.inputMin = 0.0;
+        pid.autoTuneSettings.inputMax = 20.0;
+
+        CHECK_TRUE(pid.startAutoTune(0));
+
+        /* -1 deviendrait +1 après normalisation : tester avant est vital. */
+        measurement.setReading(-1.0);
+        pid.update(0);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Failed);
+        CHECK_TRUE(
+            pid.getAutoTuneError() ==
+                PID::AutoTuneError::InputOutOfRange);
+        CHECK_FALSE(
+            pid.takeAutoTuneTuningsApplied());
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testPIDAutotuneStopsOnInvalidMeasurement()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 20.0;
+
+        CHECK_TRUE(pid.startAutoTune(0));
+
+        measurement.setReading(20.0);
+        pid.update(0);
+        CHECK_TRUE(pid.isCommandValid());
+
+        measurement.setReading(0.0, false);
+        pid.update(1000);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Failed);
+        CHECK_TRUE(
+            pid.getAutoTuneError() ==
+                PID::AutoTuneError::InvalidMeasurement);
+        CHECK_FALSE(
+            pid.takeAutoTuneTuningsApplied());
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testPIDAutotuneTimeoutIncludesWaiting()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 20.0;
+        pid.autoTuneSettings.timeoutSeconds = 4;
+        pid.autoTuneSettings.minimumCycleSeconds = 1;
+        pid.autoTuneSettings.cycles = 2;
+
+        const uint32_t startedAt =
+            UINT32_MAX - 2000UL;
+
+        CHECK_TRUE(
+            pid.startAutoTune(startedAt));
+
+        /* La mesure reste invalide et millis() traverse son rollover. */
+        pid.update(1999);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Failed);
+        CHECK_TRUE(
+            pid.getAutoTuneError() ==
+                PID::AutoTuneError::Timeout);
+        CHECK_FALSE(
+            pid.takeAutoTuneTuningsApplied());
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testPIDAutotuneRejectsUnstableCycles()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 10.0;
+        pid.autoTuneSettings.noiseBand = 0.5;
+        pid.autoTuneSettings.inputMin = 0.0;
+        pid.autoTuneSettings.inputMax = 20.0;
+        pid.autoTuneSettings.timeoutSeconds = 300;
+        pid.autoTuneSettings.minimumCycleSeconds = 1;
+        pid.autoTuneSettings.stabilityTolerance = 0.05;
+        pid.autoTuneSettings.cycles = 2;
+
+        CHECK_TRUE(pid.startAutoTune(0));
+
+        measurement.setReading(10.0);
+        pid.update(0);
+
+        const double_t readings[] = {
+            8.0,
+            10.6,
+            12.0,
+            9.4,
+            9.0,
+            10.6,
+            11.0,
+            9.4,
+            8.0,
+            10.6,
+            12.0,
+            9.4
+        };
+
+        for (size_t i = 0;
+             i < sizeof(readings) /
+                     sizeof(readings[0]);
+             i++)
+        {
+            measurement.setReading(readings[i]);
+            pid.update(
+                static_cast<uint32_t>(
+                    (i + 1) * 5000UL));
+        }
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Running);
+
+        measurement.setReading(10.0);
+        pid.update(300000);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Failed);
+        CHECK_TRUE(
+            pid.getAutoTuneError() ==
+                PID::AutoTuneError::InsufficientOscillation);
+        CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testPIDAutotuneInterruptedByResume()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 20.0;
+
+        CHECK_TRUE(pid.startAutoTune(0));
+
+        measurement.setReading(20.0);
+        pid.update(0);
+        CHECK_TRUE(pid.isCommandValid());
+
+        pid.resume(1000);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Cancelled);
+        CHECK_TRUE(
+            pid.getAutoTuneError() ==
+                PID::AutoTuneError::Interrupted);
+        CHECK_FALSE(pid.isEnabled());
+        CHECK_FALSE(pid.isCommandValid());
+    }
+
+    void testPIDAutotuneWaitingSurvivesResume()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 20.0;
+
+        CHECK_TRUE(pid.startAutoTune(0));
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::WaitingForMeasurement);
+
+        /* Le lancement depuis le menu précède la reprise d'acquisition. */
+        pid.resume(1000);
+
+        CHECK_TRUE(pid.isAutoTuneActive());
+        CHECK_TRUE(pid.isEnabled());
+        CHECK_FALSE(pid.settings.enabled);
+
+        measurement.setReading(20.0);
+        pid.update(1000);
+
+        CHECK_TRUE(
+            pid.getAutoTuneStatus() ==
+                PID::AutoTuneStatus::Running);
+        CHECK_TRUE(pid.isCommandValid());
+    }
+
+    void testPIDAutotuneParametersAreOptIn()
+    {
+        FakeTemperature measurement;
+        PID pid;
+        Parameter storage[20];
+        ParameterList parameters;
+
+        pid.begin("pid", measurement);
+        parameters.begin(storage, 20);
+
+        pid.registerParameters(parameters);
+        CHECK_TRUE(parameters.count() == 8);
+
+        const Parameter* enabledParameter =
+            parameters.find("pid", "enabled");
+
+        const Parameter* modeParameter =
+            parameters.find("pid", "mode");
+
+        CHECK_TRUE(enabledParameter != nullptr);
+        CHECK_TRUE(
+            enabledParameter->type ==
+                Parameter::Type::Bool);
+        CHECK_TRUE(modeParameter != nullptr);
+        CHECK_TRUE(
+            modeParameter->type ==
+                Parameter::Type::Selection);
+        CHECK_TRUE(
+            modeParameter->data.selection.count == 2);
+        CHECK_TRUE(
+            modeParameter->data.selection
+                .options[0].value ==
+                static_cast<int32_t>(
+                    PID::Mode::Heating));
+        CHECK_TRUE(
+            modeParameter->data.selection
+                .options[1].value ==
+                static_cast<int32_t>(
+                    PID::Mode::Cooling));
+
+        CHECK_TRUE(
+            pid.registerAutoTuneParameters(
+                parameters,
+                "pid.autotune",
+                "PID autotune"));
+        CHECK_TRUE(parameters.count() == 17);
+
+        CHECK_TRUE(
+            parameters.find(
+                "pid.autotune",
+                "autotune_noise_band") !=
+            nullptr);
+        CHECK_TRUE(
+            parameters.find(
+                "pid",
+                "autotune_noise_band") ==
+            nullptr);
+        CHECK_TRUE(
+            parameters.find(
+                "pid.autotune",
+                "pid_autotune_start") ==
+            nullptr);
+
+        ParameterEditor editor;
+        editor.begin(parameters);
+        editor.capture();
+
+        CHECK_TRUE(editor.validate());
+        CHECK_TRUE(pid.validateParameters(editor));
+
+        ParameterDraft* enabledDraft = nullptr;
+        ParameterDraft* modeDraft = nullptr;
+
+        for (size_t i = 0;
+             i < editor.count();
+             i++)
+        {
+            if (editor.get(i).parameter ==
+                enabledParameter)
+            {
+                enabledDraft = &editor.get(i);
+            }
+            else if (editor.get(i).parameter ==
+                modeParameter)
+            {
+                modeDraft = &editor.get(i);
+            }
+        }
+
+        CHECK_TRUE(enabledDraft != nullptr);
+        CHECK_TRUE(modeDraft != nullptr);
+
+        enabledDraft->booleanValue = false;
+
+        modeDraft->selectionValue =
+            static_cast<int32_t>(
+                PID::Mode::Cooling);
+
+        CHECK_TRUE(editor.validate());
+        CHECK_TRUE(editor.apply());
+        CHECK_TRUE(
+            pid.settings.mode ==
+                PID::Mode::Cooling);
+        CHECK_FALSE(pid.settings.enabled);
+
+        modeDraft->selectionValue = 99;
+        CHECK_FALSE(editor.validate());
+    }
+
+    void testRelaySafeStateLock()
+    {
+        RelayOutput relay;
+
+        relay.begin(
+            "heater_relay",
+            "Heater relay",
+            RELAIS_1,
+            true,
+            false);
+
+        relay.lockSafeState(false);
+
+        Parameter storage[4];
+        ParameterList parameters;
+        parameters.begin(storage, 4);
+        relay.registerParameters(parameters);
+
+        const Parameter* safeState =
+            parameters.find(
+                "heater_relay",
+                "safe_state");
+
+        CHECK_TRUE(safeState != nullptr);
+        CHECK_TRUE(safeState->readOnly);
+
+        ParameterEditor editor;
+        editor.begin(parameters);
+        editor.capture();
+
+        ParameterDraft* safeStateDraft = nullptr;
+
+        for (size_t i = 0;
+             i < editor.count();
+             i++)
+        {
+            if (editor.get(i).parameter ==
+                safeState)
+            {
+                safeStateDraft =
+                    &editor.get(i);
+                break;
+            }
+        }
+
+        CHECK_TRUE(safeStateDraft != nullptr);
+
+        safeStateDraft->booleanValue = true;
+        CHECK_FALSE(
+            relay.validateParameters(editor));
+
+        safeStateDraft->booleanValue = false;
+        CHECK_TRUE(
+            relay.validateParameters(editor));
+
+        relay.settings.safeState = true;
+        relay.forceSafe();
+        CHECK_FALSE(relay.settings.safeState);
+        CHECK_NEAR(relay.appliedCommand(), 0.0, 0.0);
+
+        relay.settings.safeState = true;
+        CHECK_TRUE(relay.applySettings());
+        CHECK_FALSE(relay.settings.safeState);
+        CHECK_NEAR(relay.appliedCommand(), 0.0, 0.0);
     }
 
     void testParameterEditor()
@@ -740,6 +1574,76 @@ namespace
             menu.findGroupForOwner(
                 "measurement_watchdog") ==
                 inputs);
+
+        const MenuBuilder::GroupId regulators =
+            menu.findSubmenu(
+                root,
+                "regulators");
+
+        const MenuBuilder::GroupId pidGroup =
+            menu.findGroupForOwner("pid");
+
+        const MenuBuilder::GroupId autoTuneGroup =
+            menu.findGroupForOwner(
+                "pid.autotune");
+
+        CHECK_TRUE(
+            regulators !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            pidGroup !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            autoTuneGroup !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(pidGroup != autoTuneGroup);
+        CHECK_TRUE(
+            menu.getGroup(pidGroup)->parent ==
+                regulators);
+        CHECK_TRUE(
+            menu.getGroup(autoTuneGroup)->parent ==
+                regulators);
+
+        CHECK_TRUE(menu.actionCount() == 2);
+
+        const MenuBuilder::Action* startAction =
+            menu.findAction(
+                "pid_autotune_start");
+
+        const MenuBuilder::Action* cancelAction =
+            menu.findAction(2);
+
+        CHECK_TRUE(startAction != nullptr);
+        CHECK_TRUE(startAction->id == 1);
+        CHECK_TRUE(
+            startAction->group == autoTuneGroup);
+        CHECK_TRUE(cancelAction != nullptr);
+        CHECK_TRUE(
+            cancelAction->group == autoTuneGroup);
+        CHECK_TRUE(
+            installation.getParameters().find(
+                "pid.autotune",
+                "pid_autotune_start") ==
+            nullptr);
+
+        CHECK_FALSE(
+            menu.addAction(
+                autoTuneGroup,
+                MenuBuilder::NO_ACTION,
+                "invalid_action",
+                "Invalide"));
+        CHECK_FALSE(
+            menu.addAction(
+                autoTuneGroup,
+                1,
+                "duplicate_id",
+                "Doublon ID"));
+        CHECK_FALSE(
+            menu.addAction(
+                autoTuneGroup,
+                3,
+                "pid_autotune_start",
+                "Doublon clé"));
 
         const MenuBuilder::GroupId calibration =
             menu.findSubmenu(
@@ -971,6 +1875,70 @@ int main()
     TestHarness::run(
         "PID",
         testPID);
+
+    TestHarness::run(
+        "PID refroidissement",
+        testCoolingPID);
+
+    TestHarness::run(
+        "changement de mode PID",
+        testPIDModeChangeResetsController);
+
+    TestHarness::run(
+        "dérivée PID refroidissement",
+        testCoolingPIDDerivative);
+
+    TestHarness::run(
+        "anti-windup PID refroidissement",
+        testCoolingPIDAntiWindup);
+
+    TestHarness::run(
+        "rejet mode PID invalide",
+        testPIDRejectsInvalidMode);
+
+    TestHarness::run(
+        "rejet sens autotune invalide",
+        testPIDAutoTuneRejectsInvalidDirection);
+
+    TestHarness::run(
+        "autotune PID",
+        testPIDAutotune);
+
+    TestHarness::run(
+        "autotune PID refroidissement",
+        testCoolingPIDAutotune);
+
+    TestHarness::run(
+        "limites autotune PID refroidissement",
+        testCoolingPIDAutotuneUsesPhysicalLimits);
+
+    TestHarness::run(
+        "sécurité autotune PID",
+        testPIDAutotuneStopsOnInvalidMeasurement);
+
+    TestHarness::run(
+        "timeout attente autotune PID",
+        testPIDAutotuneTimeoutIncludesWaiting);
+
+    TestHarness::run(
+        "rejet oscillations PID instables",
+        testPIDAutotuneRejectsUnstableCycles);
+
+    TestHarness::run(
+        "interruption autotune PID",
+        testPIDAutotuneInterruptedByResume);
+
+    TestHarness::run(
+        "attente autotune PID après menu",
+        testPIDAutotuneWaitingSurvivesResume);
+
+    TestHarness::run(
+        "paramètres autotune PID optionnels",
+        testPIDAutotuneParametersAreOptIn);
+
+    TestHarness::run(
+        "verrouillage sécurité relais",
+        testRelaySafeStateLock);
 
     TestHarness::run(
         "éditeur de paramètres",

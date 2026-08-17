@@ -12,6 +12,20 @@ class Adafruit_ST7789;
 class ArduinoMenuUI
 {
 public:
+    struct EnterResult
+    {
+        enum class Type : uint8_t
+        {
+            None,
+            Exit,
+            Action
+        };
+
+        Type type = Type::None;
+        MenuBuilder::ActionId actionId =
+            MenuBuilder::NO_ACTION;
+    };
+
     ArduinoMenuUI();
 
     bool begin(Adafruit_ST7789& display,
@@ -21,7 +35,7 @@ public:
     void show();
     void close();
     void move(int32_t direction);
-    bool enter();
+    EnterResult enter();
     void poll();
 
     bool isInitialized() const;
@@ -37,6 +51,7 @@ private:
         MenuBuilder::MAX_GROUPS;
     static constexpr size_t MAX_MENU_ITEMS =
         MAX_PARAMETERS +
+        MenuBuilder::MAX_ACTIONS +
         (2 * (MAX_GROUPS - 1)) +
         1;
     static constexpr size_t MAX_SELECTION_OPTIONS =
@@ -48,9 +63,12 @@ private:
 
     Menu::prompt* parameterItems[MAX_PARAMETERS] = {};
     MenuBuilder::GroupId parameterGroups[MAX_PARAMETERS] = {};
+    Menu::prompt* actionItems[MenuBuilder::MAX_ACTIONS] = {};
+    MenuBuilder::ActionId actionIds[MenuBuilder::MAX_ACTIONS] = {};
     Menu::prompt* booleanOptions[MAX_PARAMETERS][2] = {};
     Menu::prompt* selectionOptionItems[MAX_SELECTION_OPTIONS] = {};
     char labels[MAX_PARAMETERS][LABEL_LENGTH] = {};
+    char actionLabels[MenuBuilder::MAX_ACTIONS][LABEL_LENGTH] = {};
     char unitLabels[MAX_PARAMETERS][UNIT_LENGTH] = {};
     char groupLabels[MAX_GROUPS][LABEL_LENGTH] = {};
     char selectionOptionLabels

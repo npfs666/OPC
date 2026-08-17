@@ -151,19 +151,47 @@ void ArduinoMenuUI::move(int32_t direction)
         nav->doNav(Menu::navCmd(Menu::upCmd));
 }
 
-bool ArduinoMenuUI::enter()
+ArduinoMenuUI::EnterResult ArduinoMenuUI::enter()
 {
     if (!initialized || nav == nullptr)
-        return false;
+        return {};
+
+    Menu::prompt* selected = &nav->selected();
 
     const bool exitRequested =
         nav->level == 0 &&
         quitItem != nullptr &&
-        &nav->selected() == quitItem;
+        selected == quitItem;
+
+    if (exitRequested)
+    {
+        nav->doNav(Menu::navCmd(Menu::enterCmd));
+
+        return {
+            EnterResult::Type::Exit,
+            MenuBuilder::NO_ACTION
+        };
+    }
+
+    for (size_t i = 0;
+         i < MenuBuilder::MAX_ACTIONS;
+         i++)
+    {
+        if (actionItems[i] == nullptr ||
+            selected != actionItems[i])
+        {
+            continue;
+        }
+
+        return {
+            EnterResult::Type::Action,
+            actionIds[i]
+        };
+    }
 
     nav->doNav(Menu::navCmd(Menu::enterCmd));
 
-    return exitRequested;
+    return {};
 }
 
 void ArduinoMenuUI::poll()
@@ -197,6 +225,14 @@ bool ArduinoMenuUI::buildMenuTree(
 
     selectionOptionsUsed = 0;
     quitItem = nullptr;
+
+    for (size_t i = 0;
+         i < MenuBuilder::MAX_ACTIONS;
+         i++)
+    {
+        actionItems[i] = nullptr;
+        actionIds[i] = MenuBuilder::NO_ACTION;
+    }
 
     for (size_t i = 0;
          i < MAX_SELECTION_OPTIONS;
@@ -273,6 +309,39 @@ bool ArduinoMenuUI::buildMenuTree(
         parameterItems[i] = item;
         parameterGroups[i] = group;
         menuItemCounts[group]++;
+    }
+
+    const size_t actionCount =
+        menuDefinition.actionCount();
+
+    if (actionCount > MenuBuilder::MAX_ACTIONS)
+        return false;
+
+    for (size_t i = 0; i < actionCount; i++)
+    {
+        const MenuBuilder::Action* action =
+            menuDefinition.getAction(i);
+
+        if (action == nullptr ||
+            action->id == MenuBuilder::NO_ACTION ||
+            menuDefinition.getGroup(
+                action->group) == nullptr)
+        {
+            return false;
+        }
+
+        DisplayTextCodec::utf8ToCp437(
+            action->name,
+            actionLabels[i],
+            LABEL_LENGTH);
+
+        if (actionLabels[i][0] == '\0')
+            return false;
+
+        actionItems[i] = new Menu::prompt(
+            actionLabels[i]);
+        actionIds[i] = action->id;
+        menuItemCounts[action->group]++;
     }
 
     const MenuBuilder::GroupId rootGroup =
@@ -354,6 +423,20 @@ bool ArduinoMenuUI::buildMenuTree(
         if (!appendMenuItem(
                 parameterGroups[i],
                 parameterItems[i]))
+        {
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < actionCount; i++)
+    {
+        const MenuBuilder::Action* action =
+            menuDefinition.getAction(i);
+
+        if (action == nullptr ||
+            !appendMenuItem(
+                action->group,
+                actionItems[i]))
         {
             return false;
         }

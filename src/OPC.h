@@ -98,7 +98,11 @@ private:
     bool acquisitionPausedForMenu = false;
     bool controlOutputsEnabled = false;
     bool bmeInitialized = false;
+    bool configurationSavePending = false;
     uint32_t lastMeasurementTime = 0;
+
+    MenuBuilder::ActionId pendingMenuAction =
+        MenuBuilder::NO_ACTION;
 
     mutex_t processDataMutex;
     ProcessSnapshot sharedProcessSnapshot;
@@ -113,7 +117,9 @@ private:
 
     void requestMenu();
 
-    void requestParameterApply();
+    void requestParameterApply(
+        MenuBuilder::ActionId actionId =
+            MenuBuilder::NO_ACTION);
 
     bool validateRestoredParameters(
         const ParameterEditor& editor) const override;

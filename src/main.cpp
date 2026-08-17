@@ -15,12 +15,13 @@
 #include <testInstallation.h>
 #include <Templates/ThermostatInstallation.h>
 #include <Templates/SolarInstallation.h>
+#include <Templates/PIDInstallation.h>
 #include <hardware/sync.h>
 
 
 namespace
 {
-    SolarInstallation installation;
+    PIDInstallation installation;
     OPC opc(installation);
     SystemWatchdog systemWatchdog;
 

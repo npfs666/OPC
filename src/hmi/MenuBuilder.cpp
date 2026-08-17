@@ -102,6 +102,36 @@ bool MenuBuilder::addParameters(
     return true;
 }
 
+bool MenuBuilder::addAction(
+    GroupId group,
+    ActionId id,
+    const char* key,
+    const char* name)
+{
+    if (!isInitialized() ||
+        getGroup(group) == nullptr ||
+        id == NO_ACTION ||
+        !isValidText(key) ||
+        !isValidText(name) ||
+        actionsUsed >= MAX_ACTIONS ||
+        findAction(id) != nullptr ||
+        findAction(key) != nullptr)
+    {
+        return false;
+    }
+
+    actions[actionsUsed] = Action{
+        id,
+        key,
+        name,
+        group
+    };
+
+    actionsUsed++;
+
+    return true;
+}
+
 bool MenuBuilder::isInitialized() const
 {
     return groupsUsed > 0;
@@ -115,6 +145,11 @@ size_t MenuBuilder::groupCount() const
 size_t MenuBuilder::ownerBindingCount() const
 {
     return ownerBindingsUsed;
+}
+
+size_t MenuBuilder::actionCount() const
+{
+    return actionsUsed;
 }
 
 const MenuBuilder::Group* MenuBuilder::getGroup(
@@ -136,6 +171,48 @@ MenuBuilder::getOwnerBinding(size_t index) const
         return nullptr;
 
     return &ownerBindings[index];
+}
+
+const MenuBuilder::Action* MenuBuilder::getAction(
+    size_t index) const
+{
+    if (index >= actionsUsed)
+        return nullptr;
+
+    return &actions[index];
+}
+
+const MenuBuilder::Action* MenuBuilder::findAction(
+    ActionId id) const
+{
+    if (id == NO_ACTION)
+        return nullptr;
+
+    for (size_t i = 0; i < actionsUsed; i++)
+    {
+        if (actions[i].id == id)
+            return &actions[i];
+    }
+
+    return nullptr;
+}
+
+const MenuBuilder::Action* MenuBuilder::findAction(
+    const char* key) const
+{
+    if (!isValidText(key))
+        return nullptr;
+
+    for (size_t i = 0; i < actionsUsed; i++)
+    {
+        if (actions[i].key != nullptr &&
+            std::strcmp(actions[i].key, key) == 0)
+        {
+            return &actions[i];
+        }
+    }
+
+    return nullptr;
 }
 
 MenuBuilder::GroupId MenuBuilder::findGroupForOwner(
@@ -194,6 +271,7 @@ void MenuBuilder::reset()
 {
     groupsUsed = 0;
     ownerBindingsUsed = 0;
+    actionsUsed = 0;
 }
 
 bool MenuBuilder::isValidText(const char* text)

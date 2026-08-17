@@ -41,10 +41,12 @@ fi
     "${project_dir}/src/Measurements/Temperature/TemperatureBME.cpp" \
     "${project_dir}/src/Outputs/Actuator.cpp" \
     "${project_dir}/src/Outputs/Output.cpp" \
+    "${project_dir}/src/Outputs/RelayOutput.cpp" \
     "${project_dir}/src/Physics/PT100.cpp" \
     "${project_dir}/src/Physics/Psychrometrics.cpp" \
     "${project_dir}/src/ProcessControl.cpp" \
     "${project_dir}/src/Regulator/PID.cpp" \
+    "${project_dir}/src/Regulator/PIDAutoTune.cpp" \
     "${project_dir}/src/Regulator/Regulator.cpp" \
     "${project_dir}/src/Regulator/SolarRegulator.cpp" \
     "${project_dir}/src/Regulator/Thermostat.cpp" \

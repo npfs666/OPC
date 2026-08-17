@@ -44,7 +44,7 @@ Les principaux dossiers sont :
 - `src/Outputs` : actionneurs et sorties physiques ;
 - `src/Hardware` et `src/Drivers` : carte de mesure et pilotes ;
 - `src/hmi` : paramètres, menu, encodeur et affichage ;
-- `src/Templates` : installations thermostat et solaire prêtes à adapter ;
+- `src/Templates` : installations thermostat, solaire et PID prêtes à adapter ;
 - `examples/MinimalInstallation` : création minimale d'une installation.
 
 ## Choisir une installation
@@ -68,6 +68,77 @@ Pour commencer une application, copier et renommer le contenu de
 [`examples/MinimalInstallation`](examples/MinimalInstallation), puis remplacer
 le type de l'installation dans `src/main.cpp`. Le reste du démarrage
 multicœur peut rester inchangé.
+
+### Installation PID avec autotune optionnel
+
+Le template `PIDInstallation` assemble une PT100 quatre fils, un PID, un
+actionneur temporel et le relais 1. Pour le sélectionner dans `src/main.cpp` :
+
+```cpp
+#include <Templates/PIDInstallation.h>
+
+namespace
+{
+    PIDInstallation installation;
+    OPC opc(installation);
+}
+```
+
+Avec la configuration par défaut, la sortie reste arrêtée après le démarrage.
+Le choix `Régulation active` est persistant : s'il a été sauvegardé à `Oui`,
+le PID reprendra après le redémarrage et la réception de mesures valides. Le
+menu `Regulateur` contient deux sous-menus indépendants :
+
+- `PID` regroupe `Régulation active`, le mode, la consigne, `Kp`, `Ki`, `Kd`
+  et les limites de sortie. Il permet donc un réglage entièrement manuel ;
+- `PID autotune` regroupe les niveaux de sortie d'essai, la demi-bande, les
+  limites de mesure, le timeout, la période minimale, la stabilité, les cycles
+  et l'action `Lancer autotune`.
+
+Lors du passage depuis l'ancien `TunePIDInstallation`, la consigne, le mode et
+les gains du PID sont conservés. Les réglages propres à l'autotune reprennent
+leurs valeurs par défaut lors de cette migration, car ils sont désormais
+stockés dans leur propre sous-menu.
+
+Avant tout essai matériel, vérifier le brochage et la polarité réelle du relais
+(`Actif à HIGH`) : l'état logique sûr est `OFF`, mais il doit aussi correspondre
+à une sortie physiquement désactivée. Pour un réglage manuel, saisir les gains
+dans `Regulateur > PID`, passer `Régulation active` à `Oui`, puis quitter le
+menu. Pour un réglage automatique, choisir d'abord dans ce même menu
+`Chauffage` si la sortie fait monter la température, ou `Refroidissement` si
+elle la fait descendre. Régler ensuite les limites de l'essai dans
+`Regulateur > PID autotune`, puis sélectionner `Lancer autotune`. Cette action
+applique les valeurs éditées, ferme le menu et démarre l'essai ; elle n'est ni
+un paramètre ni une valeur persistante. Si la désactivation du PID ne peut pas
+être sauvegardée, l'essai est annulé et la sortie reste sûre.
+
+La sortie oscille ensuite sans bloquer la boucle de contrôle. Ouvrir le menu
+pendant l'essai suffit à l'annuler, car le framework met alors les sorties en
+sécurité. Une mesure invalide, une sortie de la plage sûre, un timeout ou des
+oscillations instables arrêtent également la commande. L'état sûr du relais est
+verrouillé à `OFF` dans ce template.
+
+L'écran d'accueil affiche l'état du PID ou la progression de l'autotune. Le
+port série fournit aussi l'erreur éventuelle et le résultat `Ku/Tu`. En cas de
+succès, `Kp`, `Ki` et `Kd` sont copiés ensemble dans le PID principal puis
+sauvegardés automatiquement. Le PID reste volontairement arrêté : relire les
+gains dans `Regulateur > PID`, puis passer `Régulation active` à `Oui` pour
+démarrer la régulation. Si le stockage signale un échec sur le port série, les
+gains restent disponibles en mémoire vive ; ouvrir puis quitter le menu permet
+de tenter une nouvelle sauvegarde avant de redémarrer la carte.
+
+L'essai par relais suit automatiquement le mode choisi et applique ensuite les
+règles PID classiques de Ziegler-Nichols. Ces règles peuvent être agressives :
+commencer avec une puissance et une plage de température prudentes.
+
+Ne jamais sélectionner `Refroidissement` lorsqu'un chauffage est raccordé : la
+boucle agirait dans le mauvais sens. Un compresseur ne doit pas non plus être
+piloté directement avec la période de 10 s de ce template ; il nécessite un
+actionneur dédié qui impose ses temps minimaux de marche et d'arrêt.
+
+Les limites `mesure min/max` protègent l'essai d'autotune uniquement. La
+régulation PID normale doit rester surveillée par une sécurité thermique
+indépendante adaptée à l'installation.
 
 Chaque installation expose deux textes aux rôles distincts :
 

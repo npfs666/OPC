@@ -41,8 +41,18 @@ public:
 
     bool isHealthy() const override;
 
+    /**
+     * Impose l'état logique de sécurité et interdit sa restauration/édition.
+     * Utile lorsqu'un état ON ne peut jamais être considéré comme sûr.
+     */
+    void lockSafeState(bool safeState = false);
+
     void registerParameters(
         ParameterList& list) override;
+
+    bool validateParameters(
+        const ParameterEditor& editor)
+        const override;
 
 private:
     void applyLogicalState(bool state);
@@ -56,6 +66,9 @@ private:
     uint8_t configuredPin = 0;
     bool configuredActiveHigh = true;
     bool configuredSafeState = false;
+
+    bool safeStateLocked = false;
+    bool lockedSafeState = false;
 };
 
 #endif

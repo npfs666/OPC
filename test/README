@@ -12,8 +12,11 @@ Ils couvrent actuellement :
 - la validation et la propagation des mesures BME280 ;
 - l'interpolation PT100 ;
 - les calculs psychrométriques ;
-- les régulateurs thermostat, solaire et PID ;
-- l'éditeur de paramètres ;
+- les régulateurs thermostat, solaire et PID en chauffage/refroidissement,
+  dont l'autotune par relais dans les deux sens ;
+- le timeout, la stabilité des oscillations et le verrouillage sûr des relais ;
+- l'éditeur de paramètres et la séparation des menus PID/autotune ;
+- les actions de menu non persistantes et l'événement de nouveaux gains ;
 - l'ordre régulateur, actionneur, sortie et snapshot.
 
 Les tests qui dépendent réellement de l'ADS1120, des multiplexeurs, de

@@ -2,6 +2,7 @@
 #define INSTALLATION_H
 
 #include <Hardware/pinout.h>
+#include <hmi/MenuBuilder.h>
 #include <hmi/ParameterList.h>
 
 class SensorBoard;
@@ -9,7 +10,6 @@ class Adafruit_BME280;
 struct HomeScreenContext;
 class ProcessControl;
 class ParameterEditor;
-class MenuBuilder;
 class OPC;
 
 class Installation
@@ -50,6 +50,14 @@ public:
     virtual void printHomeScreen(
         HomeScreenContext& context) = 0;
 
+    /**
+     * Copie rapidement l'état propre à l'écran pendant que le contrôle est
+     * verrouillé. L'affichage doit ensuite utiliser uniquement cette copie.
+     */
+    virtual void captureHomeScreenState()
+    {
+    }
+
     virtual bool validateParameters(
         const ParameterEditor& editor) const
     {
@@ -59,6 +67,42 @@ public:
 
     virtual void onParametersApplied()
     {
+    }
+
+    /** Appelé sur le cœur de contrôle juste avant la capture du menu. */
+    virtual void onMenuOpened()
+    {
+    }
+
+    /** Ajoute des commandes non persistantes après la création des groupes. */
+    virtual bool addMenuActions(
+        MenuBuilder& menu) const
+    {
+        (void)menu;
+        return true;
+    }
+
+    /** Exécute une commande de menu sur le cœur de contrôle. */
+    virtual bool executeMenuAction(
+        MenuBuilder::ActionId actionId)
+    {
+        (void)actionId;
+        return false;
+    }
+
+    /**
+     * Ramène une action à un état sûr si sa configuration n'a pas été sauvée.
+     */
+    virtual void onMenuActionSaveFailed(
+        MenuBuilder::ActionId actionId)
+    {
+        (void)actionId;
+    }
+
+    /** Consomme une demande de sauvegarde produite par le contrôle. */
+    virtual bool takeConfigurationSaveRequest()
+    {
+        return false;
     }
 
     ParameterList& getParameters()
