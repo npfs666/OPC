@@ -123,8 +123,7 @@ void RTDSensor::addLP(int32_t value)
         nMinusOneValue = value;
     else
         nMinusOneValue = (double_t) ((ALPHA * value) + (1.0 - ALPHA) * nMinusOneValue);
-    //Serial.print(this->val,2); Serial.print(" | ");Serial.println(value);
-    //Serial.println(this->val);
+
     sum += nMinusOneValue;
     sampleCount++;
 }

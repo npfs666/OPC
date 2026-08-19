@@ -44,17 +44,17 @@ void Thermostat::begin(
     settings.mode = Mode::Heating;
     settings.setpoint = 20.0;
     settings.hysteresis = 1.0;
+    setpointRamp.begin();
 }
 
 void Thermostat::update(uint32_t now)
 {
-    (void)now;
-
     if (temperature == nullptr ||
         !temperature->isValid() ||
         !std::isfinite(
             temperature->getValue()))
     {
+        setpointRamp.resume(now);
         invalidateCommand();
         return;
     }
@@ -62,12 +62,24 @@ void Thermostat::update(uint32_t now)
     const double_t value =
         temperature->getValue();
 
+    if (!setpointRamp.update(
+            now,
+            settings.setpoint,
+            value))
+    {
+        invalidateCommand();
+        return;
+    }
+
+    const double_t activeSetpoint =
+        setpointRamp.activeSetpoint();
+
     const double_t lowerThreshold =
-        settings.setpoint -
+        activeSetpoint -
         settings.hysteresis / 2.0;
 
     const double_t upperThreshold =
-        settings.setpoint +
+        activeSetpoint +
         settings.hysteresis / 2.0;
 
     switch (settings.mode)
@@ -92,6 +104,12 @@ void Thermostat::update(uint32_t now)
     }
 }
 
+void Thermostat::resume(uint32_t now)
+{
+    Regulator::resume(now);
+    setpointRamp.resume(now);
+}
+
 void Thermostat::print(Stream& stream) const {
     stream.print(getName());
 
@@ -103,7 +121,17 @@ void Thermostat::print(Stream& stream) const {
 
     stream.print((command == 0) ? "Off" : "On");
     stream.print(" | SP : ");
-    stream.print(settings.setpoint);
+    stream.print(
+        setpointRamp.hasActiveSetpoint()
+            ? setpointRamp.activeSetpoint()
+            : settings.setpoint);
+
+    if (setpointRamp.settings.enabled)
+    {
+        stream.print(" | Target : ");
+        stream.print(settings.setpoint);
+    }
+
     stream.print(" | Hyst : ");
     stream.print(settings.hysteresis);
 

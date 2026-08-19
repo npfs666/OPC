@@ -78,11 +78,11 @@ int32_t ADS1120::readADC()
 {
   digitalWrite(cs, LOW); // Take CS low
   delayMicroseconds(1);              // Minimum of td(CSSC)
-  int32_t adcVal = HW_SPI->transfer(SPI_MASTER_DUMMY);
+  uint16_t adcVal = HW_SPI->transfer(SPI_MASTER_DUMMY);
   adcVal = (adcVal << 8) | HW_SPI->transfer(SPI_MASTER_DUMMY);
   delayMicroseconds(1); // Minimum of td(CSSC)
   digitalWrite(cs, HIGH);
-  return adcVal;
+  return static_cast<int16_t>(adcVal);
 }
 
 byte *ADS1120::readADC_Array()
@@ -102,21 +102,37 @@ byte *ADS1120::readADC_Array()
 // Single Conversion read modes
 int32_t ADS1120::readADC_Single()
 {
+  int32_t value = 0;
+  readADC_Single(value, UINT32_MAX);
+  return value;
+}
+
+bool ADS1120::readADC_Single(
+  int32_t& value,
+  uint32_t timeoutMs)
+{
   digitalWrite(cs, LOW); // Take CS low
   delayMicroseconds(10);              // Minimum of td(CSSC)
 
   HW_SPI->transfer(CMD_START_SYNC);
+
+  const uint32_t startedAt = millis();
+
   while (digitalRead(drdy) == HIGH)
   {
-    // Espera a que DRDY se ponga en nivel bajo. Esto es un riesgo porque pude quedar bloqueado el codigo aca.
-    // Se deberia poner un timeout configurable en el metodo de begin y devolver un error si no responde
+    if ((millis() - startedAt) >= timeoutMs)
+    {
+      digitalWrite(cs, HIGH);
+      return false;
+    }
   }
 
-  int adcVal = HW_SPI->transfer(SPI_MASTER_DUMMY);
+  uint16_t adcVal = HW_SPI->transfer(SPI_MASTER_DUMMY);
   adcVal = (adcVal << 8) | HW_SPI->transfer(SPI_MASTER_DUMMY);
   delayMicroseconds(1); // Minimum of td(CSSC)
   digitalWrite(cs, HIGH);
-  return adcVal;
+  value = static_cast<int16_t>(adcVal);
+  return true;
 }
 
 byte *ADS1120::readADC_SingleArray()
@@ -143,15 +159,30 @@ byte *ADS1120::readADC_SingleArray()
 
 double ADS1120::readInternalTemp(void) {
 
+  double value = NAN;
+  readInternalTemp(value, UINT32_MAX);
+  return value;
+}
+
+bool ADS1120::readInternalTemp(
+  double& value,
+  uint32_t timeoutMs) {
+
   setConversionMode(CONVERSION_SINGLE_SHOT); // Cancel the continuous sample
   setTemperatureMode(TEMP_ON);
   delay(1);
-  double val = readADC_Single();
+
+  int32_t rawValue = 0;
+  const bool success =
+    readADC_Single(rawValue, timeoutMs);
+
   setTemperatureMode(TEMP_OFF);
-  val *= 0.03125;
-  val /= 4.0;
-  
-  return val;
+
+  if (!success)
+    return false;
+
+  value = static_cast<double>(rawValue) * 0.03125 / 4.0;
+  return true;
 }
 
 void ADS1120::sendCommand(uint8_t command)

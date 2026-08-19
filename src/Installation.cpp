@@ -205,7 +205,7 @@ bool Installation::buildMenu(
             if (!addOwner(
                     calibration,
                     *parameter,
-                    false))
+                    true))
             {
                 return false;
             }

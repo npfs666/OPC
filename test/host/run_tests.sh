@@ -48,6 +48,7 @@ fi
     "${project_dir}/src/Regulator/PID.cpp" \
     "${project_dir}/src/Regulator/PIDAutoTune.cpp" \
     "${project_dir}/src/Regulator/Regulator.cpp" \
+    "${project_dir}/src/Regulator/SetpointRamp.cpp" \
     "${project_dir}/src/Regulator/SolarRegulator.cpp" \
     "${project_dir}/src/Regulator/Thermostat.cpp" \
     "${project_dir}/src/SystemWatchdog.cpp" \

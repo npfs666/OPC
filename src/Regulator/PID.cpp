@@ -179,6 +179,7 @@ void PID::begin(
 
     settings = Settings{};
     autoTuneSettings = AutoTuneSettings{};
+    setpointRamp.begin();
     autoTuneParametersRegistered = false;
     autoTuneTuningsApplied = false;
     autoTuneOwnerKey = nullptr;
@@ -208,6 +209,7 @@ void PID::start()
 {
     settings.enabled = true;
     autoTune.reset();
+    setpointRamp.restart();
     resetController();
 }
 
@@ -217,6 +219,7 @@ void PID::stop()
         autoTune.cancel();
 
     settings.enabled = false;
+    setpointRamp.restart();
     resetController();
 }
 
@@ -408,6 +411,8 @@ void PID::update(uint32_t now)
 
     if (autoTune.isActive())
     {
+        setpointRamp.resume(now);
+
         autoTune.update(
             now,
             measurementValid,
@@ -460,6 +465,7 @@ void PID::update(uint32_t now)
 
     if (!settings.enabled)
     {
+        setpointRamp.restart();
         invalidateCommand();
         return;
     }
@@ -467,18 +473,30 @@ void PID::update(uint32_t now)
     if (!measurementValid ||
         !controlSettingsAreValid())
     {
+        setpointRamp.resume(now);
+        resetController();
+        return;
+    }
+
+    if (!setpointRamp.update(
+            now,
+            settings.setpoint,
+            processValue))
+    {
         resetController();
         return;
     }
 
     updateAutomatic(
         now,
-        processValue);
+        processValue,
+        setpointRamp.activeSetpoint());
 }
 
 void PID::updateAutomatic(
     uint32_t now,
-    double_t processValue)
+    double_t processValue,
+    double_t activeSetpoint)
 {
     if (settings.ki <= 0.0)
         integral = 0.0;
@@ -507,7 +525,7 @@ void PID::updateAutomatic(
 
     const double_t error =
         actionSign *
-        (settings.setpoint -
+        (activeSetpoint -
          processValue);
 
     const double_t derivative =
@@ -589,7 +607,7 @@ void PID::updateAutomatic(
 
 void PID::resume(uint32_t now)
 {
-    (void)now;
+    setpointRamp.resume(now);
 
     /*
      * WaitingForMeasurement peut avoir été demandé depuis le menu pendant
@@ -944,7 +962,17 @@ void PID::print(Stream& stream) const
     }
 
     stream.print(" | SP : ");
-    stream.print(settings.setpoint, 2);
+    stream.print(
+        setpointRamp.hasActiveSetpoint()
+            ? setpointRamp.activeSetpoint()
+            : settings.setpoint,
+        2);
+
+    if (setpointRamp.settings.enabled)
+    {
+        stream.print(" | Target : ");
+        stream.print(settings.setpoint, 2);
+    }
 
     stream.print(" | Mode : ");
     stream.print(

@@ -40,6 +40,12 @@ namespace
     constexpr const char* AUTOTUNE_OWNER_NAME =
         "PID autotune";
 
+    constexpr const char* RAMP_OWNER_KEY =
+        "tune_pid.ramp";
+
+    constexpr const char* RAMP_OWNER_NAME =
+        "Rampe PID";
+
     void prepareValue(
         Adafruit_GFX& display,
         int16_t y,
@@ -174,7 +180,12 @@ bool PIDInstallation::begin(
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
-    if (!pid.registerAutoTuneParameters(
+    if (!pid.setpointRamp.registerParameters(
+            parameterList,
+            RAMP_OWNER_KEY,
+            RAMP_OWNER_NAME,
+            "°C/min") ||
+        !pid.registerAutoTuneParameters(
             parameterList,
             AUTOTUNE_OWNER_KEY,
             AUTOTUNE_OWNER_NAME))
@@ -185,7 +196,7 @@ bool PIDInstallation::begin(
     if (parameterList.hasError())
     {
         Serial.println(
-            "PID autotune installation parameter registration failed");
+            "PID installation parameter registration failed");
         return false;
     }
 
@@ -238,7 +249,10 @@ bool PIDInstallation::takeConfigurationSaveRequest()
 void PIDInstallation::captureHomeScreenState()
 {
     homeState.mode = pid.settings.mode;
-    homeState.setpoint = pid.settings.setpoint;
+    homeState.setpoint =
+        pid.setpointRamp.hasActiveSetpoint()
+            ? pid.setpointRamp.activeSetpoint()
+            : pid.settings.setpoint;
     homeState.pidEnabled = pid.settings.enabled;
 
     homeState.autoTuneStatus =

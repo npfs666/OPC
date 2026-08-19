@@ -2,6 +2,7 @@
 #define THERMOSTAT_H
 
 #include <Regulator/Regulator.h>
+#include <Regulator/SetpointRamp.h>
 
 class Temperature;
 
@@ -22,6 +23,7 @@ public:
     };
 
     Settings settings;
+    SetpointRamp setpointRamp;
 
     Thermostat();
 
@@ -32,6 +34,7 @@ public:
         Temperature& temperature);
 
     void update(uint32_t now);
+    void resume(uint32_t now) override;
 
     void print(Stream& stream) const override;
 

@@ -113,8 +113,10 @@ class ADS1120 {
     int32_t readADC(void);
     byte * readADC_Array(void);
     int32_t readADC_Single(void);
+    bool readADC_Single(int32_t& value, uint32_t timeoutMs);
     byte * readADC_SingleArray(void);
     double readInternalTemp(void);
+    bool readInternalTemp(double& value, uint32_t timeoutMs);
     void sendCommand(uint8_t command);
     void reset(void);
     void startSync(void);
@@ -146,4 +148,3 @@ class ADS1120 {
     SPIClassRP2040 *HW_SPI;
   };
 #endif
-

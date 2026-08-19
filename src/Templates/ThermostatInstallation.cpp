@@ -27,6 +27,12 @@ namespace
     constexpr int16_t SETPOINT_Y = 58;
     constexpr int16_t OUTPUT_Y = 103;
 
+    constexpr const char* RAMP_OWNER_KEY =
+        "thermostat.ramp";
+
+    constexpr const char* RAMP_OWNER_NAME =
+        "Rampe thermostat";
+
     void printCenteredText(
         Adafruit_GFX& display,
         int16_t y,
@@ -277,6 +283,15 @@ bool ThermostatInstallation::begin(
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
+    if (!thermostat.setpointRamp.registerParameters(
+            parameterList,
+            RAMP_OWNER_KEY,
+            RAMP_OWNER_NAME,
+            "°C/min"))
+    {
+        return false;
+    }
+
     if (parameterList.hasError())
     {
         Serial.println(
@@ -321,7 +336,9 @@ void ThermostatInstallation::printHomeScreen(
 
     printSetpoint(
         display,
-        thermostat.settings.setpoint);
+        thermostat.setpointRamp.hasActiveSetpoint()
+            ? thermostat.setpointRamp.activeSetpoint()
+            : thermostat.settings.setpoint);
 
     const OutputSample* relaySample =
         context.snapshot.find(

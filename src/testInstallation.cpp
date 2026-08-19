@@ -189,7 +189,7 @@ bool TestInstallation::begin(
 
     solar.begin("Reg Solaire", tempBME, rtd1Temperature, rtd2Temperature);
 
-    if (!controller.add(thermostat) ||
+    /*if (!controller.add(thermostat) ||
         !controller.add(pid) ||
         !controller.add(solar))
     {
@@ -200,7 +200,7 @@ bool TestInstallation::begin(
 
     pump.begin("pompe", thermostat, 10000);
 
-    if (!controller.add(heater) ||
+    /*if (!controller.add(heater) ||
         !controller.add(pump))
     {
         return false;
@@ -219,9 +219,23 @@ bool TestInstallation::begin(
     {
         return false;
     }
-
+*/
     board.registerParameters(parameterList);
     controller.registerParameters(parameterList);
+
+    if (!thermostat.setpointRamp.registerParameters(
+            parameterList,
+            "thermostat.ramp",
+            "Rampe thermostat",
+            "°C/min") ||
+        !pid.setpointRamp.registerParameters(
+            parameterList,
+            "pid.ramp",
+            "Rampe PID",
+            "°C/min"))
+    {
+        return false;
+    }
 
     if (parameterList.hasError())
     {

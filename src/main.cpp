@@ -21,7 +21,7 @@
 
 namespace
 {
-    PIDInstallation installation;
+    TestInstallation installation;
     OPC opc(installation);
     SystemWatchdog systemWatchdog;
 

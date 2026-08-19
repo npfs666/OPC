@@ -348,6 +348,8 @@ void OPC::initMenu()
     parameterEditor.capture();
 
     if (!userInstall.buildMenu(
+            menuDefinition) ||
+        !input.addMenuActions(
             menuDefinition))
     {
         Serial.println("Menu generation failed");
@@ -593,15 +595,23 @@ void OPC::handleControlMessage(
         userInstall.onParametersApplied();
 
         bool actionSucceeded = true;
+        bool sensorBoardAction = false;
 
         if (actionId != MenuBuilder::NO_ACTION)
         {
             mutex_enter_blocking(
                 &processDataMutex);
 
-            actionSucceeded =
-                userInstall.executeMenuAction(
+            sensorBoardAction =
+                input.handlesMenuAction(
                     actionId);
+
+            actionSucceeded =
+                sensorBoardAction
+                    ? input.executeMenuAction(
+                          actionId)
+                    : userInstall.executeMenuAction(
+                          actionId);
 
             controller.forceSafeOutputs();
 
@@ -620,8 +630,16 @@ void OPC::handleControlMessage(
             mutex_enter_blocking(
                 &processDataMutex);
 
-            userInstall.onMenuActionSaveFailed(
-                actionId);
+            if (sensorBoardAction)
+            {
+                input.onMenuActionSaveFailed(
+                    actionId);
+            }
+            else
+            {
+                userInstall.onMenuActionSaveFailed(
+                    actionId);
+            }
 
             controller.forceSafeOutputs();
 
@@ -629,6 +647,12 @@ void OPC::handleControlMessage(
 
             Serial.println(
                 "Menu action cancelled because configuration save failed");
+        }
+        else if (actionSucceeded &&
+                 sensorBoardAction &&
+                 configurationSaved)
+        {
+            input.onMenuActionSaved(actionId);
         }
 
         configurationSavePending = false;

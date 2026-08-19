@@ -14,6 +14,7 @@
 #include <Physics/Psychrometrics.h>
 #include <ProcessControl.h>
 #include <Regulator/PID.h>
+#include <Regulator/SetpointRamp.h>
 #include <Regulator/SolarRegulator.h>
 #include <Regulator/Thermostat.h>
 #include <SystemWatchdog.h>
@@ -69,8 +70,22 @@ namespace
             auto calibration = parameterList.forOwner({
                 "calibration",
                 "Calibration",
-                "sensor_board",
-                "Carte capteurs"
+                "sensor_board.pt100_calibration",
+                "PT100"
+            });
+
+            auto calibrationPt1000 = parameterList.forOwner({
+                "calibration",
+                "Calibration",
+                "sensor_board.pt1000_calibration",
+                "PT1000"
+            });
+
+            auto zeroCalibration = parameterList.forOwner({
+                "calibration",
+                "Calibration",
+                "sensor_board.zero_calibration",
+                "Zeros ADC"
             });
 
             auto regulator = parameterList.forOwner({
@@ -114,6 +129,18 @@ namespace
                     "Rref",
                     reference,
                     "Ω",
+                    true) &&
+                calibrationPt1000.addDouble(
+                    "reference",
+                    "Rref",
+                    referencePt1000,
+                    "Ω",
+                    true) &&
+                zeroCalibration.addDouble(
+                    "zero_input_1",
+                    "N0 entree 1",
+                    zeroInputOne,
+                    "pts",
                     true) &&
                 regulator.addDouble(
                     "setpoint",
@@ -175,6 +202,8 @@ namespace
     private:
         uint16_t samples = 16;
         double_t reference = 1649.819;
+        double_t referencePt1000 = 16500.0;
+        double_t zeroInputOne = 0.0;
         double_t setpoint = 20.0;
         double_t noiseBand = 0.5;
         uint32_t menuTimeout = 10;
@@ -486,6 +515,137 @@ namespace
                 absoluteHumidity(
                     20.0,
                     50.0) > 0.0);
+    }
+
+    void testSetpointRamp()
+    {
+        SetpointRamp ramp;
+        ramp.begin();
+
+        CHECK_TRUE(ramp.update(0, 30.0, 20.0));
+        CHECK_NEAR(ramp.activeSetpoint(), 30.0, 0.0001);
+
+        ramp.settings.enabled = true;
+        ramp.settings.risingRate = 2.0;
+        ramp.settings.fallingRate = 1.0;
+
+        CHECK_TRUE(ramp.update(1000, 30.0, 20.0));
+        CHECK_NEAR(ramp.activeSetpoint(), 20.0, 0.0001);
+
+        CHECK_TRUE(ramp.update(61000, 30.0, 20.0));
+        CHECK_NEAR(ramp.activeSetpoint(), 22.0, 0.0001);
+
+        CHECK_TRUE(ramp.update(121000, 15.0, 20.0));
+        CHECK_NEAR(ramp.activeSetpoint(), 21.0, 0.0001);
+
+        ramp.resume(181000);
+        CHECK_TRUE(ramp.update(241000, 15.0, 20.0));
+        CHECK_NEAR(ramp.activeSetpoint(), 20.0, 0.0001);
+
+        ramp.settings.enabled = false;
+        CHECK_TRUE(ramp.update(242000, 12.0, 20.0));
+        CHECK_NEAR(ramp.activeSetpoint(), 12.0, 0.0001);
+
+        ramp.restart();
+        ramp.settings.enabled = true;
+
+        const uint32_t beforeRollover =
+            UINT32_MAX - 30000UL;
+
+        CHECK_TRUE(
+            ramp.update(
+                beforeRollover,
+                30.0,
+                20.0));
+        CHECK_TRUE(ramp.update(29999, 30.0, 20.0));
+        CHECK_NEAR(ramp.activeSetpoint(), 22.0, 0.0001);
+
+        Parameter storage[3];
+        ParameterList parameters;
+        parameters.begin(storage, 3);
+
+        CHECK_TRUE(
+            ramp.registerParameters(
+                parameters,
+                "pid.ramp",
+                "Rampe PID",
+                "°C/min"));
+        CHECK_TRUE(parameters.count() == 3);
+        CHECK_TRUE(
+            parameters.find(
+                "pid.ramp",
+                "enabled") != nullptr);
+        CHECK_TRUE(
+            parameters.find(
+                "pid.ramp",
+                "rising_rate") != nullptr);
+        CHECK_TRUE(
+            parameters.find(
+                "pid.ramp",
+                "falling_rate") != nullptr);
+    }
+
+    void testThermostatSetpointRamp()
+    {
+        FakeTemperature temperature;
+        Thermostat thermostat;
+
+        thermostat.begin("thermostat", temperature);
+        thermostat.settings.setpoint = 30.0;
+        thermostat.settings.hysteresis = 2.0;
+        thermostat.setpointRamp.settings.enabled = true;
+        thermostat.setpointRamp.settings.risingRate = 1.0;
+
+        temperature.setReading(20.0);
+        thermostat.update(0);
+        CHECK_NEAR(
+            thermostat.setpointRamp.activeSetpoint(),
+            20.0,
+            0.0001);
+        CHECK_FALSE(thermostat.isCommandValid());
+
+        thermostat.update(60000);
+        CHECK_NEAR(
+            thermostat.setpointRamp.activeSetpoint(),
+            21.0,
+            0.0001);
+        CHECK_NEAR(thermostat.readCommand(), 1.0, 0.0);
+
+        temperature.setReading(0.0, false);
+        thermostat.update(120000);
+        CHECK_FALSE(thermostat.isCommandValid());
+
+        temperature.setReading(20.0);
+        thermostat.update(180000);
+        CHECK_NEAR(
+            thermostat.setpointRamp.activeSetpoint(),
+            22.0,
+            0.0001);
+    }
+
+    void testPIDSetpointRamp()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 30.0;
+        pid.settings.kp = 0.1;
+        pid.settings.ki = 0.0;
+        pid.settings.kd = 0.0;
+        pid.setpointRamp.settings.enabled = true;
+        pid.setpointRamp.settings.risingRate = 1.0;
+
+        measurement.setReading(20.0);
+        pid.update(0);
+        CHECK_FALSE(pid.isCommandValid());
+
+        pid.update(60000);
+        CHECK_NEAR(
+            pid.setpointRamp.activeSetpoint(),
+            21.0,
+            0.0001);
+        CHECK_NEAR(pid.readCommand(), 0.1, 0.0001);
     }
 
     void testHeatingThermostat()
@@ -1661,9 +1821,44 @@ namespace
         CHECK_TRUE(
             menuSettings !=
                 MenuBuilder::INVALID_GROUP);
-        CHECK_TRUE(
+        const MenuBuilder::GroupId pt100Calibration =
             menu.findGroupForOwner(
-                "sensor_board") ==
+                "sensor_board.pt100_calibration");
+
+        const MenuBuilder::GroupId pt1000Calibration =
+            menu.findGroupForOwner(
+                "sensor_board.pt1000_calibration");
+
+        const MenuBuilder::GroupId zeroCalibration =
+            menu.findGroupForOwner(
+                "sensor_board.zero_calibration");
+
+        CHECK_TRUE(
+            pt100Calibration !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            pt1000Calibration !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            zeroCalibration !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            pt100Calibration !=
+                pt1000Calibration);
+        CHECK_TRUE(
+            zeroCalibration !=
+                pt100Calibration);
+        CHECK_TRUE(
+            zeroCalibration !=
+                pt1000Calibration);
+        CHECK_TRUE(
+            menu.getGroup(pt100Calibration)->parent ==
+                calibration);
+        CHECK_TRUE(
+            menu.getGroup(pt1000Calibration)->parent ==
+                calibration);
+        CHECK_TRUE(
+            menu.getGroup(zeroCalibration)->parent ==
                 calibration);
         CHECK_TRUE(
             menu.findGroupForOwner(
@@ -1859,6 +2054,18 @@ int main()
     TestHarness::run(
         "psychrométrie",
         testPsychrometrics);
+
+    TestHarness::run(
+        "rampe de consigne",
+        testSetpointRamp);
+
+    TestHarness::run(
+        "rampe thermostat",
+        testThermostatSetpointRamp);
+
+    TestHarness::run(
+        "rampe PID",
+        testPIDSetpointRamp);
 
     TestHarness::run(
         "thermostat chauffage",

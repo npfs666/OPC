@@ -3,6 +3,7 @@
 
 #include <Regulator/PIDAutoTune.h>
 #include <Regulator/Regulator.h>
+#include <Regulator/SetpointRamp.h>
 
 class Measurement;
 
@@ -50,6 +51,7 @@ public:
 
     Settings settings;
     AutoTuneSettings autoTuneSettings;
+    SetpointRamp setpointRamp;
 
     PID();
 
@@ -149,7 +151,8 @@ private:
 
     void updateAutomatic(
         uint32_t now,
-        double_t processValue);
+        double_t processValue,
+        double_t activeSetpoint);
 };
 
 #endif

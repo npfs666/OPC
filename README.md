@@ -87,10 +87,12 @@ namespace
 Avec la configuration par défaut, la sortie reste arrêtée après le démarrage.
 Le choix `Régulation active` est persistant : s'il a été sauvegardé à `Oui`,
 le PID reprendra après le redémarrage et la réception de mesures valides. Le
-menu `Regulateur` contient deux sous-menus indépendants :
+menu `Regulateur` contient trois sous-menus indépendants :
 
 - `PID` regroupe `Régulation active`, le mode, la consigne, `Kp`, `Ki`, `Kd`
   et les limites de sortie. Il permet donc un réglage entièrement manuel ;
+- `Rampe PID` permet d'activer une limitation distincte de la vitesse de montée
+  et de descente de la consigne, en `°C/min` ;
 - `PID autotune` regroupe les niveaux de sortie d'essai, la demi-bande, les
   limites de mesure, le timeout, la période minimale, la stabilité, les cycles
   et l'action `Lancer autotune`.
@@ -99,6 +101,16 @@ Lors du passage depuis l'ancien `TunePIDInstallation`, la consigne, le mode et
 les gains du PID sont conservés. Les réglages propres à l'autotune reprennent
 leurs valeurs par défaut lors de cette migration, car ils sont désormais
 stockés dans leur propre sous-menu.
+
+Quand la rampe est activée, la consigne appliquée part de la première mesure
+valide puis rejoint progressivement la consigne cible. Elle est figée pendant
+une pause du menu ou une mesure invalide, afin de ne pas rattraper brutalement
+le temps perdu. L'autotune utilise directement sa consigne cible et ignore la
+rampe.
+
+`ThermostatInstallation` expose le même composant dans
+`Regulateur > Rampe thermostat`. Le thermostat applique alors son hystérésis
+autour de la consigne progressive, et non autour de la cible finale.
 
 Avant tout essai matériel, vérifier le brochage et la polarité réelle du relais
 (`Actif à HIGH`) : l'état logique sûr est `OFF`, mais il doit aussi correspondre
@@ -205,8 +217,14 @@ enregistrée à nouveau.
   PT100. Le type PT1000 reste déclaré, mais n'est pas le chemin matériel validé.
 - La sortie physique implémentée est le relais tout-ou-rien. PWM et Modbus sont
   prévus comme extensions de l'abstraction `Output`.
-- Les valeurs de calibration peuvent être stockées et affichées en lecture
-  seule ; l'action de calibration depuis le menu reste à implémenter.
+- `Divers > Calibration` contient un profil PT100 et un profil PT1000. Chaque
+  profil conserve sa résistance de référence effective, la valeur de l'étalon,
+  et la température de calibration. Le sous-menu commun `Zeros ADC` conserve
+  un zéro propre à chacune des trois entrées. Les actions `Mesurer N0` utilisent
+  un shunt au connecteur et l'action `Remettre les N0 à zéro` efface les trois
+  corrections en une fois. L'action `Calibrer Rref (E1)` utilise ensuite
+  l'étalon branché en quatre fils sur l'entrée 1. Une mesure instable, saturée
+  ou hors plage est rejetée sans remplacer la calibration précédente.
 - Les dimensions des listes sont fixes afin d'éviter l'allocation dynamique sur
   le microcontrôleur. Leurs limites sont regroupées dans
   `src/Hardware/pinout.h`.
