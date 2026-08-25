@@ -10,6 +10,7 @@ s'exécutent sans carte connectée :
 Ils couvrent actuellement :
 
 - la validation et la propagation des mesures BME280 ;
+- le driver et l'interface du DS3231 (date, heure 24 h, alarme et erreurs I2C) ;
 - l'interpolation PT100 ;
 - les calculs psychrométriques ;
 - les régulateurs thermostat, solaire et PID en chauffage/refroidissement,

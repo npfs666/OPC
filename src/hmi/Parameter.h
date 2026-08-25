@@ -46,6 +46,12 @@ struct ParameterOwner
      * Exemple : "Thermostats"
      */
     const char* ownerName = nullptr;
+
+    /*
+     * Les paramètres purement interactifs restent disponibles dans le menu
+     * sans être écrits dans la configuration persistante.
+     */
+    bool persistent = true;
 };
 
 struct Parameter
@@ -94,6 +100,9 @@ struct Parameter
      * Le logiciel et la restauration peuvent toujours modifier la valeur.
      */
     bool readOnly = false;
+
+    /* Indique si Storage doit sauvegarder et restaurer ce paramètre. */
+    bool persistent = true;
 
     union Value
     {

@@ -1,10 +1,6 @@
-#ifndef PINOUT_h
-#define PINOUT_h
+#pragma once
 
-/**
- * Pinout for the v0.1 OPC PCB
- * Global settings
- */
+
 
 // Used in RTDSensor
 #define MAX_RTD 3
@@ -18,39 +14,16 @@
 #define MAX_REGISTERED_OUTPUTS 16 // Outputs managed by ProcessControl
 #define MAX_PARAMETERS 64   // Used in ParameterList
 
-// Ecran SPI TFT (SPI1)
-#define LCD_SCK 14
-#define LCD_MOSI 15
-#define LCD_DC 12
-#define LCD_CS 13
-#define LCD_RESET 11
-
-// Encodeur rotatif
-#define ROTENC_A 26
-#define ROTENC_B 22
-#define ROTENC_CLIC 21
-
-// Analog switches
-#define SW_3_WIRE 28
-#define SW_4_WIRE 27
-#define SW_MUX_1 2
-#define SW_MUX_2 1
-#define SW_MUX_3 0
-
-// ADS1120 (SPI)
-#define SPI_CLK  18
-#define SPI_MISO 16
-#define SPI_MOSI 19
-#define SPI_CS   17
-#define SPI_DRDY 20
-
-// BME (I²C)
-#define BME_SDA 8
-#define BME_SCL 9
-
-// Sorties
-#define RELAIS_1 4
-#define RELAIS_2 5
 
 
+#ifndef OPC_BOARD_REV
+#error "OPC_BOARD_REV doit être définie"
+#endif
+
+#if OPC_BOARD_REV == 1
+#include "Boards/Pinout_v0.1.h"
+#elif OPC_BOARD_REV == 2
+#include "Boards/Pinout_v0.2.h"
+#else
+#error "Révision de PCB inconnue"
 #endif

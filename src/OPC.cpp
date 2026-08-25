@@ -131,10 +131,10 @@ void OPC::initBME280()
 
 void OPC::initSensorBoard()
 {
-    // Set pin 23 HIGH to switch the pico DC-DC converter to PWM (improved ripple)
+    // Set pin DC_DC_PWM HIGH to switch the pico DC-DC converter to PWM (improved ripple)
 	// Improves a lot measurement stability
-    pinMode(23,OUTPUT);
-    digitalWrite(23,HIGH);
+    pinMode(DC_DC_PWM,OUTPUT);
+    digitalWrite(DC_DC_PWM,HIGH);
 
     input.init();
 }

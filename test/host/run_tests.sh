@@ -29,6 +29,8 @@ fi
     -I"${project_dir}/test/host" \
     -I"${project_dir}/src" \
     "${project_dir}/test/host/test_main.cpp" \
+    "${project_dir}/src/Drivers/DS3231.cpp" \
+    "${project_dir}/src/Hardware/RTC.cpp" \
     "${project_dir}/src/Installation.cpp" \
     "${project_dir}/src/hmi/Displayable.cpp" \
     "${project_dir}/src/hmi/MenuBuilder.cpp" \

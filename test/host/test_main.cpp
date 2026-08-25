@@ -1,6 +1,8 @@
 #include "TestHarness.h"
 
 #include <Adafruit_BME280.h>
+#include <Drivers/DS3231.h>
+#include <Hardware/RTC.h>
 #include <Installation.h>
 #include <Measurements/Humidity/HumidityBME.h>
 #include <ProcessSnapshot.h>
@@ -116,7 +118,10 @@ namespace
                 "Surveillance mesures"
             });
 
+            clock.registerParameters(parameterList);
+
             return
+                !parameterList.hasError() &&
                 input.addInteger(
                     "samples",
                     "Samples",
@@ -196,7 +201,8 @@ namespace
                     group,
                     2,
                     "pid_autotune_cancel",
-                    "Annuler autotune");
+                    "Annuler autotune") &&
+                clock.addMenuActions(menu);
         }
 
     private:
@@ -208,6 +214,7 @@ namespace
         double_t noiseBand = 0.5;
         uint32_t menuTimeout = 10;
         uint32_t measurementTimeout = 30;
+        RTC clock;
     };
 
     class FakeTemperature final :
@@ -1604,6 +1611,313 @@ namespace
         CHECK_NEAR(relay.appliedCommand(), 0.0, 0.0);
     }
 
+    void testDS3231RegisterDriver()
+    {
+        TwoWire wire;
+        DS3231 driver;
+
+        wire.registers[0x10] = 0xA5;
+
+        CHECK_TRUE(driver.begin(wire));
+        CHECK_TRUE(driver.isConnected());
+
+        uint8_t value = 0;
+
+        CHECK_TRUE(
+            driver.readRegister(
+                DS3231::Register::AgingOffset,
+                value));
+        CHECK_TRUE(value == 0xA5);
+
+        CHECK_TRUE(
+            driver.writeRegister(
+                DS3231::Register::Control,
+                0xAA));
+        CHECK_TRUE(wire.registers[0x0E] == 0xAA);
+
+        CHECK_TRUE(
+            driver.updateRegister(
+                DS3231::Register::Control,
+                0x0F,
+                0x05));
+        CHECK_TRUE(wire.registers[0x0E] == 0xA5);
+
+        CHECK_FALSE(
+            driver.updateRegister(
+                DS3231::Register::Status,
+                0x01,
+                0));
+
+        uint8_t values[2] = {};
+
+        wire.shortRead = true;
+        CHECK_FALSE(
+            driver.readRegisters(
+                DS3231::Register::Seconds,
+                values,
+                sizeof(values)));
+
+        wire.nextTransmissionError = 4;
+        CHECK_FALSE(
+            driver.readRegister(
+                DS3231::Register::Seconds,
+                value));
+
+        CHECK_FALSE(
+            driver.readRegisters(
+                DS3231::REGISTER_COUNT - 1,
+                values,
+                sizeof(values)));
+
+        wire.connected = false;
+        CHECK_FALSE(driver.isConnected());
+    }
+
+    bool setClockDraft(
+        ParameterEditor& editor,
+        const char* key,
+        int32_t value)
+    {
+        for (size_t i = 0; i < editor.count(); i++)
+        {
+            ParameterDraft& draft = editor.get(i);
+
+            if (draft.parameter != nullptr &&
+                std::strcmp(
+                    draft.parameter->ownerKey,
+                    "rtc.clock") == 0 &&
+                std::strcmp(
+                    draft.parameter->key,
+                    key) == 0)
+            {
+                draft.integerValue = value;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void testRTCInterface()
+    {
+        TwoWire wire;
+
+        wire.registers[0x00] = 0x58;
+        wire.registers[0x01] = 0x59;
+        wire.registers[0x02] = 0x71;
+        wire.registers[0x03] = 4;
+        wire.registers[0x04] = 0x29;
+        wire.registers[0x05] = 0x02;
+        wire.registers[0x06] = 0x24;
+        wire.registers[0x0E] = 0x9A;
+        wire.registers[0x0F] = 0x8A;
+
+        RTC clock;
+
+        CHECK_TRUE(clock.begin(8, 9, wire));
+        CHECK_TRUE(wire.started);
+        CHECK_TRUE(wire.sdaPin == 8);
+        CHECK_TRUE(wire.sclPin == 9);
+        CHECK_TRUE(wire.registers[0x02] == 0x71);
+        CHECK_TRUE(wire.registers[0x0E] == 0x1C);
+        CHECK_TRUE(wire.registers[0x0F] == 0x88);
+
+        RTC::DateTime dateTime;
+
+        CHECK_TRUE(clock.readDateTime(dateTime));
+        CHECK_TRUE(dateTime.year == 2024);
+        CHECK_TRUE(dateTime.month == 2);
+        CHECK_TRUE(dateTime.day == 29);
+        CHECK_TRUE(dateTime.dayOfWeek == 4);
+        CHECK_TRUE(dateTime.hour == 23);
+        CHECK_TRUE(dateTime.minute == 59);
+        CHECK_TRUE(dateTime.second == 58);
+
+        wire.registers[0x02] = 0x52;
+        CHECK_TRUE(clock.readDateTime(dateTime));
+        CHECK_TRUE(dateTime.hour == 0);
+
+        wire.registers[0x02] = 0x72;
+        CHECK_TRUE(clock.readDateTime(dateTime));
+        CHECK_TRUE(dateTime.hour == 12);
+
+        wire.registers[0x02] = 0x71;
+        wire.registers[0x05] = 0x82;
+        CHECK_FALSE(clock.readDateTime(dateTime));
+
+        wire.registers[0x05] = 0x02;
+        wire.registers[0x00] = 0x6A;
+        CHECK_FALSE(clock.readDateTime(dateTime));
+        wire.registers[0x00] = 0x58;
+
+        bool timeValid = true;
+
+        CHECK_TRUE(clock.isTimeValid(timeValid));
+        CHECK_FALSE(timeValid);
+
+        RTC::DateTime updated;
+        updated.year = 2026;
+        updated.month = 8;
+        updated.day = 21;
+        updated.hour = 7;
+        updated.minute = 6;
+        updated.second = 5;
+
+        CHECK_TRUE(clock.setDateTime(updated));
+        CHECK_TRUE(wire.registers[0x00] == 0x05);
+        CHECK_TRUE(wire.registers[0x01] == 0x06);
+        CHECK_TRUE(wire.registers[0x02] == 0x07);
+        CHECK_TRUE(wire.registers[0x03] == 5);
+        CHECK_TRUE(wire.registers[0x04] == 0x21);
+        CHECK_TRUE(wire.registers[0x05] == 0x08);
+        CHECK_TRUE(wire.registers[0x06] == 0x26);
+        CHECK_TRUE(wire.registers[0x0F] == 0x08);
+
+        CHECK_TRUE(clock.isTimeValid(timeValid));
+        CHECK_TRUE(timeValid);
+
+        wire.registers[0x11] = 0xFE;
+        wire.registers[0x12] = 0xC0;
+
+        float temperature = 0.0f;
+
+        CHECK_TRUE(clock.readTemperature(temperature));
+        CHECK_NEAR(temperature, -1.25, 0.001);
+
+        wire.registers[0x11] = 0xFF;
+        wire.registers[0x12] = 0xC0;
+        CHECK_TRUE(clock.readTemperature(temperature));
+        CHECK_NEAR(temperature, -0.25, 0.001);
+
+        wire.registers[0x0F] |= 0x01;
+
+        CHECK_TRUE(clock.setDailyAlarm(6, 7, 8));
+        CHECK_TRUE(wire.registers[0x07] == 0x08);
+        CHECK_TRUE(wire.registers[0x08] == 0x07);
+        CHECK_TRUE(wire.registers[0x09] == 0x06);
+        CHECK_TRUE(wire.registers[0x0A] == 0x80);
+        CHECK_TRUE(wire.registers[0x0E] == 0x1D);
+        CHECK_TRUE(wire.registers[0x0F] == 0x08);
+
+        bool triggered = false;
+
+        wire.registers[0x0F] |= 0x01;
+        CHECK_TRUE(clock.isAlarmTriggered(triggered));
+        CHECK_TRUE(triggered);
+        CHECK_TRUE(clock.clearAlarm());
+        CHECK_TRUE(wire.registers[0x0F] == 0x08);
+        CHECK_TRUE(clock.disableAlarm());
+        CHECK_TRUE(wire.registers[0x0E] == 0x1C);
+
+        RTC::Alarm dateAlarm;
+        dateAlarm.mode = RTC::AlarmMode::DayOfMonth;
+        dateAlarm.day = 15;
+        dateAlarm.hour = 12;
+        dateAlarm.minute = 30;
+        dateAlarm.second = 45;
+
+        CHECK_TRUE(clock.setAlarm(dateAlarm));
+        CHECK_TRUE(wire.registers[0x0A] == 0x15);
+
+        dateAlarm.day = 0;
+        CHECK_FALSE(clock.setAlarm(dateAlarm));
+
+        CHECK_TRUE(
+            RTC::isValidDate(2024, 2, 29));
+        CHECK_FALSE(
+            RTC::isValidDate(2023, 2, 29));
+        CHECK_FALSE(
+            RTC::isValidDate(2024, 4, 31));
+        CHECK_TRUE(
+            RTC::calculateDayOfWeek(
+                2026,
+                8,
+                21) == 5);
+
+        TwoWire uninitializedWire;
+        uninitializedWire.registers[0x02] = 0x7F;
+        uninitializedWire.registers[0x0F] = 0x80;
+
+        RTC uninitializedClock;
+
+        CHECK_TRUE(
+            uninitializedClock.begin(
+                uninitializedWire));
+        CHECK_TRUE(
+            uninitializedClock.setDateTime(
+                updated));
+
+        Parameter storage[6];
+        ParameterList parameters;
+        parameters.begin(storage, 6);
+        clock.registerParameters(parameters);
+
+        CHECK_TRUE(parameters.count() == 6);
+
+        for (size_t i = 0;
+             i < parameters.count();
+             i++)
+        {
+            CHECK_FALSE(
+                parameters.get(i)->persistent);
+        }
+
+        ParameterEditor editor;
+        editor.begin(parameters);
+        editor.capture();
+
+        CHECK_TRUE(setClockDraft(editor, "year", 2023));
+        CHECK_TRUE(setClockDraft(editor, "month", 2));
+        CHECK_TRUE(setClockDraft(editor, "day", 29));
+        CHECK_FALSE(clock.validateParameters(editor));
+
+        CHECK_TRUE(setClockDraft(editor, "year", 2024));
+        CHECK_TRUE(clock.validateParameters(editor));
+
+        CHECK_TRUE(setClockDraft(editor, "year", 2030));
+        CHECK_TRUE(setClockDraft(editor, "month", 12));
+        CHECK_TRUE(setClockDraft(editor, "day", 31));
+        CHECK_TRUE(setClockDraft(editor, "hour", 23));
+        CHECK_TRUE(setClockDraft(editor, "minute", 58));
+        CHECK_TRUE(setClockDraft(editor, "second", 57));
+        CHECK_TRUE(editor.apply());
+
+        MenuBuilder menu;
+        CHECK_TRUE(menu.begin("Test"));
+
+        const MenuBuilder::GroupId miscellaneous =
+            menu.addSubmenu(
+                menu.root(),
+                "miscellaneous",
+                "Divers");
+
+        const MenuBuilder::GroupId clockGroup =
+            menu.addSubmenu(
+                miscellaneous,
+                "rtc.clock",
+                "Horloge");
+
+        CHECK_TRUE(
+            menu.addParameters(
+                clockGroup,
+                "rtc.clock"));
+        CHECK_TRUE(clock.addMenuActions(menu));
+
+        const MenuBuilder::Action* action =
+            menu.findAction(
+                "rtc_set_date_time");
+
+        CHECK_TRUE(action != nullptr);
+        CHECK_TRUE(
+            clock.executeMenuAction(action->id));
+        CHECK_TRUE(wire.registers[0x00] == 0x57);
+        CHECK_TRUE(wire.registers[0x01] == 0x58);
+        CHECK_TRUE(wire.registers[0x02] == 0x23);
+        CHECK_TRUE(wire.registers[0x04] == 0x31);
+        CHECK_TRUE(wire.registers[0x05] == 0x12);
+        CHECK_TRUE(wire.registers[0x06] == 0x30);
+    }
+
     void testParameterEditor()
     {
         Parameter storage[8];
@@ -1764,7 +2078,7 @@ namespace
             menu.getGroup(autoTuneGroup)->parent ==
                 regulators);
 
-        CHECK_TRUE(menu.actionCount() == 2);
+        CHECK_TRUE(menu.actionCount() == 3);
 
         const MenuBuilder::Action* startAction =
             menu.findAction(
@@ -1864,6 +2178,34 @@ namespace
             menu.findGroupForOwner(
                 "menu") ==
                 menuSettings);
+
+        const MenuBuilder::GroupId clockGroup =
+            menu.findGroupForOwner(
+                "rtc.clock");
+
+        CHECK_TRUE(
+            clockGroup !=
+                MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(
+            menu.getGroup(clockGroup)->parent ==
+                miscellaneous);
+
+        const MenuBuilder::Action* clockAction =
+            menu.findAction(
+                "rtc_set_date_time");
+
+        CHECK_TRUE(clockAction != nullptr);
+        CHECK_TRUE(clockAction->id == 48);
+        CHECK_TRUE(
+            clockAction->group == clockGroup);
+
+        const Parameter* clockHour =
+            installation.getParameters().find(
+                "rtc.clock",
+                "hour");
+
+        CHECK_TRUE(clockHour != nullptr);
+        CHECK_FALSE(clockHour->persistent);
 
         CHECK_TRUE(
             menu.findSubmenu(
@@ -2146,6 +2488,14 @@ int main()
     TestHarness::run(
         "verrouillage sécurité relais",
         testRelaySafeStateLock);
+
+    TestHarness::run(
+        "driver registres DS3231",
+        testDS3231RegisterDriver);
+
+    TestHarness::run(
+        "interface RTC DS3231",
+        testRTCInterface);
 
     TestHarness::run(
         "éditeur de paramètres",

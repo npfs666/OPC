@@ -9,7 +9,6 @@
  * 
  * MIT license, all text above must be included in any redistribution 
  */
-
 #include <OPC.h>
 #include <SystemWatchdog.h>
 #include <testInstallation.h>
@@ -84,7 +83,7 @@ void setup()
 
     systemWatchdog.printLastResetDiagnostic(Serial);
 
-	attachInterrupt(digitalPinToInterrupt(SPI_DRDY), adcInterrupt, FALLING);
+	attachInterrupt(digitalPinToInterrupt(ADC_DRDY), adcInterrupt, FALLING);
 
     const bool measurementsReady =
         opc.initMeasurements();

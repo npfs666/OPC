@@ -90,6 +90,9 @@ bool Installation::buildMenu(
                 parameter->categoryKey,
                 "calibration") ||
             sameText(
+                parameter->categoryKey,
+                "miscellaneous") ||
+            sameText(
                 parameter->ownerKey,
                 "menu"))
         {
@@ -204,6 +207,18 @@ bool Installation::buildMenu(
         {
             if (!addOwner(
                     calibration,
+                    *parameter,
+                    true))
+            {
+                return false;
+            }
+        }
+        else if (sameText(
+                     parameter->categoryKey,
+                     "miscellaneous"))
+        {
+            if (!addOwner(
+                    miscellaneous,
                     *parameter,
                     true))
             {

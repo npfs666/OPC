@@ -435,6 +435,7 @@ Parameter* ParameterList::create(
     parameter.name = name;
     parameter.type = type;
     parameter.readOnly = readOnly;
+    parameter.persistent = owner.persistent;
 
     parameterCount++;
 

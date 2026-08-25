@@ -129,6 +129,12 @@ bool Storage::save(
         const Parameter* parameter =
             parameters.get(i);
 
+        if (parameter != nullptr &&
+            !parameter->persistent)
+        {
+            continue;
+        }
+
         if (parameter == nullptr ||
             parameter->categoryKey == nullptr ||
             parameter->categoryName == nullptr ||
@@ -543,13 +549,21 @@ bool Storage::readConfiguration(
         if (parameterIndex >= parameters.count())
             continue;
 
+        Parameter* parameter =
+            parameters.get(parameterIndex);
+
+        /* Ignore aussi une ancienne entrée devenue transitoire. */
+        if (parameter != nullptr &&
+            !parameter->persistent)
+        {
+            continue;
+        }
+
         if (seen[parameterIndex])
             return false;
 
         seen[parameterIndex] = true;
 
-        Parameter* parameter =
-            parameters.get(parameterIndex);
         ParameterDraft& draft =
             editor.get(parameterIndex);
 

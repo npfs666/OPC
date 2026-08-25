@@ -45,7 +45,7 @@ SensorBoard::SensorBoard()
 void SensorBoard::init()
 {
     mux.begin();
-    adc.begin(&SPI,SPI_CLK, SPI_MISO, SPI_MOSI, SPI_CS, SPI_DRDY);
+    adc.begin(&SPI,ADC_CLK, ADC_MISO, ADC_MOSI, ADC_CS, ADC_DRDY);
     adc.setOpMode(0);
 }
 
@@ -165,7 +165,7 @@ void SensorBoard::startContinuous()
     discardNextConversion = true;
     adc.startSync();
 
-    gpio_acknowledge_irq(SPI_DRDY, GPIO_IRQ_EDGE_FALL);
+    gpio_acknowledge_irq(ADC_DRDY, GPIO_IRQ_EDGE_FALL);
 
     pauseInterrupts = false;
 }
@@ -193,7 +193,7 @@ void SensorBoard::restart() {
      */
     adc.startSync();
 
-    gpio_acknowledge_irq(SPI_DRDY, GPIO_IRQ_EDGE_FALL);
+    gpio_acknowledge_irq(ADC_DRDY, GPIO_IRQ_EDGE_FALL);
 
     pauseInterrupts = false;
 }
