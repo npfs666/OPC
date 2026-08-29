@@ -45,7 +45,12 @@ SensorBoard::SensorBoard()
 void SensorBoard::init()
 {
     mux.begin();
-    adc.begin(&SPI,ADC_CLK, ADC_MISO, ADC_MOSI, ADC_CS, ADC_DRDY);
+    adc.begin(Board::Rp2040::ADC_SPI,
+                Board::Rp2040::ADC_CLK,
+                Board::Rp2040::ADC_MISO,
+                Board::Rp2040::ADC_MOSI,
+                Board::Rp2040::ADC_CS,
+                Board::Rp2040::ADC_DRDY);
     adc.setOpMode(0);
 }
 
@@ -92,6 +97,25 @@ void SensorBoard::setWiringRoute(RTDSensor::Settings settings)
 
     switch (settings.wiring)
     {
+    case RTDSensor::RTDWiring::TwoWire:
+
+        mux.set2Wire();
+        adc.setGain(8);
+
+        switch (settings.type)
+        {
+
+        case RTDSensor::RTDType::Pt100:
+            adc.setIDACcurrent(CURRENT_1000_UA);
+            mux.setPT100();
+            break;
+
+        case RTDSensor::RTDType::Pt1000:
+            adc.setIDACcurrent(CURRENT_100_UA);
+            mux.setPT1000();
+            break;
+        }
+        break;
 
     case RTDSensor::RTDWiring::ThreeWire:
 
@@ -104,10 +128,12 @@ void SensorBoard::setWiringRoute(RTDSensor::Settings settings)
 
         case RTDSensor::RTDType::Pt100:
             adc.setIDACcurrent(CURRENT_500_UA);
+            mux.setPT100();
             break;
 
         case RTDSensor::RTDType::Pt1000:
             adc.setIDACcurrent(CURRENT_50_UA);
+            mux.setPT1000();
             break;
         }
         break;
@@ -122,10 +148,12 @@ void SensorBoard::setWiringRoute(RTDSensor::Settings settings)
 
         case RTDSensor::RTDType::Pt100:
             adc.setIDACcurrent(CURRENT_1000_UA);
+            mux.setPT100();
             break;
 
         case RTDSensor::RTDType::Pt1000:
             adc.setIDACcurrent(CURRENT_100_UA);
+            mux.setPT1000();
             break;
         }
         break;
@@ -165,9 +193,11 @@ void SensorBoard::startContinuous()
     discardNextConversion = true;
     adc.startSync();
 
-    gpio_acknowledge_irq(ADC_DRDY, GPIO_IRQ_EDGE_FALL);
+    gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
 
     pauseInterrupts = false;
+
+    Serial.println("ok");
 }
 
 
@@ -193,7 +223,7 @@ void SensorBoard::restart() {
      */
     adc.startSync();
 
-    gpio_acknowledge_irq(ADC_DRDY, GPIO_IRQ_EDGE_FALL);
+    gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
 
     pauseInterrupts = false;
 }
@@ -218,7 +248,7 @@ void SensorBoard::adcInterrupt() {
     }
 	
     //rtd[curRTDSensor].add(value);
-    rtd[curRTDSensor]->add(value);
+    rtd[curRTDSensor]->addLP(value);
 
     // Cas particulier de la mesure en 3 fils (current chopping) : 
 	// inversion des sources d'exitation de courant à la moitié de la série, pour supprimer leur inégalité de courant
@@ -289,13 +319,13 @@ double_t SensorBoard::computeResistance(RTDSensor& rtdSensor) {
         correctedValue *
         calibration.refResistanceValue /
         (ADC_FULL_SCALE * gain);
-    
+
     // Compensation de la mesure en fonction de la température
     const double_t ppm =
         (adcTemperature - calibration.calTemperatureADC) *
         calibration.systemPPMCoeff;
 
-    Rrtd = Rrtd * (1 + ppm/1000000.0);
+    //Rrtd = Rrtd * (1 + ppm/1000000.0);
 
     return Rrtd;
 }
@@ -823,11 +853,11 @@ double_t SensorBoard::measurementGain(
 {
     switch (wiring)
     {
+    case RTDSensor::RTDWiring::TwoWire:
     case RTDSensor::RTDWiring::ThreeWire:
     case RTDSensor::RTDWiring::FourWire:
         return 8.0;
-
-    case RTDSensor::RTDWiring::TwoWire:
+        
     default:
         return 1.0;
     }

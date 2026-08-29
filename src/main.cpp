@@ -58,61 +58,91 @@ namespace
     void ISRRotenc()
     {
         opc.handleISRRotenc();
+        Serial.println("AB");
     }
 
     void ISRButton()
     {
         opc.handleISRButton();
+        Serial.println("clic");
     }
 }
 
-
+RTDSensor input1, input2;
 
 /**
  * CPU0 : contrôle de la mesure ADC et de la régulation
  */
 void setup()
 {
-	systemWatchdog.begin();
-
+    delay(3000);
+    
+    opc.initSerial();
 	opc.initSensorBoard();
+    //opc.initDisplay();
+    //opc.initRotenc();
 
-    synchronizeStartup(
-        InterCoreMessage::ControlCoreReady,
-        InterCoreMessage::UiCoreReady);
+	attachInterrupt(digitalPinToInterrupt(Board::Rp2040::ADC_DRDY), adcInterrupt, FALLING);
+    //attachInterrupt(digitalPinToInterrupt(Board::Rp2040::ROTENC_A), ISRRotenc, CHANGE);
+    //attachInterrupt(digitalPinToInterrupt(Board::Rp2040::ROTENC_B), ISRRotenc, CHANGE);
+    //attachInterrupt(digitalPinToInterrupt(Board::Rp2040::ROTENC_CLIC), ISRButton, FALLING);
 
-    systemWatchdog.printLastResetDiagnostic(Serial);
 
-	attachInterrupt(digitalPinToInterrupt(ADC_DRDY), adcInterrupt, FALLING);
+    input1.begin("input1", "Input 1", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 32, 0);
+    input2.begin("input2", "Input 2", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 32, 0);
 
-    const bool measurementsReady =
-        opc.initMeasurements();
+    //opc.input.executeMenuAction(35); //cal 1650.404 ohm at 25.93 C
 
-    if (measurementsReady)
-        rp2040.fifo.push(
-            interCoreMessageValue(
-                InterCoreMessage::ParametersReady));
+    opc.input.addRTD(input1);
+    opc.input.addRTD(input2);
+    opc.input.startContinuous();
+
+    
+    //1650.356 ohm at 24.89 C
 }
 
 
-
+#include <Physics/PT100.h>
 /**
  * CPU0
  */
 void loop()
 {	
-    uint32_t message;
 
-    while (rp2040.fifo.pop_nb(&message))
-        opc.handleControlMessage(
-            static_cast<InterCoreMessage>(message));
+    /*for( int i = 0; i < 3; i++) {
+        opc.input.mux.enableChannel(i);
+        Serial.println(i+1);
+        delay(3000);
+        opc.input.mux.disableChannel(0);
+        opc.input.mux.disableChannel(1);
+        opc.input.mux.disableChannel(2);
+    }*/
 
-    // Mettre en place le calcul des measurement, car ici on est pas dans l'ISR donc on a le temps.
-    opc.newMeasurement();
+    if( !opc.input.newMeasurement)
+        return;
 
-    opc.controlPoll();
+    opc.input.newMeasurement = false;
+    #include <Hardware/RTC.h>
+    RTC::DateTime time;
+    opc.clock.readDateTime(time);
+    char str[50];
+    sprintf(str, "%02d:%02d;%02d", time.hour, time.minute, time.second);
 
-    systemWatchdog.checkInControlCore();
+    Serial.println("-------------------------");
+    Serial.println(str);
+
+    double_t res = opc.input.computeResistance(*opc.input.rtd[0]);
+    double_t temp = PT100::getResistanceToTemperature(res);
+    Serial.print(opc.input.rtd[0]->readValue());Serial.print("  -  ");
+    Serial.print(res,3);Serial.print("  -  ");
+    Serial.println(temp,3);
+
+    res = opc.input.computeResistance(*opc.input.rtd[1]);
+    temp = PT100::getResistanceToTemperature(res); 
+    Serial.print(opc.input.rtd[1]->readValue());Serial.print("  -  ");
+    Serial.print(res,3);Serial.print("  -  ");
+    Serial.println(temp,3);
+ 
 }
 
 
@@ -122,48 +152,15 @@ void loop()
  */
 void setup1()
 {
-	opc.initSerial();
-	opc.initRotenc();
-    attachInterrupt(digitalPinToInterrupt(ROTENC_A), ISRRotenc, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ROTENC_B), ISRRotenc, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ROTENC_CLIC), ISRButton, FALLING);
-	opc.initDisplay();
-	opc.initBME280();
 
-    synchronizeStartup(
-        InterCoreMessage::UiCoreReady,
-        InterCoreMessage::ControlCoreReady);
 }
 
 
-/**
- * ATTENTION ! Avec ce système de refresh timé, il faut que le temps de mesure soit plus court !
- * Système uniquement valable pour des mesures d'essai
- */
-/*uint32_t currentTime, previousTime = 3000, refreshTime = 7000;     // All in ms
- currentTime = millis();
 
-    // Refresh loop, every refreshTime ms
-    if ( (currentTime - previousTime) >= refreshTime) {
-        opc.controller.printCSVPsychro(currentTime);
-
-        opc.input.restart(); // Once UI update is done we can restart conversions.
-        
-        previousTime = currentTime;  // Remember the time
-    }
-*/
 /**
  * Cpu1
  */
 void loop1()
 {
-    uint32_t message;
 
-    while (rp2040.fifo.pop_nb(&message))
-        opc.handleUIMessage(
-            static_cast<InterCoreMessage>(message));
-
-    opc.uiPoll();
-
-    systemWatchdog.checkInUiCore();
 }

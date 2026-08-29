@@ -24,10 +24,10 @@ public:
     struct Settings
     {
         CalibrationProfile pt100 = {
-            1649.819,
+            1650.404,
             7.5,
-            100.056,
-            22.12
+            100.061,
+            26.0
         };
 
         CalibrationProfile pt1000 = {

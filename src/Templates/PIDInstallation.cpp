@@ -163,7 +163,7 @@ bool PIDInstallation::begin(
     controlRelay.begin(
         "pid_tune_relay",
         "Relais PID",
-        RELAIS_1,
+        Board::Rp2040::OUTPUT_1,
         true,
         false);
 

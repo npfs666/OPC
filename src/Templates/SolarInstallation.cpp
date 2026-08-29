@@ -219,7 +219,7 @@ bool SolarInstallation::begin(
     pumpRelay.begin(
         "solar_pump_relay",
         "Relais pompe",
-        RELAIS_1,
+        Board::Rp2040::OUTPUT_1,
         true,
         false);
 

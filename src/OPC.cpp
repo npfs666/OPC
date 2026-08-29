@@ -71,12 +71,12 @@ namespace
 }
 
 OPC::OPC(Installation& installation)
-    : tft(&SPI1, LCD_CS, LCD_DC, -1),
+    : tft(Board::Rp2040::LCD_SPI, Board::Rp2040::LCD_CS, Board::Rp2040::LCD_DC, -1),
       userInstall(installation)
 {
     mutex_init(&processDataMutex);
-    pinMode(LCD_RESET, OUTPUT);
-    digitalWrite(LCD_RESET, 1);
+    //pinMode(LCD_RESET, OUTPUT);
+    //digitalWrite(LCD_RESET, 1);
 
 }
 
@@ -85,21 +85,18 @@ OPC::OPC(Installation& installation)
 void OPC::initSerial()
 {
     Serial.begin(115200);
-
-    delay(1000);
-
-    Serial.println("Open Process Controller v0.3");
+    Serial.println("Open Process Controller v0.2");
 }
 
 
 
 void OPC::initDisplay()
 {
-    SPI1.setSCK(LCD_SCK);
-    SPI1.setTX(LCD_MOSI);
+    SPI1.setSCK(Board::Rp2040::LCD_SCK);
+    SPI1.setTX(Board::Rp2040::LCD_MOSI);
 
-    tft.init(135, 240);
-    tft.setRotation(3);
+    tft.init(240, 240);
+    tft.setRotation(1);
     tft.setSPISpeed(48000000);
     tft.setTextWrap(false);
     tft.cp437(true);
@@ -108,11 +105,11 @@ void OPC::initDisplay()
 
 void OPC::initBME280()
 {
-    Wire.setSDA(BME_SDA);
-    Wire.setSCL(BME_SCL);
+    Wire1.setSDA(Board::Rp2040::I2C_SDA);
+    Wire1.setSCL(Board::Rp2040::I2C_SCL);
 
     bmeInitialized =
-        bme.begin(0x76, &Wire);
+        bme.begin(0x76, &Wire1);
 
     if (!bmeInitialized)
     {
@@ -133,10 +130,15 @@ void OPC::initSensorBoard()
 {
     // Set pin DC_DC_PWM HIGH to switch the pico DC-DC converter to PWM (improved ripple)
 	// Improves a lot measurement stability
-    pinMode(DC_DC_PWM,OUTPUT);
-    digitalWrite(DC_DC_PWM,HIGH);
+    pinMode(Board::Rp2040::DC_DC_PWM,OUTPUT);
+    digitalWrite(Board::Rp2040::DC_DC_PWM,HIGH);
 
     input.init();
+
+    //Wire1.setSDA(Board::Rp2040::I2C_SDA);
+    //Wire1.setSCL(Board::Rp2040::I2C_SCL);
+    clock.begin(Board::Rp2040::I2C_SDA, Board::Rp2040::I2C_SCL, Wire1);
+    
 }
 
 

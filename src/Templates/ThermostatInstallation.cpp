@@ -269,7 +269,7 @@ bool ThermostatInstallation::begin(
     relayOutput.begin(
         "thermostat_relay",
         "Output 1",
-        RELAIS_1,
+        Board::Rp2040::OUTPUT_1,
         true,
         false);
 

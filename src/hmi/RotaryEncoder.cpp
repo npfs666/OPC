@@ -22,9 +22,9 @@ namespace
 
 void RotaryEncoder::begin()
 {
-    pinMode(ROTENC_A, INPUT_PULLUP);
-    pinMode(ROTENC_B, INPUT_PULLUP);
-    pinMode(ROTENC_CLIC, INPUT_PULLUP);
+    pinMode(Board::Rp2040::ROTENC_A, INPUT);
+    pinMode(Board::Rp2040::ROTENC_B, INPUT);
+    pinMode(Board::Rp2040::ROTENC_CLIC, INPUT);
 
     previousState = readState();
     transitionAccumulator = 0;
@@ -95,10 +95,10 @@ int32_t RotaryEncoder::takeRotation()
 uint8_t RotaryEncoder::readState() const
 {
     const uint8_t stateA =
-        digitalRead(ROTENC_A) ? 1 : 0;
+        digitalRead(Board::Rp2040::ROTENC_A) ? 1 : 0;
 
     const uint8_t stateB =
-        digitalRead(ROTENC_B) ? 1 : 0;
+        digitalRead(Board::Rp2040::ROTENC_B) ? 1 : 0;
 
     return static_cast<uint8_t>(
         (stateA << 1) | stateB);

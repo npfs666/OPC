@@ -44,7 +44,7 @@ bool RTC::begin(TwoWire& wire)
 {
     initialized = false;
 
-    if (!device.begin(wire) ||
+    if (!device.begin(wire, Board::DS3231::ADDRESS) ||
         !device.updateRegister(
             DS3231::Register::Control,
             CONTROL_EOSC |

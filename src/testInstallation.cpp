@@ -204,7 +204,7 @@ bool TestInstallation::begin(
     relayHeater.begin(
         "relay_heater",
         "Relais chauffage",
-        RELAIS_1,
+        Board::Rp2040::OUTPUT_1,
         true,
         false);
 

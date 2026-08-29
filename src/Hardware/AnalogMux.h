@@ -2,6 +2,7 @@
 #define ANALOGMUX_H
 
 #include <cstdint>
+#include <Adafruit_MCP23X17.h>
 
 /**
  * This class includes all the multiplexers.
@@ -16,11 +17,19 @@ public:
     void enableChannel(uint8_t channel);
     void disableChannel(uint8_t channel);
 
+    void resetMeasurementMode();
+    void resetMeasurementType();
+
+    void set2Wire();
     void set3Wire();
     void set4Wire();
+    void setTC();
+
+    void setPT100();
+    void setPT1000();
 
 private:
-    //void selectChannel(uint8_t channel);
+    Adafruit_MCP23X17 mcp;
 };
 
  #endif

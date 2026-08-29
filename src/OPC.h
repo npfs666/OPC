@@ -5,6 +5,7 @@
 
 #include <InterCoreMessages.h>
 #include "Hardware/SensorBoard.h"
+#include <Hardware/RTC.h>
 #include <ProcessControl.h>
 
 #include <Adafruit_ST7789.h>
@@ -71,6 +72,8 @@ public:
     Adafruit_BME280 bme;
 
     ProcessControl controller;
+
+    RTC clock;
 
 private:
     static constexpr size_t SERIAL_PRINT_BUFFER_SIZE =

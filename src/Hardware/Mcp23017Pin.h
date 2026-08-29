@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-enum class Mcp23017Pin : uint8_t
+enum Mcp23017Pin : uint8_t
 {
     GPA0 = 0,
     GPA1 = 1,

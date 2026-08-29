@@ -9,11 +9,11 @@ namespace
 {
     constexpr ParameterOption RELAY_PIN_OPTIONS[] = {
         {
-            RELAIS_1,
+            Board::Rp2040::OUTPUT_1,
             "Relais 1"
         },
         {
-            RELAIS_2,
+            Board::Rp2040::OUTPUT_2,
             "Relais 2"
         }
     };
