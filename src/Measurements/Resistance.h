@@ -4,7 +4,7 @@
 #include <Measurements/Measurement.h>
 
 class SensorBoard;
-class RTDSensor;
+class Sensor;
 
 /**
  * @brief Représente une mesure de résistance (Ohms).
@@ -23,20 +23,20 @@ public:
 
     void begin(const char* name,
                SensorBoard& board,
-               RTDSensor& sensor);
+               Sensor& sensor);
 
     void update() override;
 
-    RTDSensor& getSensor();
+    Sensor& getSensor();
 
-    const RTDSensor& getSensor() const;
+    const Sensor& getSensor() const;
 
     uint8_t printDecimals() const override;
 
 private:
 
     SensorBoard* board = nullptr;
-    RTDSensor*   sensor = nullptr;
+    Sensor*   sensor = nullptr;
 };
 
 #endif

@@ -1,6 +1,6 @@
 #include <Measurements/Temperature/TemperatureRTD.h>
 #include <Measurements/Resistance.h>
-#include <Hardware/RTDSensor.h>
+#include <Hardware/Sensor.h>
 
 #include <Physics/PT100.h>
 #include <cmath>
@@ -31,12 +31,12 @@ void TemperatureRTD::update()
 
     switch(resistance->getSensor().settings.type)
     {
-        case RTDSensor::RTDType::Pt100:
+        case Sensor::Type::Pt100:
             temperature = PT100::getResistanceToTemperature(
                 resistance->getValue());
             break;
 
-        /*case RTDSensor::RTDType::Pt1000:
+        /*case Sensor::Type::Pt1000:
             temperature = PT1000::resistanceToTemperature(
                 m_resistance.value());
             break;*/

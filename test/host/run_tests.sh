@@ -25,12 +25,15 @@ fi
     -Wall \
     -Wextra \
     -DOPC_HOST_TEST \
+    -DOPC_BOARD_REV=2 \
     -I"${project_dir}/test/host/fakes" \
     -I"${project_dir}/test/host" \
     -I"${project_dir}/src" \
     "${project_dir}/test/host/test_main.cpp" \
+    "${project_dir}/test/host/test_thermocouple.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
+    "${project_dir}/src/Hardware/Sensor.cpp" \
     "${project_dir}/src/Installation.cpp" \
     "${project_dir}/src/hmi/Displayable.cpp" \
     "${project_dir}/src/hmi/MenuBuilder.cpp" \
@@ -41,10 +44,12 @@ fi
     "${project_dir}/src/ProcessSnapshot.cpp" \
     "${project_dir}/src/Measurements/Pressure/PressureBME.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureBME.cpp" \
+    "${project_dir}/src/Measurements/Temperature/TemperatureTC.cpp" \
     "${project_dir}/src/Outputs/Actuator.cpp" \
     "${project_dir}/src/Outputs/Output.cpp" \
     "${project_dir}/src/Outputs/RelayOutput.cpp" \
     "${project_dir}/src/Physics/PT100.cpp" \
+    "${project_dir}/src/Physics/Thermocouple.cpp" \
     "${project_dir}/src/Physics/Psychrometrics.cpp" \
     "${project_dir}/src/ProcessControl.cpp" \
     "${project_dir}/src/Regulator/PID.cpp" \

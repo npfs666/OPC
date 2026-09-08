@@ -1,32 +1,32 @@
-#include <Hardware/RTDSensor.h>
+#include <Hardware/Sensor.h>
 
 #include <Hardware/pinout.h>
 #include <hmi/ParameterList.h>
 
 namespace
 {
-    constexpr ParameterOption RTD_TYPE_OPTIONS[] = {
+    constexpr ParameterOption TYPE_OPTIONS[] = {
         {
             static_cast<int32_t>(
-                RTDSensor::RTDType::Pt100),
+                Sensor::Type::Pt100),
             "PT100"
         }
     };
 
-    constexpr ParameterOption RTD_WIRING_OPTIONS[] = {
+    constexpr ParameterOption WIRING_OPTIONS[] = {
         {
             static_cast<int32_t>(
-                RTDSensor::RTDWiring::ThreeWire),
+                Sensor::Wiring::ThreeWire),
             "3 fils"
         },
         {
             static_cast<int32_t>(
-                RTDSensor::RTDWiring::FourWire),
+                Sensor::Wiring::FourWire),
             "4 fils"
         }
     };
 
-    constexpr ParameterOption RTD_SAMPLE_OPTIONS[] = {
+    constexpr ParameterOption SAMPLE_OPTIONS[] = {
         {2, "2"},
         {4, "4"},
         {8, "8"},
@@ -38,11 +38,11 @@ namespace
 }
 
 
-RTDSensor::RTDSensor() {
+Sensor::Sensor() {
 
 }
 
-RTDSensor::RTDSensor(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
+Sensor::Sensor(const char* name, Type type, Wiring wiring, uint16_t samples, float_t offset)
 {
     begin(
         name,
@@ -53,11 +53,11 @@ RTDSensor::RTDSensor(const char* name, RTDType type, RTDWiring wiring, uint16_t 
         offset);
 }
 
-RTDSensor::RTDSensor(
+Sensor::Sensor(
     const char* key,
     const char* name,
-    RTDType type,
-    RTDWiring wiring,
+    Type type,
+    Wiring wiring,
     uint16_t samples,
     float_t offset)
 {
@@ -79,7 +79,7 @@ RTDSensor::RTDSensor(
  * @param samples 4 samples -> 1bit improve, 16 -> 2bits, 64 -> 3bits, 256 -> 4bits (oversampling)
  * @param offset Sensor offset
  */
-void RTDSensor::begin(const char* name, RTDType type, RTDWiring wiring, uint16_t samples, float_t offset)
+void Sensor::begin(const char* name, Type type, Wiring wiring, uint16_t samples, float_t offset)
 {
     begin(
         name,
@@ -90,11 +90,11 @@ void RTDSensor::begin(const char* name, RTDType type, RTDWiring wiring, uint16_t
         offset);
 }
 
-void RTDSensor::begin(
+void Sensor::begin(
     const char* key,
     const char* name,
-    RTDType type,
-    RTDWiring wiring,
+    Type type,
+    Wiring wiring,
     uint16_t samples,
     float_t offset)
 {
@@ -107,8 +107,9 @@ void RTDSensor::begin(
     reset();
 }
 
-void RTDSensor::add(int32_t value)
+void Sensor::add(int32_t value)
 {
+    saturated |= value <= -32768 || value >= 32767;
     sum += value;
     sampleCount++;
 }
@@ -117,8 +118,9 @@ void RTDSensor::add(int32_t value)
  * 
  * @param value Last adc read value
  */
-void RTDSensor::addLP(int32_t value)
+void Sensor::addLP(int32_t value)
 {
+    saturated |= value <= -32768 || value >= 32767;
     if( nMinusOneValue == 0 ) 
         nMinusOneValue = value;
     else
@@ -127,26 +129,29 @@ void RTDSensor::addLP(int32_t value)
     sum += nMinusOneValue;
     sampleCount++;
 }
-void RTDSensor::reset()
+void Sensor::reset()
 {
+    avgValue = NAN;
+    saturated = false;
     sum = 0.0;
     sampleCount = 0.0;
     nMinusOneValue = 0.0;
 }
-void RTDSensor::compute()
+void Sensor::compute()
 {
-    avgValue = (double_t)sum / settings.samples;
-    // Serial.print(sum);Serial.print("  |  ");Serial.print(settings.samples);Serial.print("  |  ");Serial.println(sampleCount);
+    const double_t result = sampleCount > 0 && !saturated
+        ? sum / sampleCount : NAN;
     reset();
+    avgValue = result;
 }
-double_t RTDSensor::readValue() const
+double_t Sensor::readValue() const
 {
     return avgValue;
 }
 
-bool RTDSensor::isAccumulationHalfWay()
+bool Sensor::isAccumulationHalfWay()
 {
-    if (settings.wiring != RTDWiring::ThreeWire)
+    if (settings.type == Type::Tc || settings.wiring != Wiring::ThreeWire)
         return false;
 
     if (sampleCount == (settings.samples / 2))
@@ -155,7 +160,7 @@ bool RTDSensor::isAccumulationHalfWay()
         return false;
 }
 
-bool RTDSensor::isAccumulationDone()
+bool Sensor::isAccumulationDone()
 {
     if (sampleCount == settings.samples)
         return true;
@@ -163,7 +168,7 @@ bool RTDSensor::isAccumulationDone()
         return false;
 }
 
-void RTDSensor::registerParameters(ParameterList& list)
+void Sensor::registerParameters(ParameterList& list)
 {
     auto parameters = list.forOwner({
         "inputs",
@@ -172,20 +177,35 @@ void RTDSensor::registerParameters(ParameterList& list)
         ownerName
     });
 
-    parameters.addSelection(
-        "rtd.type",
-        "Type",
-        settings.type,
-        RTD_TYPE_OPTIONS);
+    if (settings.type == Type::Tc)
+    {
+        using Type = Physics::Thermocouple::Type;
+        static constexpr ParameterOption types[] = {
+            {int32_t(Type::B), "B"}, {int32_t(Type::E), "E"},
+            {int32_t(Type::J), "J"}, {int32_t(Type::K), "K"},
+            {int32_t(Type::N), "N"}, {int32_t(Type::R), "R"},
+            {int32_t(Type::S), "S"}, {int32_t(Type::T), "T"}
+        };
+        parameters.addSelection("tc.type", "Thermocouple", settings.thermocoupleType, types);
+    }
+    else
+    {
+        parameters.addSelection(
+            "sensor.type",
+            "Type",
+            settings.type,
+            TYPE_OPTIONS);
 
-    parameters.addSelection(
-        "rtd.wiring",
-        "Câblage",
-        settings.wiring,
-        RTD_WIRING_OPTIONS);
+        parameters.addSelection(
+            "sensor.wiring",
+            "Câblage",
+            settings.wiring,
+            WIRING_OPTIONS);
+
+    }
 
     parameters.addDouble(
-        "rtd.offset",
+        "sensor.offset",
         "Offset",
         settings.offset,
         -5,
@@ -195,8 +215,8 @@ void RTDSensor::registerParameters(ParameterList& list)
         "°C");
 
     parameters.addSelection(
-        "rtd.samples",
+        "sensor.samples",
         "Samples",
         settings.samples,
-        RTD_SAMPLE_OPTIONS);
+        SAMPLE_OPTIONS);
 }

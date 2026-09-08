@@ -35,8 +35,6 @@ void AnalogMux::begin()
 
     resetMeasurementMode();
     resetMeasurementType();
-
-    enableChannel(1);
 }
 
 void AnalogMux::enableChannel(uint8_t channel)

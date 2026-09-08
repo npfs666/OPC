@@ -22,13 +22,13 @@ namespace
 
     constexpr int16_t BORDER_SIZE = 2;
     constexpr int16_t LABEL_X = 10;
-    constexpr int16_t VALUE_X = 108;
-    constexpr int16_t VALUE_HEIGHT = 20;
+    constexpr int16_t VALUE_X = 98;
+    constexpr int16_t VALUE_HEIGHT = 30;
 
-    constexpr int16_t COLLECTOR_Y = 12;
-    constexpr int16_t TANK_TOP_Y = 41;
-    constexpr int16_t TANK_BOTTOM_Y = 70;
-    constexpr int16_t PUMP_Y = 103;
+    constexpr int16_t COLLECTOR_Y = 28;
+    constexpr int16_t TANK_TOP_Y = 80;
+    constexpr int16_t TANK_BOTTOM_Y = 132;
+    constexpr int16_t PUMP_Y = 188;
 
     void printTemperature(
         Adafruit_GFX& display,
@@ -44,6 +44,7 @@ namespace
             VALUE_HEIGHT,
             COLOR_BLACK);
 
+        display.setTextSize(3);
         display.setCursor(VALUE_X, y);
         display.setTextColor(
             COLOR_ORANGE,
@@ -92,13 +93,14 @@ namespace
                 ? "POMPE : ON"
                 : "POMPE : OFF";
 
-        constexpr int16_t CHARACTER_WIDTH = 12;
+        constexpr int16_t CHARACTER_WIDTH = 18;
 
         const int16_t textWidth =
             static_cast<int16_t>(
                 std::strlen(text) *
                 CHARACTER_WIDTH);
 
+        display.setTextSize(3);
         display.setCursor(
             (display.width() - textWidth) / 2,
             PUMP_Y);
@@ -125,38 +127,38 @@ const char* SolarInstallation::configurationKey() const
 
 bool SolarInstallation::begin(
     SensorBoard& board,
-    Adafruit_BME280& bme,
+    Adafruit_BMP5xx& bmp580,
     ProcessControl& process)
 {
-    (void)bme;
+    (void)bmp580;
 
     collectorInput.begin(
         "solar_collector_input",
         "Capteur solaire",
-        RTDSensor::RTDType::Pt100,
-        RTDSensor::RTDWiring::FourWire,
+        Sensor::Type::Pt100,
+        Sensor::Wiring::FourWire,
         16,
         0.0f);
 
     tankTopInput.begin(
         "tank_top_input",
         "Haut ballon",
-        RTDSensor::RTDType::Pt100,
-        RTDSensor::RTDWiring::FourWire,
+        Sensor::Type::Pt100,
+        Sensor::Wiring::FourWire,
         16,
         0.0f);
 
     tankBottomInput.begin(
         "tank_bottom_input",
         "Bas ballon",
-        RTDSensor::RTDType::Pt100,
-        RTDSensor::RTDWiring::ThreeWire,
+        Sensor::Type::Pt100,
+        Sensor::Wiring::ThreeWire,
         16,
         0.0f);
 
-    if (!board.addRTD(collectorInput) ||
-        !board.addRTD(tankTopInput) ||
-        !board.addRTD(tankBottomInput))
+    if (!board.addSensor(collectorInput) ||
+        !board.addSensor(tankTopInput) ||
+        !board.addSensor(tankBottomInput))
     {
         return false;
     }

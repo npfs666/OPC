@@ -28,10 +28,10 @@ namespace
 SensorBoard::SensorBoard()
 {
     beginConfiguration("sensor_board");
-    numRTDSensors = 0;
+    numSensors = 0;
     newMeasurement = false;
     pauseInterrupts = true;
-    adcTemperature = 0.0;
+    adcTemperature = NAN;
 
     for (uint8_t i = 0; i < MAX_RTD; i++)
         rtd[i] = nullptr;
@@ -57,13 +57,14 @@ void SensorBoard::init()
 
 
 
-bool SensorBoard::addRTD(RTDSensor& sensor) {
+bool SensorBoard::addSensor(Sensor& sensor) {
 
-    if (numRTDSensors >= MAX_RTD)
+    if (sensor.board != nullptr || numSensors >= MAX_RTD)
         return false;
 
-    rtd[numRTDSensors] = &sensor;
-    numRTDSensors++;
+    sensor.board = this;
+    rtd[numSensors] = &sensor;
+    numSensors++;
 
     return true;
 }
@@ -73,7 +74,7 @@ bool SensorBoard::addRTD(RTDSensor& sensor) {
 /**
  * Common config for every RTD
  */
-void SensorBoard::setStandartRTD() {
+void SensorBoard::setStandardRTD() {
 
     adc.setConversionMode(CONVERSION_SINGLE_SHOT);
     adc.setMultiplexer(MUX_AINP_AIN0_AINN_AIN1);
@@ -81,44 +82,63 @@ void SensorBoard::setStandartRTD() {
     adc.setIDAC1routing(IDAC_AIN3_REFN1);
     adc.setIDAC2routing(IDAC_DISABLED);
     adc.setFIR(FIR_50HZ); 
-    adc.setDataRate(DATARATE_20_SPS);               // No 50/60Hz filtering above 20 SPS
+    adc.setDataRate(DATARATE_20_SPS);   // No 50/60Hz filtering above 20 SPS
 }
 
+void SensorBoard::setStandardTC() {
+
+    adc.setConversionMode(CONVERSION_SINGLE_SHOT);
+    adc.setMultiplexer(MUX_AINP_AIN0_AINN_AIN1);
+    adc.setVoltageRef(VREF_INTERNAL_2048_MV);
+    adc.setIDAC1routing(IDAC_DISABLED);
+    adc.setIDAC2routing(IDAC_DISABLED);
+    adc.setIDACcurrent(CURRENT_0_UA);
+    adc.setFIR(FIR_50HZ); 
+    adc.setDataRate(DATARATE_20_SPS);   // No 50/60Hz filtering above 20 SPS
+}
 
 
 /**
  * Sets up the ADC and multiplexer according each RTD settings
  */
-void SensorBoard::setWiringRoute(RTDSensor::Settings settings)
+void SensorBoard::setWiringRoute(Sensor::Settings settings)
 {
-    setStandartRTD();
-
-    mux.enableChannel(curRTDSensor);
+    if (settings.type == Sensor::Type::Tc)
+        settings.wiring = Sensor::Wiring::TwoWire;
 
     switch (settings.wiring)
     {
-    case RTDSensor::RTDWiring::TwoWire:
+    case Sensor::Wiring::TwoWire:
 
         mux.set2Wire();
-        adc.setGain(8);
-
+        
         switch (settings.type)
         {
 
-        case RTDSensor::RTDType::Pt100:
+        case Sensor::Type::Pt100:
+            adc.setGain(8);
+            setStandardRTD();
             adc.setIDACcurrent(CURRENT_1000_UA);
             mux.setPT100();
             break;
 
-        case RTDSensor::RTDType::Pt1000:
+        case Sensor::Type::Pt1000:
+            adc.setGain(8);
+            setStandardRTD();
             adc.setIDACcurrent(CURRENT_100_UA);
             mux.setPT1000();
             break;
+
+        case Sensor::Type::Tc:
+            adc.setGain(thermocoupleGain(settings.thermocoupleType));
+            setStandardTC();
+            mux.setTC();
         }
         break;
 
-    case RTDSensor::RTDWiring::ThreeWire:
+    case Sensor::Wiring::ThreeWire:
 
+        setStandardRTD();
         mux.set3Wire();
         adc.setIDAC2routing(IDAC_AIN2);
         adc.setGain(16);
@@ -126,32 +146,33 @@ void SensorBoard::setWiringRoute(RTDSensor::Settings settings)
         switch (settings.type)
         {
 
-        case RTDSensor::RTDType::Pt100:
+        case Sensor::Type::Pt100:
             adc.setIDACcurrent(CURRENT_500_UA);
             mux.setPT100();
             break;
 
-        case RTDSensor::RTDType::Pt1000:
+        case Sensor::Type::Pt1000:
             adc.setIDACcurrent(CURRENT_50_UA);
             mux.setPT1000();
             break;
         }
         break;
 
-    case RTDSensor::RTDWiring::FourWire:
+    case Sensor::Wiring::FourWire:
 
+        setStandardRTD();
         mux.set4Wire();
         adc.setGain(8);
 
         switch (settings.type)
         {
 
-        case RTDSensor::RTDType::Pt100:
+        case Sensor::Type::Pt100:
             adc.setIDACcurrent(CURRENT_1000_UA);
             mux.setPT100();
             break;
 
-        case RTDSensor::RTDType::Pt1000:
+        case Sensor::Type::Pt1000:
             adc.setIDACcurrent(CURRENT_100_UA);
             mux.setPT1000();
             break;
@@ -160,6 +181,8 @@ void SensorBoard::setWiringRoute(RTDSensor::Settings settings)
     default:
         break;
     }
+
+    mux.enableChannel(curSensor);
 }
 
 
@@ -179,15 +202,15 @@ void SensorBoard::invert3WireIDAC()
 // Starts continuous conversion of the ADC
 void SensorBoard::startContinuous()
 {
-    if (numRTDSensors == 0 || rtd[0] == nullptr) 
+    if (numSensors == 0 || rtd[0] == nullptr) 
         return;
 
     pauseInterrupts = true;
 
     // Init first read
-    curRTDSensor = 0;
+    curSensor = 0;
 
-    setWiringRoute(rtd[curRTDSensor]->settings);
+    setWiringRoute(rtd[curSensor]->settings);
 
     adc.setConversionMode(CONVERSION_CONTINUOUS);
     discardNextConversion = true;
@@ -247,12 +270,12 @@ void SensorBoard::adcInterrupt() {
         return;
     }
 	
-    //rtd[curRTDSensor].add(value);
-    rtd[curRTDSensor]->addLP(value);
+    //rtd[curSensor].add(value);
+    rtd[curSensor]->addLP(value);
 
     // Cas particulier de la mesure en 3 fils (current chopping) : 
 	// inversion des sources d'exitation de courant à la moitié de la série, pour supprimer leur inégalité de courant
-	if ( rtd[curRTDSensor]->isAccumulationHalfWay() )
+	if ( rtd[curSensor]->isAccumulationHalfWay() )
 	{
         pause();
 		invert3WireIDAC();
@@ -260,26 +283,28 @@ void SensorBoard::adcInterrupt() {
 	}
 
     // If all samples of one RTD are measured, compute the result
-    if ( rtd[curRTDSensor]->isAccumulationDone() )
+    if ( rtd[curSensor]->isAccumulationDone() )
 	{
         pause();
 
 		//temperatureADC = board.ads1120.readInternalTemp();	// T°C interne de l'ADC
 
-		rtd[curRTDSensor]->compute();
+		rtd[curSensor]->compute();
 
-        mux.disableChannel(curRTDSensor);
-		curRTDSensor++;
-        //Serial.print(curRTDSensor);Serial.print("  |  ");Serial.print(numRTDSensors);
+        mux.disableChannel(curSensor);
+		curSensor++;
+        //Serial.print(curSensor);Serial.print("  |  ");Serial.print(numSensors);
         // If all inputs RTDs are finished, we flag newMeasurement available
-        if( curRTDSensor == numRTDSensors ) {
-            curRTDSensor = 0;
-			newMeasurement = true;
+        if( curSensor == numSensors ) {
+            curSensor = 0;
+
             //return; // when all measurement are done, we pause and wait for UI update to restart them.
-            adcTemperature = adc.readInternalTemp();
+            if (!adc.readInternalTemp(adcTemperature, 250))
+                adcTemperature = NAN;
+            newMeasurement = true;
         }
 
-        setWiringRoute(rtd[curRTDSensor]->settings);
+        setWiringRoute(rtd[curSensor]->settings);
 
         // relance de la conversion continue
 		restart();
@@ -291,6 +316,10 @@ void SensorBoard::adcInterrupt() {
 }
 
 
+double_t SensorBoard::getAdcTemperature() {
+
+    return adcTemperature;
+}
 
 /**
  * Conversion from an ADC value to a resistance
@@ -299,7 +328,7 @@ void SensorBoard::adcInterrupt() {
  * 
  * @return double_t Résistance en Ohms
  */
-double_t SensorBoard::computeResistance(RTDSensor& rtdSensor) {
+double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
     const uint8_t channel = channelFor(rtdSensor);
 
     if (channel >= MAX_RTD)
@@ -330,30 +359,62 @@ double_t SensorBoard::computeResistance(RTDSensor& rtdSensor) {
     return Rrtd;
 }
 
+uint8_t SensorBoard::thermocoupleGain(Physics::Thermocouple::Type type)
+{
+    using Type = Physics::Thermocouple::Type;
+    return type == Type::E || type == Type::J ? 16 : 32;
+}
+
+double_t SensorBoard::computeVoltage(const Sensor& sensor) const
+{
+    if (sensor.getBoard() != this || sensor.settings.type != Sensor::Type::Tc)
+        return NAN;
+    // Référence interne 2,048 V ; tension différentielle en mV.
+    return sensor.readValue() * 2048.0 /
+        (32768.0 * thermocoupleGain(sensor.settings.thermocoupleType));
+}
+
+double_t SensorBoard::getColdJunctionTemperature() const
+{
+    return adcTemperature + settings.coldJunctionOffset;
+}
+
 void SensorBoard::registerParameters(ParameterList& list)
 {
-    for (size_t i = 0; i < numRTDSensors; i++)
+    for (size_t i = 0; i < numSensors; i++)
     {
         rtd[i]->registerParameters(list);
     }
+
+    auto parameters = list.forOwner({
+        "calibration", "Calibration", "sensor_board.thermocouple_calibration", "Thermocouples"
+    });
+    parameters.addDouble("cold_junction_offset", "C.J. offset",
+        settings.coldJunctionOffset, -10, 10, 0.01, 2, "°C");
+
+    auto readings = list.forOwner({
+        "calibration", "Calibration", "sensor_board.thermocouple_calibration", "Thermocouples", false
+    });
+    readings.addDouble("adc_temperature", "Temp. ADC",
+        adcTemperature, "°C", true, 2);
 
     registerZeroCalibrationParameters(list);
 
     registerCalibrationParameters(
         list,
-        RTDSensor::RTDType::Pt100);
+        Sensor::Type::Pt100);
 
     registerCalibrationParameters(
         list,
-        RTDSensor::RTDType::Pt1000);
+        Sensor::Type::Pt1000);
 }
 
 void SensorBoard::registerCalibrationParameters(
     ParameterList& list,
-    RTDSensor::RTDType type)
+    Sensor::Type type)
 {
     const bool isPt1000 =
-        type == RTDSensor::RTDType::Pt1000;
+        type == Sensor::Type::Pt1000;
 
     CalibrationProfile& calibration =
         calibrationFor(type);
@@ -546,13 +607,13 @@ bool SensorBoard::executeMenuAction(
     else if (actionId == CALIBRATE_PT100_REFERENCE)
     {
         success = calibrateReference(
-            RTDSensor::RTDType::Pt100,
+            Sensor::Type::Pt100,
             CALIBRATION_CHANNEL);
     }
     else if (actionId == CALIBRATE_PT1000_REFERENCE)
     {
         success = calibrateReference(
-            RTDSensor::RTDType::Pt1000,
+            Sensor::Type::Pt1000,
             CALIBRATION_CHANNEL);
     }
     else if (actionId == RESET_ZERO_OFFSETS)
@@ -589,29 +650,29 @@ void SensorBoard::onMenuActionSaveFailed(
 
 SensorBoard::CalibrationProfile&
 SensorBoard::calibrationFor(
-    RTDSensor::RTDType type)
+    Sensor::Type type)
 {
     return
-        type == RTDSensor::RTDType::Pt1000
+        type == Sensor::Type::Pt1000
             ? settings.pt1000
             : settings.pt100;
 }
 
 const SensorBoard::CalibrationProfile&
 SensorBoard::calibrationFor(
-    RTDSensor::RTDType type) const
+    Sensor::Type type) const
 {
     return
-        type == RTDSensor::RTDType::Pt1000
+        type == Sensor::Type::Pt1000
             ? settings.pt1000
             : settings.pt100;
 }
 
 uint8_t SensorBoard::channelFor(
-    const RTDSensor& sensor) const
+    const Sensor& sensor) const
 {
     for (uint8_t channel = 0;
-         channel < numRTDSensors;
+         channel < numSensors;
          channel++)
     {
         if (rtd[channel] == &sensor)
@@ -626,7 +687,7 @@ bool SensorBoard::calibrateZero(uint8_t channel)
     CalibrationSamples samples;
 
     if (!readCalibrationSamples(
-            RTDSensor::RTDType::Pt100,
+            Sensor::Type::Pt100,
             channel,
             samples))
     {
@@ -666,7 +727,7 @@ bool SensorBoard::resetZeroOffsets()
 }
 
 bool SensorBoard::calibrateReference(
-    RTDSensor::RTDType type,
+    Sensor::Type type,
     uint8_t channel)
 {
     CalibrationSamples samples;
@@ -698,7 +759,7 @@ bool SensorBoard::calibrateReference(
         calibration.calResistanceValue *
         ADC_FULL_SCALE *
         measurementGain(
-            RTDSensor::RTDWiring::FourWire) /
+            Sensor::Wiring::FourWire) /
         correctedValue;
 
     const double_t nominalReference =
@@ -746,7 +807,7 @@ bool SensorBoard::calibrateReference(
 }
 
 bool SensorBoard::readCalibrationSamples(
-    RTDSensor::RTDType type,
+    Sensor::Type type,
     uint8_t channel,
     CalibrationSamples& samples)
 {
@@ -754,11 +815,11 @@ bool SensorBoard::readCalibrationSamples(
         return false;
 
     resetAcquisition();
-    curRTDSensor = channel;
+    curSensor = channel;
 
-    RTDSensor::Settings calibrationSettings{
+    Sensor::Settings calibrationSettings{
         type,
-        RTDSensor::RTDWiring::FourWire,
+        Sensor::Wiring::FourWire,
         0.0,
         CALIBRATION_SAMPLES
     };
@@ -840,22 +901,22 @@ void SensorBoard::stopCalibrationHardware(
 }
 
 double_t SensorBoard::nominalReferenceResistance(
-    RTDSensor::RTDType type)
+    Sensor::Type type)
 {
     return
-        type == RTDSensor::RTDType::Pt1000
+        type == Sensor::Type::Pt1000
             ? 16500.0
             : 1650.0;
 }
 
 double_t SensorBoard::measurementGain(
-    RTDSensor::RTDWiring wiring)
+    Sensor::Wiring wiring)
 {
     switch (wiring)
     {
-    case RTDSensor::RTDWiring::TwoWire:
-    case RTDSensor::RTDWiring::ThreeWire:
-    case RTDSensor::RTDWiring::FourWire:
+    case Sensor::Wiring::TwoWire:
+    case Sensor::Wiring::ThreeWire:
+    case Sensor::Wiring::FourWire:
         return 8.0;
         
     default:
@@ -876,8 +937,8 @@ void SensorBoard::resetAcquisition()
     adc.setIDAC1routing(IDAC_DISABLED);
     adc.setIDAC2routing(IDAC_DISABLED);
 
-    curRTDSensor = 0;
+    curSensor = 0;
 
-    for (uint8_t i = 0; i < numRTDSensors; i++)
+    for (uint8_t i = 0; i < numSensors; i++)
         rtd[i]->reset();
 }

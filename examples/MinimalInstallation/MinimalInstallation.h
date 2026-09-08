@@ -3,7 +3,7 @@
 
 #include <Installation.h>
 
-#include <Hardware/RTDSensor.h>
+#include <Hardware/Sensor.h>
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
 
@@ -26,7 +26,7 @@ public:
         HomeScreenContext& context) override;
 
 private:
-    RTDSensor temperatureInput;
+    Sensor temperatureInput;
     Resistance temperatureResistance;
     TemperatureRTD temperature;
 };

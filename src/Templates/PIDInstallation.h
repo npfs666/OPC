@@ -3,7 +3,7 @@
 
 #include <Installation.h>
 
-#include <Hardware/RTDSensor.h>
+#include <Hardware/Sensor.h>
 
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
@@ -13,7 +13,7 @@
 
 #include <Regulator/PID.h>
 
-class Adafruit_BME280;
+class Adafruit_BMP5xx;
 class ProcessControl;
 class SensorBoard;
 
@@ -32,7 +32,7 @@ public:
 
     bool begin(
         SensorBoard& board,
-        Adafruit_BME280& bme,
+        Adafruit_BMP5xx& bmp580,
         ProcessControl& process) override;
 
     void onMenuOpened() override;
@@ -69,7 +69,7 @@ private:
     };
 
     // Entrée physique
-    RTDSensor temperatureInput;
+    Sensor temperatureInput;
 
     // Mesures
     Resistance temperatureResistance;

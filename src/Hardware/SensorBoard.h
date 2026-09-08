@@ -3,7 +3,7 @@
 
 #include<Arduino.h>
 #include<Hardware/pinout.h>
-#include<Hardware/RTDSensor.h>
+#include<Hardware/Sensor.h>
 #include<Drivers/ADS1120.h>
 #include<Hardware/AnalogMux.h>
 #include <Configurable.h>
@@ -24,7 +24,7 @@ public:
     struct Settings
     {
         CalibrationProfile pt100 = {
-            1650.404,
+            1650.541,
             7.5,
             100.061,
             26.0
@@ -37,6 +37,8 @@ public:
             25.0
         };
 
+        double_t coldJunctionOffset = 0.0;
+
         double_t zeroOffset[MAX_RTD] = {};
     };
 
@@ -44,22 +46,27 @@ public:
 
     ADS1120   adc;  // ADC
     AnalogMux mux;  // Front end multiplexers
-    RTDSensor* rtd[MAX_RTD]; // Sensor array
+    Sensor* rtd[MAX_RTD]; // Sensor array
     
     volatile bool newMeasurement=false;    // ADC has finished accumulating values, data is readable
     
     SensorBoard();
     void init();
-    bool addRTD(RTDSensor& sensor);
+    bool addSensor(Sensor& sensor);
     void startContinuous();
     void pause();
     void restart();
     void invert3WireIDAC();
     void adcInterrupt();
-    void setStandartRTD();
-    void setWiringRoute(RTDSensor::Settings settings);
+    void setStandardRTD();
+    void setStandardTC();
+    double_t getAdcTemperature();
+    void setWiringRoute(Sensor::Settings settings);
 
-    double_t computeResistance(RTDSensor& rtdSensor);
+    double_t getColdJunctionTemperature() const;
+    double_t computeVoltage(const Sensor& sensor) const;
+
+    double_t computeResistance(Sensor& rtdSensor);
 
     void registerParameters(ParameterList& list) override;
     bool addMenuActions(MenuBuilder& menu) const;
@@ -94,37 +101,39 @@ private:
         RESET_ZERO_OFFSETS = 37;
 
     CalibrationProfile& calibrationFor(
-        RTDSensor::RTDType type);
+        Sensor::Type type);
     const CalibrationProfile& calibrationFor(
-        RTDSensor::RTDType type) const;
+        Sensor::Type type) const;
 
     uint8_t channelFor(
-        const RTDSensor& sensor) const;
+        const Sensor& sensor) const;
 
     bool calibrateZero(uint8_t channel);
     bool resetZeroOffsets();
     bool calibrateReference(
-        RTDSensor::RTDType type,
+        Sensor::Type type,
         uint8_t channel);
     bool readCalibrationSamples(
-        RTDSensor::RTDType type,
+        Sensor::Type type,
         uint8_t channel,
         CalibrationSamples& samples);
     void registerCalibrationParameters(
         ParameterList& list,
-        RTDSensor::RTDType type);
+        Sensor::Type type);
     void registerZeroCalibrationParameters(
         ParameterList& list);
     void stopCalibrationHardware(
         uint8_t channel);
 
-    static double_t nominalReferenceResistance(
-        RTDSensor::RTDType type);
-    static double_t measurementGain(
-        RTDSensor::RTDWiring wiring);
+    static uint8_t thermocoupleGain(Physics::Thermocouple::Type type);
 
-    uint8_t curRTDSensor;   // cur sensor index
-    uint8_t numRTDSensors;  // number of RTD sensors in rtd array[]
+    static double_t nominalReferenceResistance(
+        Sensor::Type type);
+    static double_t measurementGain(
+        Sensor::Wiring wiring);
+
+    uint8_t curSensor;   // cur sensor index
+    uint8_t numSensors;  // number of RTD sensors in rtd array[]
     volatile bool pauseInterrupts = true;
     volatile bool discardNextConversion = false;
     double_t adcTemperature;

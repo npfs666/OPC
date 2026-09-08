@@ -6,7 +6,7 @@
 #include <hmi/ParameterList.h>
 
 class SensorBoard;
-class Adafruit_BME280;
+class Adafruit_BMP5xx;
 struct HomeScreenContext;
 class ProcessControl;
 class ParameterEditor;
@@ -39,10 +39,10 @@ public:
 
     virtual bool begin(
         SensorBoard& board,
-        Adafruit_BME280& bme,
+        Adafruit_BMP5xx& bmp580,
         ProcessControl& process) = 0;
 
-    virtual bool requiresBME280() const
+    virtual bool requiresBMP580() const
     {
         return false;
     }

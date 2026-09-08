@@ -9,7 +9,7 @@
 #include <ProcessControl.h>
 
 #include <Adafruit_ST7789.h>
-#include <Adafruit_BME280.h>
+#include <Adafruit_BMP5xx.h>
 
 #include <ProcessSnapshot.h>
 
@@ -35,7 +35,7 @@ public:
 
     void initSerial();
     void initDisplay();
-    void initBME280();
+    void initBMP580();
     void initSensorBoard();
     void initRotenc();
     void initMenu();
@@ -69,7 +69,7 @@ public:
 
     Adafruit_ST7789 tft;
 
-    Adafruit_BME280 bme;
+    Adafruit_BMP5xx bmp580;
 
     ProcessControl controller;
 
@@ -100,7 +100,7 @@ private:
 
     bool acquisitionPausedForMenu = false;
     bool controlOutputsEnabled = false;
-    bool bmeInitialized = false;
+    bool bmp580Initialized = false;
     bool configurationSavePending = false;
     uint32_t lastMeasurementTime = 0;
 

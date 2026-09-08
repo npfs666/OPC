@@ -36,12 +36,12 @@ bool MinimalInstallation::begin(
     temperatureInput.begin(
         "minimal_temperature_input",
         "Sonde PT100",
-        RTDSensor::RTDType::Pt100,
-        RTDSensor::RTDWiring::FourWire,
+        Sensor::Type::Pt100,
+        Sensor::Wiring::FourWire,
         16,
         0.0f);
 
-    if (!board.addRTD(temperatureInput))
+    if (!board.addSensor(temperatureInput))
         return false;
 
     temperatureResistance.begin(

@@ -74,6 +74,9 @@ bool ParameterEditor::validate() const
         const Parameter& parameter =
             *draft.parameter;
 
+        if (parameter.readOnly && !parameter.persistent)
+            continue;
+
         switch (parameter.type)
         {
         case Parameter::Type::Bool:
@@ -170,6 +173,9 @@ bool ParameterEditor::apply()
         ParameterDraft& draft = drafts[i];
         const Parameter& parameter =
             *draft.parameter;
+
+        if (parameter.readOnly && !parameter.persistent)
+            continue;
 
         switch (parameter.type)
         {

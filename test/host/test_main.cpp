@@ -1,5 +1,6 @@
 #include "TestHarness.h"
 
+#include <Adafruit_BMP5xx.h>
 #include <Adafruit_BME280.h>
 #include <Drivers/DS3231.h>
 #include <Hardware/RTC.h>
@@ -45,7 +46,7 @@ namespace
 
         bool begin(
             SensorBoard&,
-            Adafruit_BME280&,
+            Adafruit_BMP5xx&,
             ProcessControl&) override
         {
             return true;
@@ -1552,7 +1553,7 @@ namespace
         relay.begin(
             "heater_relay",
             "Heater relay",
-            RELAIS_1,
+            Board::Rp2040::OUTPUT_1,
             true,
             false);
 
@@ -1918,6 +1919,47 @@ namespace
         CHECK_TRUE(wire.registers[0x06] == 0x30);
     }
 
+    void testUnavailableAdcMenuReading()
+    {
+        Parameter storage[4];
+        ParameterList list;
+        list.begin(storage, 4);
+        double_t offset = 0.0;
+        double_t adcTemperature = NAN;
+        auto parameters = list.forOwner({
+            "calibration", "Calibration", "thermo", "Thermo"
+        });
+        CHECK_TRUE(parameters.addDouble("offset", "C.J. offset",
+            offset, -10, 10, 0.01, 2, "°C"));
+        auto readings = list.forOwner({
+            "calibration", "Calibration", "thermo", "Thermo", false
+        });
+        CHECK_TRUE(readings.addDouble("adc_temperature", "Temp. ADC",
+            adcTemperature, "°C", true, 2));
+        CHECK_FALSE(list.hasError());
+        CHECK_TRUE(list.count() == 2);
+        if (list.count() != 2) return;
+        CHECK_TRUE(list.get(1)->readOnly);
+        CHECK_FALSE(list.get(1)->persistent);
+        ParameterEditor editor;
+        editor.begin(list);
+        editor.capture();
+        CHECK_TRUE(editor.validate());
+        CHECK_TRUE(editor.apply());
+        CHECK_TRUE(std::isnan(adcTemperature));
+        adcTemperature = 24.51;
+        editor.capture();
+        CHECK_NEAR(editor.get(1).numberValue, 24.51, 0.00001);
+        editor.get(1).numberValue = 99;
+        CHECK_TRUE(editor.apply());
+        CHECK_NEAR(adcTemperature, 24.51, 0.00001);
+
+        // Les réglages modifiables refusent toujours une valeur indisponible.
+        double_t invalidSetting = NAN;
+        CHECK_FALSE(parameters.addDouble("invalid", "Invalid",
+            invalidSetting, -10, 10, 0.01, 2, "°C"));
+    }
+
     void testParameterEditor()
     {
         Parameter storage[8];
@@ -2000,6 +2042,14 @@ namespace
             displayedValue,
             99.0,
             0.0001);
+
+        // Une lecture de diagnostic indisponible ne bloque pas les réglages
+        // et ne doit jamais être réécrite par le brouillon du menu.
+        list.get(3)->persistent = false;
+        editor.get(3).numberValue = NAN;
+        CHECK_TRUE(editor.validate());
+        CHECK_TRUE(editor.apply());
+        CHECK_NEAR(displayedValue, 99.0, 0.0001);
 
         editor.capture();
         editor.get(1).integerValue = 9;
@@ -2383,6 +2433,8 @@ namespace
     }
 }
 
+void runThermocoupleTests();
+
 int main()
 {
     TestHarness::run(
@@ -2497,6 +2549,7 @@ int main()
         "interface RTC DS3231",
         testRTCInterface);
 
+    TestHarness::run("menu ADC indisponible au demarrage", testUnavailableAdcMenuReading);
     TestHarness::run(
         "éditeur de paramètres",
         testParameterEditor);
@@ -2520,6 +2573,8 @@ int main()
     TestHarness::run(
         "watchdog des deux coeurs",
         testSystemWatchdogRequiresBothCores);
+
+    runThermocoupleTests();
 
     return TestHarness::finish();
 }

@@ -70,7 +70,7 @@ const char* TestInstallation::configurationKey() const
     return "test_installation";
 }
 
-bool TestInstallation::requiresBME280() const
+bool TestInstallation::requiresBMP580() const
 {
     return true;
 }
@@ -139,42 +139,39 @@ void TestInstallation::printHomeScreen(
 
 bool TestInstallation::begin(
     SensorBoard& board,
-    Adafruit_BME280& bme,
+    Adafruit_BMP5xx& bmp580,
     ProcessControl& controller)
 {
     // ----- Configuration du matériel -----
-    input1.begin("input1", "Input 1", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
+    input1.begin("input1", "Input 1", Sensor::Type::Tc, Sensor::Wiring::FourWire, 16, 0);
 
-    if (!board.addRTD(input1))
+    if (!board.addSensor(input1))
         return false;
 
-    input2.begin("input2", "Input 2", RTDSensor::RTDType::Pt100, RTDSensor::RTDWiring::FourWire, 16, 0);
+    input2.begin("input2", "Input 2", Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0);
 
-    if (!board.addRTD(input2))
+    if (!board.addSensor(input2))
         return false;
 
     // ----- Construction des objets -----
-    tempBME.begin("BME", bme);
-    humidityBME.begin("BME", bme);
-    pressureBME.begin("BME", bme);
+    pressureBMP580.begin("BMP580", bmp580);
 
-    rtd1Resistance.begin("RTD1", board, input1);
-    rtd1Temperature.begin("TempRTD1", rtd1Resistance);
+    //rtd1Resistance.begin("RTD1", board, input1);
+    //rtd1Temperature.begin("TempRTD1", rtd1Resistance);
+    tcTemp.begin("TempTC", input1);
 
     rtd2Resistance.begin("RTD2", board, input2);
     rtd2Temperature.begin("TempRTD2", rtd2Resistance);
 
-    psychrometer.begin(rtd1Temperature, rtd2Temperature, pressureBME);
+    psychrometer.begin(tcTemp, rtd2Temperature, pressureBMP580);
     psychroHumidity.begin("RH psychrom",psychrometer);
 
 
     // ----- Enregistrement dans le framework -----
 
-    if (!controller.add(tempBME) ||
-        !controller.add(humidityBME) ||
-        !controller.add(pressureBME) ||
-        !controller.add(rtd1Resistance) ||
-        !controller.add(rtd1Temperature) ||
+    if (!controller.add(pressureBMP580) ||
+        //!controller.add(rtd1Resistance) ||
+        !controller.add(tcTemp) ||
         !controller.add(rtd2Resistance) ||
         !controller.add(rtd2Temperature) ||
         !controller.add(psychroHumidity))
@@ -182,7 +179,7 @@ bool TestInstallation::begin(
         return false;
     }
 
-    thermostat.begin("thermostat", "Thermostats", rtd2Temperature);
+    /*thermostat.begin("thermostat", "Thermostats", rtd2Temperature);
     thermostat.settings.setpoint = 25;
 
 
@@ -213,19 +210,19 @@ bool TestInstallation::begin(
             relayHeater))
     {
         return false;
-    }
+    }*/
 
     board.registerParameters(parameterList);
     controller.registerParameters(parameterList);
 
-    if (!thermostat.setpointRamp.registerParameters(
+    /*if (!thermostat.setpointRamp.registerParameters(
             parameterList,
             "thermostat.ramp",
             "Rampe thermostat",
             "°C/min"))
     {
         return false;
-    }
+    }*/
 
     if (parameterList.hasError())
     {

@@ -287,7 +287,9 @@ bool ParameterList::addDouble(
     if (decimals > 3)
         return false;
 
-    if (!(value >= minimum &&
+    // Une lecture de diagnostic peut être indisponible avant l'acquisition.
+    const bool diagnosticReading = readOnly && !owner.persistent;
+    if (!diagnosticReading && !(value >= minimum &&
           value <= maximum))
     {
         return false;

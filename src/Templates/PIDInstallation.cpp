@@ -22,17 +22,20 @@ namespace
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
 
     constexpr int16_t LABEL_X = 10;
-    constexpr int16_t VALUE_X = 100;
-    constexpr int16_t VALUE_WIDTH = 130;
+    constexpr int16_t VALUE_X = 90;
+    constexpr int16_t VALUE_WIDTH = 145;
 
     constexpr int16_t STATUS_X = 105;
     constexpr int16_t STATUS_Y = 8;
     constexpr int16_t STATUS_WIDTH = 125;
     constexpr int16_t STATUS_HEIGHT = 16;
 
-    constexpr int16_t TEMPERATURE_Y = 39;
-    constexpr int16_t SETPOINT_Y = 70;
-    constexpr int16_t OUTPUT_Y = 101;
+    constexpr int16_t TEMPERATURE_LABEL_Y = 36;
+    constexpr int16_t TEMPERATURE_Y = 52;
+    constexpr int16_t SETPOINT_LABEL_Y = 92;
+    constexpr int16_t SETPOINT_Y = 108;
+    constexpr int16_t OUTPUT_LABEL_Y = 148;
+    constexpr int16_t OUTPUT_Y = 164;
 
     constexpr const char* AUTOTUNE_OWNER_KEY =
         "tune_pid.autotune";
@@ -55,9 +58,10 @@ namespace
             VALUE_X,
             y,
             VALUE_WIDTH,
-            20,
+            30,
             COLOR_BLACK);
 
+        display.setTextSize(3);
         display.setCursor(VALUE_X, y);
         display.setTextColor(
             color,
@@ -94,20 +98,20 @@ PIDInstallation::configurationKey() const
 
 bool PIDInstallation::begin(
     SensorBoard& board,
-    Adafruit_BME280& bme,
+    Adafruit_BMP5xx& bmp580,
     ProcessControl& process)
 {
-    (void)bme;
+    (void)bmp580;
 
     temperatureInput.begin(
         "pid_tune_input",
         "Sonde PID",
-        RTDSensor::RTDType::Pt100,
-        RTDSensor::RTDWiring::FourWire,
+        Sensor::Type::Pt100,
+        Sensor::Wiring::FourWire,
         16,
         0.0f);
 
-    if (!board.addRTD(temperatureInput))
+    if (!board.addSensor(temperatureInput))
         return false;
 
     temperatureResistance.begin(
@@ -275,7 +279,7 @@ void PIDInstallation::printHomeScreen(
 
     display.cp437(true);
     display.setTextWrap(false);
-    display.setTextSize(2);
+    display.setTextSize(3);
 
     if (context.fullRefresh)
     {
@@ -327,17 +331,17 @@ void PIDInstallation::printHomeScreen(
 
         display.setCursor(
             LABEL_X,
-            TEMPERATURE_Y);
+            TEMPERATURE_LABEL_Y);
         display.print("Temp :");
 
         display.setCursor(
             LABEL_X,
-            SETPOINT_Y);
+            SETPOINT_LABEL_Y);
         display.print("SP   :");
 
         display.setCursor(
             LABEL_X,
-            OUTPUT_Y);
+            OUTPUT_LABEL_Y);
         display.print("Relais:");
     }
 

@@ -2,7 +2,7 @@
 
 
 
-// Used in RTDSensor
+// Used in Sensor
 #define MAX_RTD 3
 #define ALPHA 0.6f
 

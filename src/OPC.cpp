@@ -103,27 +103,24 @@ void OPC::initDisplay()
     tft.fillScreen(ST77XX_BLACK);
 }
 
-void OPC::initBME280()
+void OPC::initBMP580()
 {
     Wire1.setSDA(Board::Rp2040::I2C_SDA);
     Wire1.setSCL(Board::Rp2040::I2C_SCL);
 
-    bmeInitialized =
-        bme.begin(0x76, &Wire1);
+    bmp580Initialized =
+        bmp580.begin(BMP5XX_ALTERNATIVE_ADDRESS, &Wire1);
 
-    if (!bmeInitialized)
+    if (!bmp580Initialized)
     {
-        Serial.println("BME280 initialization failed");
+        Serial.println("BMP580 initialization failed");
         return;
     }
 
-    bme.setSampling(
-        Adafruit_BME280::MODE_NORMAL,
-        Adafruit_BME280::SAMPLING_X16,
-        Adafruit_BME280::SAMPLING_X16,
-        Adafruit_BME280::SAMPLING_X16,
-        Adafruit_BME280::FILTER_OFF,
-        Adafruit_BME280::STANDBY_MS_0_5);
+    bmp580.setTemperatureOversampling(BMP5XX_OVERSAMPLING_16X);
+    bmp580.setPressureOversampling(BMP5XX_OVERSAMPLING_16X);
+    bmp580.setIIRFilterCoeff(BMP5XX_IIR_FILTER_COEFF_3);
+    bmp580.setPowerMode(BMP5XX_POWERMODE_NORMAL);
 }
 
 void OPC::initSensorBoard()
@@ -260,11 +257,11 @@ void OPC::controlPoll()
 
 bool OPC::initMeasurements()
 {
-    if (userInstall.requiresBME280() &&
-        !bmeInitialized)
+    if (userInstall.requiresBMP580() &&
+        !bmp580Initialized)
     {
         Serial.println(
-            "BME280 required by installation but unavailable");
+            "BMP580 required by installation but unavailable");
         return false;
     }
 
@@ -277,7 +274,7 @@ bool OPC::initMeasurements()
 
     if (!userInstall.begin(
             input,
-            bme,
+            bmp580,
             controller))
     {
         Serial.println(

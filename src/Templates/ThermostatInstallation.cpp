@@ -23,9 +23,9 @@ namespace
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
 
     constexpr int16_t BORDER_SIZE = 2;
-    constexpr int16_t ACTUAL_TEMPERATURE_Y = 15;
-    constexpr int16_t SETPOINT_Y = 58;
-    constexpr int16_t OUTPUT_Y = 103;
+    constexpr int16_t ACTUAL_TEMPERATURE_Y = 24;
+    constexpr int16_t SETPOINT_Y = 91;
+    constexpr int16_t OUTPUT_Y = 166;
 
     constexpr const char* RAMP_OWNER_KEY =
         "thermostat.ramp";
@@ -138,13 +138,13 @@ namespace
             ACTUAL_TEMPERATURE_Y - 2,
             display.width() -
                 2 * BORDER_SIZE,
-            30,
+            36,
             COLOR_BLACK);
 
         printCenteredTemperature(
             display,
             ACTUAL_TEMPERATURE_Y,
-            3,
+            4,
             COLOR_RED,
             sample != nullptr
                 ? sample->value
@@ -165,13 +165,13 @@ namespace
             SETPOINT_Y - 2,
             display.width() -
                 2 * BORDER_SIZE,
-            30,
+            36,
             COLOR_BLACK);
 
         printCenteredTemperature(
             display,
             SETPOINT_Y,
-            3,
+            4,
             COLOR_GREEN,
             setpoint,
             1,
@@ -187,7 +187,7 @@ namespace
             OUTPUT_Y - 2,
             display.width() -
                 2 * BORDER_SIZE,
-            22,
+            28,
             COLOR_BLACK);
 
         if (!outputIsOn)
@@ -196,7 +196,7 @@ namespace
         printCenteredText(
             display,
             OUTPUT_Y,
-            2,
+            3,
             COLOR_ORANGE,
             "OUTPUT 1");
     }
@@ -214,20 +214,20 @@ const char* ThermostatInstallation::configurationKey() const
 
 bool ThermostatInstallation::begin(
     SensorBoard& board,
-    Adafruit_BME280& bme,
+    Adafruit_BMP5xx& bmp580,
     ProcessControl& process)
 {
-    (void)bme;
+    (void)bmp580;
 
     temperatureInput.begin(
         "thermostat_input",
         "Sonde thermostat",
-        RTDSensor::RTDType::Pt100,
-        RTDSensor::RTDWiring::FourWire,
+        Sensor::Type::Pt100,
+        Sensor::Wiring::FourWire,
         16,
         0.0f);
 
-    if (!board.addRTD(
+    if (!board.addSensor(
             temperatureInput))
     {
         return false;

@@ -8,7 +8,7 @@ Resistance::Resistance()
 
 void Resistance::begin(const char* name,
                        SensorBoard& board,
-                       RTDSensor& sensor)
+                       Sensor& sensor)
 {
     Measurement::begin(name, "Ω");
 
@@ -26,12 +26,12 @@ void Resistance::update()
     setValid(true);
 }
 
-RTDSensor& Resistance::getSensor()
+Sensor& Resistance::getSensor()
 {
     return *sensor;
 }
 
-const RTDSensor& Resistance::getSensor() const
+const Sensor& Resistance::getSensor() const
 {
     return *sensor;
 }
