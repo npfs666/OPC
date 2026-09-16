@@ -10,10 +10,20 @@ namespace
             static_cast<int32_t>(
                 Sensor::Type::Pt100),
             "PT100"
+        },
+        {
+            static_cast<int32_t>(
+                Sensor::Type::Pt1000),
+            "PT1000"
         }
     };
 
     constexpr ParameterOption WIRING_OPTIONS[] = {
+        {
+            static_cast<int32_t>(
+                Sensor::Wiring::TwoWire),
+            "2 fils"
+        },
         {
             static_cast<int32_t>(
                 Sensor::Wiring::ThreeWire),

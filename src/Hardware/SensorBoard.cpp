@@ -268,8 +268,8 @@ void SensorBoard::adcInterrupt() {
         return;
     }
 	
-    //rtd[curSensor].add(value);
-    rtd[curSensor]->addLP(value);
+    rtd[curSensor]->add(value);
+    //rtd[curSensor]->addLP(value);
 
     // Cas particulier de la mesure en 3 fils (current chopping) : 
 	// inversion des sources d'exitation de courant à la moitié de la série, pour supprimer leur inégalité de courant
@@ -296,7 +296,6 @@ void SensorBoard::adcInterrupt() {
         if( curSensor == numSensors ) {
             curSensor = 0;
 
-            //return; // when all measurement are done, we pause and wait for UI update to restart them.
             if (!adc.readInternalTemp(adcTemperature, 250))
                 adcTemperature = NAN;
             newMeasurement = true;

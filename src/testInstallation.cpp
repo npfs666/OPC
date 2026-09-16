@@ -144,6 +144,7 @@ bool TestInstallation::begin(
 {
     // ----- Configuration du matériel -----
     input1.begin("input1", "Input 1", Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0);
+    //input1.begin("input1", "Input 1", Sensor::Type::Tc, Sensor::Wiring::TwoWire, 16, 0);
 
     if (!board.addSensor(input1))
         return false;

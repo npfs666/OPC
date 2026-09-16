@@ -4,7 +4,6 @@
 
 #include <Physics/PT100.h>
 #include <cmath>
-//#include <Measurement/PT1000.h>
 
 TemperatureRTD::TemperatureRTD()
 {
@@ -36,10 +35,11 @@ void TemperatureRTD::update()
                 resistance->getValue());
             break;
 
-        /*case Sensor::Type::Pt1000:
-            temperature = PT1000::resistanceToTemperature(
-                m_resistance.value());
-            break;*/
+        case Sensor::Type::Pt1000:
+            // Même courbe que la PT100, avec une résistance dix fois plus grande.
+            temperature = PT100::getResistanceToTemperature(
+                resistance->getValue() / 10.0);
+            break;
 
         default:
             setValid(false);

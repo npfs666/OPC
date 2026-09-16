@@ -4,12 +4,15 @@
 #include <Adafruit_BME280.h>
 #include <Drivers/DS3231.h>
 #include <Hardware/RTC.h>
+#include <Hardware/SensorBoard.h>
 #include <Installation.h>
 #include <Measurements/Humidity/HumidityBME.h>
 #include <ProcessSnapshot.h>
 #include <Measurements/Pressure/PressureBME.h>
+#include <Measurements/Resistance.h>
 #include <Measurements/Temperature/Temperature.h>
 #include <Measurements/Temperature/TemperatureBME.h>
+#include <Measurements/Temperature/TemperatureRTD.h>
 #include <Outputs/Actuator.h>
 #include <Outputs/Output.h>
 #include <Outputs/RelayOutput.h>
@@ -490,6 +493,63 @@ namespace
                 PT100::
                     getResistanceToTemperature(
                         200.01)));
+    }
+
+    void testRTDTemperatureConversion()
+    {
+        SensorBoard board;
+        Sensor sensor("RTD", Sensor::Type::Pt1000,
+                      Sensor::Wiring::TwoWire, 16, 0.0f);
+        Resistance resistance;
+        resistance.begin("Resistance", board, sensor);
+        TemperatureRTD temperature;
+        temperature.begin("Temperature", resistance);
+
+        temperature.update();
+        CHECK_FALSE(temperature.isValid());
+
+        const auto update = [&](double ohms)
+        {
+            board.resistanceOhms = ohms;
+            resistance.update();
+            temperature.update();
+        };
+
+        const struct { double ohms; double celsius; } points[] = {
+            {1000.0, 0.0},
+            {803.06, -50.0},
+            {1385.055, 100.0},
+            {2000.0, 266.419}
+        };
+        for (const auto& point : points)
+        {
+            update(point.ohms);
+            CHECK_TRUE(temperature.isValid());
+            // Tolérance tenant compte de l'approximation de la table PT100.
+            CHECK_NEAR(temperature.getValue(), point.celsius, 0.05);
+        }
+
+        sensor.settings.offset = 1.25;
+        update(1000.0);
+        CHECK_TRUE(temperature.isValid());
+        CHECK_NEAR(temperature.getValue(), 1.25, 0.0001);
+
+        for (double ohms : {99.9, 2000.1,
+                            std::numeric_limits<double>::quiet_NaN(),
+                            std::numeric_limits<double>::infinity()})
+        {
+            update(ohms);
+            CHECK_FALSE(temperature.isValid());
+        }
+
+        sensor.settings.type = Sensor::Type::Pt100;
+        update(100.0);
+        CHECK_TRUE(temperature.isValid());
+        CHECK_NEAR(temperature.getValue(), 1.25, 0.0001);
+
+        sensor.settings.type = Sensor::Type::Tc;
+        update(100.0);
+        CHECK_FALSE(temperature.isValid());
     }
 
     void testPsychrometrics()
@@ -2604,6 +2664,10 @@ int main()
     TestHarness::run(
         "interpolation PT100",
         testPT100Interpolation);
+
+    TestHarness::run(
+        "conversion temperature PT100/PT1000",
+        testRTDTemperatureConversion);
 
     TestHarness::run(
         "psychrométrie",
