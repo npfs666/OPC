@@ -448,6 +448,22 @@ void RTC::registerParameters(
 bool RTC::validateParameters(
     const ParameterEditor& editor) const
 {
+    if (editor.find(MENU_OWNER_KEY, "year") == nullptr &&
+        editor.find(MENU_OWNER_KEY, "month") == nullptr &&
+        editor.find(MENU_OWNER_KEY, "day") == nullptr &&
+        editor.find(MENU_OWNER_KEY, "hour") == nullptr &&
+        editor.find(MENU_OWNER_KEY, "minute") == nullptr &&
+        editor.find(MENU_OWNER_KEY, "second") == nullptr)
+        return true;
+
+    DateTime dateTime;
+    return readMenuDateTime(editor, dateTime);
+}
+
+bool RTC::readMenuDateTime(
+    const ParameterEditor& editor,
+    DateTime& dateTime) const
+{
     const ParameterDraft* year =
         editor.find(MENU_OWNER_KEY, "year");
 
@@ -465,16 +481,6 @@ bool RTC::validateParameters(
 
     const ParameterDraft* second =
         editor.find(MENU_OWNER_KEY, "second");
-
-    if (year == nullptr &&
-        month == nullptr &&
-        day == nullptr &&
-        hour == nullptr &&
-        minute == nullptr &&
-        second == nullptr)
-    {
-        return true;
-    }
 
     if (year == nullptr ||
         month == nullptr ||
@@ -521,7 +527,6 @@ bool RTC::validateParameters(
         return false;
     }
 
-    DateTime dateTime;
     dateTime.year =
         static_cast<uint16_t>(
             year->integerValue);
@@ -553,6 +558,21 @@ bool RTC::onMenuOpened()
 
     menuDateTime = currentDateTime;
 
+    return true;
+}
+
+bool RTC::applyMenuParameters(ParameterEditor& editor)
+{
+    // Une simple consultation ne doit pas faire reculer l'horloge.
+    if (!editor.hasChanges(MENU_OWNER_KEY))
+        return true;
+
+    DateTime dateTime;
+    if (!readMenuDateTime(editor, dateTime) || !setDateTime(dateTime))
+        return false;
+
+    menuDateTime = dateTime;
+    editor.capture(MENU_OWNER_KEY);
     return true;
 }
 

@@ -143,7 +143,7 @@ bool TestInstallation::begin(
     ProcessControl& controller)
 {
     // ----- Configuration du matériel -----
-    input1.begin("input1", "Input 1", Sensor::Type::Tc, Sensor::Wiring::FourWire, 16, 0);
+    input1.begin("input1", "Input 1", Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0);
 
     if (!board.addSensor(input1))
         return false;
@@ -156,22 +156,22 @@ bool TestInstallation::begin(
     // ----- Construction des objets -----
     pressureBMP580.begin("BMP580", bmp580);
 
-    //rtd1Resistance.begin("RTD1", board, input1);
-    //rtd1Temperature.begin("TempRTD1", rtd1Resistance);
+    rtd1Resistance.begin("RTD1", board, input1);
+    rtd1Temperature.begin("TempRTD1", rtd1Resistance);
     tcTemp.begin("TempTC", input1);
 
     rtd2Resistance.begin("RTD2", board, input2);
     rtd2Temperature.begin("TempRTD2", rtd2Resistance);
 
-    psychrometer.begin(tcTemp, rtd2Temperature, pressureBMP580);
+    psychrometer.begin(rtd1Temperature, rtd2Temperature, pressureBMP580);
     psychroHumidity.begin("RH psychrom",psychrometer);
 
 
     // ----- Enregistrement dans le framework -----
 
     if (!controller.add(pressureBMP580) ||
-        //!controller.add(rtd1Resistance) ||
-        !controller.add(tcTemp) ||
+        !controller.add(rtd1Resistance) ||
+        !controller.add(rtd1Temperature) ||
         !controller.add(rtd2Resistance) ||
         !controller.add(rtd2Temperature) ||
         !controller.add(psychroHumidity))

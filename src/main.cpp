@@ -76,6 +76,7 @@ void setup()
 	systemWatchdog.begin();
 
 	opc.initSensorBoard();
+    opc.initBMP580();
 
     synchronizeStartup(
         InterCoreMessage::ControlCoreReady,
@@ -128,7 +129,6 @@ void setup1()
     attachInterrupt(digitalPinToInterrupt(Board::Rp2040::ROTENC_B), ISRRotenc, CHANGE);
     attachInterrupt(digitalPinToInterrupt(Board::Rp2040::ROTENC_CLIC), ISRButton, FALLING);
 	opc.initDisplay();
-    opc.initBMP580();
 
     synchronizeStartup(
         InterCoreMessage::UiCoreReady,

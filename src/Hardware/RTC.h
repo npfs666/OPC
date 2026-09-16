@@ -12,6 +12,8 @@ class ParameterList;
 class RTC : public Configurable
 {
 public:
+    static constexpr const char* MENU_OWNER_KEY = "rtc.clock";
+
     /**
      * L'heure est toujours exposée de 0 à 23 et toujours écrite en 24 h.
      * dayOfWeek est calculé à la lecture : lundi = 1, dimanche = 7.
@@ -107,6 +109,9 @@ public:
     /** Recharge les champs du menu depuis le DS3231. */
     bool onMenuOpened();
 
+    /** Valide et écrit uniquement les champs de l'horloge modifiés. */
+    bool applyMenuParameters(ParameterEditor& editor);
+
     bool addMenuActions(MenuBuilder& menu) const;
 
     bool handlesMenuAction(
@@ -129,8 +134,9 @@ public:
         uint8_t day);
 
 private:
-    static constexpr const char* MENU_OWNER_KEY =
-        "rtc.clock";
+    bool readMenuDateTime(
+        const ParameterEditor& editor,
+        DateTime& dateTime) const;
 
     static constexpr MenuBuilder::ActionId
         SET_DATE_TIME_ACTION = 48;

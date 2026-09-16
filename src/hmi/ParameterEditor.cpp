@@ -3,6 +3,48 @@
 #include <cmath>
 #include <cstring>
 
+namespace
+{
+    double_t draftValue(const ParameterDraft& draft)
+    {
+        switch (draft.parameter->type)
+        {
+        case Parameter::Type::Bool: return draft.booleanValue;
+        case Parameter::Type::Integer: return draft.integerValue;
+        case Parameter::Type::Double: return draft.numberValue;
+        case Parameter::Type::Selection: return draft.selectionValue;
+        }
+        return NAN;
+    }
+
+    void readCurrentValue(ParameterDraft& draft)
+    {
+        const Parameter& parameter = *draft.parameter;
+        switch (parameter.type)
+        {
+        case Parameter::Type::Bool:
+            if (parameter.value.boolean != nullptr)
+                draft.booleanValue = *parameter.value.boolean;
+            break;
+        case Parameter::Type::Double:
+            if (parameter.value.number != nullptr)
+                draft.numberValue = *parameter.value.number;
+            break;
+        case Parameter::Type::Integer:
+        case Parameter::Type::Selection:
+            if (parameter.discrete.target != nullptr && parameter.discrete.read != nullptr)
+            {
+                const int32_t value = parameter.discrete.read(parameter.discrete.target);
+                if (parameter.type == Parameter::Type::Integer)
+                    draft.integerValue = value;
+                else
+                    draft.selectionValue = value;
+            }
+            break;
+        }
+    }
+}
+
 void ParameterEditor::begin(const ParameterList& parameters)
 {
     draftCount = parameters.count();
@@ -19,46 +61,51 @@ size_t ParameterEditor::count() const
     return draftCount;
 }
 
-void ParameterEditor::capture()
+void ParameterEditor::capture(const char* ownerKey)
 {
     for (size_t i = 0; i < draftCount; i++)
     {
         if (drafts[i].parameter == nullptr)
             continue;
 
-        const Parameter& parameter = *drafts[i].parameter;
+        if (ownerKey != nullptr &&
+            std::strcmp(drafts[i].parameter->ownerKey, ownerKey) != 0)
+            continue;
 
-        switch (parameter.type)
+        readCurrentValue(drafts[i]);
+        capturedValues[i] = draftValue(drafts[i]);
+    }
+}
+
+bool ParameterEditor::isChanged(size_t index) const
+{
+    const ParameterDraft& draft = drafts[index];
+    if (draft.parameter == nullptr || draft.parameter->readOnly)
+        return false;
+
+    const double_t value = draftValue(draft);
+    return value != capturedValues[index] &&
+        !(std::isnan(value) && std::isnan(capturedValues[index]));
+}
+
+bool ParameterEditor::hasChanges(const char* ownerKey) const
+{
+    for (size_t i = 0; i < draftCount; i++)
+        if (isChanged(i) &&
+            (ownerKey == nullptr ||
+             std::strcmp(drafts[i].parameter->ownerKey, ownerKey) == 0))
+            return true;
+    return false;
+}
+
+void ParameterEditor::refreshUnchanged()
+{
+    for (size_t i = 0; i < draftCount; i++)
+    {
+        if (drafts[i].parameter != nullptr && !isChanged(i))
         {
-        case Parameter::Type::Bool:
-            if (parameter.value.boolean != nullptr)
-                drafts[i].booleanValue = *parameter.value.boolean;
-            break;
-
-        case Parameter::Type::Integer:
-            if (parameter.discrete.target != nullptr &&
-                parameter.discrete.read != nullptr)
-            {
-                drafts[i].integerValue =
-                    parameter.discrete.read(
-                        parameter.discrete.target);
-            }
-            break;
-
-        case Parameter::Type::Double:
-            if (parameter.value.number != nullptr)
-                drafts[i].numberValue = *parameter.value.number;
-            break;
-
-        case Parameter::Type::Selection:
-            if (parameter.discrete.target != nullptr &&
-                parameter.discrete.read != nullptr)
-            {
-                drafts[i].selectionValue =
-                    parameter.discrete.read(
-                        parameter.discrete.target);
-            }
-            break;
+            readCurrentValue(drafts[i]);
+            capturedValues[i] = draftValue(drafts[i]);
         }
     }
 }

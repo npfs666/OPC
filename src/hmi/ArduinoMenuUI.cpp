@@ -2,6 +2,8 @@
 
 #include <Adafruit_ST7789.h>
 #include <hmi/DisplayTextCodec.h>
+#include <cstdio>
+#include <cstring>
 
 namespace
 {
@@ -158,6 +160,25 @@ ArduinoMenuUI::EnterResult ArduinoMenuUI::enter()
 
     Menu::prompt* selected = &nav->selected();
 
+    if (clockGroup != MenuBuilder::INVALID_GROUP)
+    {
+        if (selected == menuNodes[clockGroup])
+        {
+            std::strcpy(groupLabels[clockGroup], "Horloge");
+            nav->doNav(Menu::navCmd(Menu::enterCmd));
+            return {EnterResult::Type::ClockOpened, MenuBuilder::NO_ACTION};
+        }
+
+        if (selected == clockValidateItem)
+            return {EnterResult::Type::ClockValidate, MenuBuilder::NO_ACTION};
+
+        if (selected == backItems[clockGroup])
+        {
+            nav->doNav(Menu::navCmd(Menu::enterCmd));
+            return {EnterResult::Type::ClockClosed, MenuBuilder::NO_ACTION};
+        }
+    }
+
     const bool exitRequested =
         nav->level == 0 &&
         quitItem != nullptr &&
@@ -207,6 +228,51 @@ bool ArduinoMenuUI::isInitialized() const
     return initialized;
 }
 
+void ArduinoMenuUI::refresh()
+{
+    if (nav != nullptr)
+        nav->refresh();
+}
+
+void ArduinoMenuUI::clockParametersApplied(bool saved)
+{
+    if (nav == nullptr || clockGroup == MenuBuilder::INVALID_GROUP)
+        return;
+
+    std::strcpy(groupLabels[clockGroup],
+        saved ? "Horloge" : "Erreur date / RTC");
+
+    nav->refresh();
+}
+
+void ArduinoMenuUI::updateClockDisplay(
+    const RTC::DateTime& dateTime, bool valid)
+{
+    if (clockDateItem == nullptr || clockTimeItem == nullptr)
+        return;
+
+    char date[LABEL_LENGTH] = "Date : --/--/----";
+    char time[LABEL_LENGTH] = "Heure : --:--:--";
+    if (valid)
+    {
+        std::snprintf(date, sizeof(date), "Date : %02u/%02u/%04u",
+            unsigned(dateTime.day), unsigned(dateTime.month), unsigned(dateTime.year));
+        std::snprintf(time, sizeof(time), "Heure : %02u:%02u:%02u",
+            unsigned(dateTime.hour), unsigned(dateTime.minute), unsigned(dateTime.second));
+    }
+
+    if (std::strcmp(date, clockDateLabel) != 0)
+    {
+        std::strcpy(clockDateLabel, date);
+        clockDateItem->dirty = true;
+    }
+    if (std::strcmp(time, clockTimeLabel) != 0)
+    {
+        std::strcpy(clockTimeLabel, time);
+        clockTimeItem->dirty = true;
+    }
+}
+
 bool ArduinoMenuUI::buildMenuTree(
     ParameterEditor& editor,
     const MenuBuilder& menuDefinition)
@@ -225,6 +291,7 @@ bool ArduinoMenuUI::buildMenuTree(
 
     selectionOptionsUsed = 0;
     quitItem = nullptr;
+    clockGroup = menuDefinition.findGroupForOwner(RTC::MENU_OWNER_KEY);
 
     for (size_t i = 0;
          i < MenuBuilder::MAX_ACTIONS;
@@ -313,6 +380,16 @@ bool ArduinoMenuUI::buildMenuTree(
 
     const size_t actionCount =
         menuDefinition.actionCount();
+
+    if (clockGroup != MenuBuilder::INVALID_GROUP)
+    {
+        clockDateItem = new Menu::prompt(clockDateLabel);
+        clockTimeItem = new Menu::prompt(clockTimeLabel);
+        clockValidateItem = new Menu::prompt("Valider");
+        clockDateItem->disable();
+        clockTimeItem->disable();
+        menuItemCounts[clockGroup] += 3;
+    }
 
     if (actionCount > MenuBuilder::MAX_ACTIONS)
         return false;
@@ -415,6 +492,13 @@ bool ArduinoMenuUI::buildMenuTree(
         }
     }
 
+    if (clockGroup != MenuBuilder::INVALID_GROUP &&
+        (!appendMenuItem(clockGroup, clockDateItem) ||
+         !appendMenuItem(clockGroup, clockTimeItem)))
+    {
+        return false;
+    }
+
     for (size_t i = 0; i < parameterCount; i++)
     {
         if (parameterItems[i] == nullptr)
@@ -453,8 +537,14 @@ bool ArduinoMenuUI::buildMenuTree(
 
     for (size_t i = 1; i < groupCount; i++)
     {
+        if (i == clockGroup &&
+            !appendMenuItem(clockGroup, clockValidateItem))
+        {
+            return false;
+        }
+
         backItems[i] =
-            new Menu::Exit("< Retour");
+            new Menu::Exit(i == clockGroup ? "Quitter" : "< Retour");
 
         if (!appendMenuItem(
                 static_cast<MenuBuilder::GroupId>(i),

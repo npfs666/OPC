@@ -5,17 +5,22 @@
 
 enum class InterCoreMessage : uint32_t
 {
-    PauseAcquisition = 1,
+    CaptureMenuParameters = 1,
     ResumeAcquisition = 2,
     PrintDataAvailable = 3,
     ApplyMenuParameters = 4,
     MenuParametersApplied = 5,
     ParametersReady = 6,
-    AcquisitionPaused = 7,
+    MenuParametersCaptured = 7,
     MenuParametersRejected = 8,
     MenuParametersAppliedNotSaved = 9,
     ControlCoreReady = 10,
-    UiCoreReady = 11
+    UiCoreReady = 11,
+    CaptureClockParameters = 12,
+    ClockParametersCaptured = 13,
+    ApplyClockParameters = 14,
+    ClockParametersApplied = 15,
+    ClockParametersRejected = 16
 };
 
 constexpr uint32_t interCoreMessageValue(

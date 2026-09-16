@@ -35,7 +35,7 @@ public:
         Adafruit_BMP5xx& bmp580,
         ProcessControl& process) override;
 
-    void onMenuOpened() override;
+    void onParametersApplied() override;
 
     bool addMenuActions(
         MenuBuilder& menu) const override;

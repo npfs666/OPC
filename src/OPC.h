@@ -83,7 +83,9 @@ private:
     {
         Starting,
         Home,
-        PauseRequested,
+        CaptureRequested,
+        ClockCaptureRequested,
+        ClockApplyRequested,
         Menu,
         ApplyRequested
     };
@@ -97,8 +99,10 @@ private:
 
     UIState uiState = UIState::Starting;
     uint32_t lastMenuActivity = 0;
+    bool clockMenuOpen = false;
 
     bool acquisitionPausedForMenu = false;
+    bool menuSessionOpen = false;
     bool controlOutputsEnabled = false;
     bool bmp580Initialized = false;
     bool configurationSavePending = false;
@@ -110,6 +114,9 @@ private:
     mutex_t processDataMutex;
     ProcessSnapshot sharedProcessSnapshot;
     ProcessSnapshot displayProcessSnapshot;
+    RTC::DateTime sharedClockDateTime;
+    bool sharedClockValid = false;
+    uint32_t lastClockRefresh = 0;
     uint8_t serialPrintBuffer[
         SERIAL_PRINT_BUFFER_SIZE] = {};
 
@@ -119,6 +126,7 @@ private:
         bool fullRefresh);
 
     void requestMenu();
+    void requestClockApply();
 
     void requestParameterApply(
         MenuBuilder::ActionId actionId =

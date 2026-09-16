@@ -68,9 +68,9 @@ namespace Board
         inline constexpr Mcp23017Pin INPUT_3_EN = Mcp23017Pin::GPB2;
     }
 
-    namespace BME
+    namespace BMP
     {
-        inline constexpr uint8_t ADDRESS = 0x46;
+        inline constexpr uint8_t ADDRESS = 0x47;
     }
 
     namespace DS3231

@@ -207,9 +207,9 @@ bool PIDInstallation::begin(
     return true;
 }
 
-void PIDInstallation::onMenuOpened()
+void PIDInstallation::onParametersApplied()
 {
-    /* Ouvrir le menu interrompt toujours un essai en cours. */
+    /* Appliquer des réglages interrompt l'essai ; la consultation le laisse tourner. */
     pid.cancelAutoTune();
 }
 

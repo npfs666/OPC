@@ -1919,6 +1919,95 @@ namespace
         CHECK_TRUE(wire.registers[0x06] == 0x30);
     }
 
+    void testRTCMenuApply()
+    {
+        TwoWire wire;
+        RTC clock;
+        CHECK_TRUE(clock.begin(wire));
+        RTC::DateTime initial;
+        initial.year = 2024;
+        initial.month = 2;
+        initial.day = 28;
+        initial.hour = 12;
+        CHECK_TRUE(clock.setDateTime(initial));
+
+        Parameter storage[7];
+        ParameterList parameters;
+        parameters.begin(storage, 7);
+        clock.registerParameters(parameters);
+        int32_t otherValue = 10;
+        CHECK_TRUE(parameters.forOwner({"other", "Autre", "other", "Autre"})
+            .addInteger("value", "Valeur", otherValue, 0, 100, 1));
+        ParameterEditor editor;
+        editor.begin(parameters);
+        editor.capture();
+        editor.get(6).integerValue = 20;
+
+        // L'entrée dans Horloge recharge le RTC sans perdre les autres edits.
+        CHECK_TRUE(clock.onMenuOpened());
+        editor.capture(RTC::MENU_OWNER_KEY);
+        CHECK_TRUE(editor.find(RTC::MENU_OWNER_KEY, "year")->integerValue == 2024);
+        CHECK_TRUE(editor.get(6).integerValue == 20);
+        CHECK_TRUE(editor.hasChanges("other"));
+        CHECK_FALSE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+
+        // Valider sans modification ne remet pas l'heure à celle de l'entrée.
+        wire.registers[0x00] = 0x15;
+        CHECK_TRUE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(wire.registers[0x00] == 0x15);
+
+        // Une date impossible ne touche ni le RTC ni le brouillon.
+        CHECK_TRUE(setClockDraft(editor, "day", 30));
+        const auto beforeInvalidDate = wire.registers;
+        CHECK_FALSE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(wire.registers == beforeInvalidDate);
+        CHECK_TRUE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+
+        // Quitter ou le timeout abandonne la saisie, même invalide.
+        editor.capture(RTC::MENU_OWNER_KEY);
+        CHECK_TRUE(wire.registers == beforeInvalidDate);
+        CHECK_FALSE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+        CHECK_TRUE(clock.validateParameters(editor));
+        CHECK_TRUE(editor.hasChanges("other"));
+        CHECK_TRUE(editor.get(6).integerValue == 20);
+
+        // Seul Valider écrit les champs dans le RTC.
+        CHECK_TRUE(setClockDraft(editor, "day", 29));
+        CHECK_TRUE(setClockDraft(editor, "hour", 23));
+        CHECK_TRUE(setClockDraft(editor, "minute", 59));
+        CHECK_TRUE(setClockDraft(editor, "second", 58));
+        CHECK_TRUE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(wire.registers[0x04] == 0x29);
+        CHECK_TRUE(wire.registers[0x03] == 4);
+        CHECK_TRUE(wire.registers[0x02] == 0x23);
+        CHECK_TRUE(wire.registers[0x01] == 0x59);
+        CHECK_TRUE(wire.registers[0x00] == 0x58);
+        CHECK_FALSE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+        CHECK_TRUE(editor.hasChanges("other"));
+        CHECK_TRUE(otherValue == 10);
+
+        // Une panne I2C conserve les champs à réessayer.
+        CHECK_TRUE(setClockDraft(editor, "minute", 12));
+        wire.nextTransmissionError = 4;
+        CHECK_FALSE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(wire.registers[0x01] == 0x59);
+        CHECK_TRUE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+        CHECK_TRUE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(wire.registers[0x01] == 0x12);
+
+        // Une nouvelle saisie abandonnée conserve l'heure déjà validée.
+        const auto savedRegisters = wire.registers;
+        CHECK_TRUE(setClockDraft(editor, "minute", 42));
+        editor.capture(RTC::MENU_OWNER_KEY);
+        CHECK_TRUE(editor.find(RTC::MENU_OWNER_KEY, "minute")->integerValue == 12);
+        CHECK_FALSE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+        CHECK_TRUE(wire.registers == savedRegisters);
+
+        CHECK_TRUE(editor.apply());
+        CHECK_TRUE(otherValue == 20);
+        CHECK_FALSE(editor.hasChanges());
+    }
+
     void testUnavailableAdcMenuReading()
     {
         Parameter storage[4];
@@ -2054,6 +2143,77 @@ namespace
         editor.capture();
         editor.get(1).integerValue = 9;
         CHECK_FALSE(editor.validate());
+    }
+
+    void testLiveMenuDrafts()
+    {
+        Parameter storage[5];
+        ParameterList list;
+        list.begin(storage, 5);
+        bool enabled = true;
+        int32_t timeout = 30;
+        double_t gain = 2.0;
+        double_t diagnostic = 0.0;
+        int32_t mode = 0;
+        constexpr ParameterOption modes[] = {{0, "Chaud"}, {1, "Froid"}};
+        auto parameters = list.forOwner({"test", "Test", "pid", "PID"});
+        CHECK_TRUE(parameters.addBool("enabled", "Actif", enabled));
+        CHECK_TRUE(parameters.addInteger("timeout", "Timeout", timeout, 10, 300, 1));
+        CHECK_TRUE(parameters.addDouble("gain", "Gain", gain, 0.0, 10.0, 0.1, 2));
+        CHECK_TRUE(parameters.addDouble("diagnostic", "Diagnostic", diagnostic, nullptr, true));
+        list.get(3)->persistent = false;
+        diagnostic = NAN;
+        CHECK_TRUE(parameters.addSelection("mode", "Mode", mode, modes));
+
+        ParameterEditor editor;
+        editor.begin(list);
+        editor.capture();
+        CHECK_FALSE(editor.hasChanges());
+        editor.get(0).booleanValue = false;
+        CHECK_TRUE(editor.hasChanges());
+        editor.get(0).booleanValue = true;
+        CHECK_FALSE(editor.hasChanges());
+        editor.get(4).selectionValue = 1;
+        CHECK_TRUE(editor.hasChanges());
+        editor.get(4).selectionValue = 0;
+        CHECK_FALSE(editor.hasChanges());
+
+        // Un autotune termine pendant une simple consultation.
+        enabled = false;
+        gain = 3.5;
+        diagnostic = 24.0;
+        CHECK_FALSE(editor.hasChanges());
+
+        // Une modification indépendante ne doit pas restaurer les anciens gains.
+        editor.get(1).integerValue = 45;
+        CHECK_TRUE(editor.hasChanges());
+        editor.refreshUnchanged();
+        CHECK_FALSE(editor.get(0).booleanValue);
+        CHECK_NEAR(editor.get(2).numberValue, 3.5, 0.0001);
+        CHECK_TRUE(editor.apply());
+        CHECK_FALSE(enabled);
+        CHECK_TRUE(timeout == 45);
+        CHECK_NEAR(gain, 3.5, 0.0001);
+        CHECK_NEAR(diagnostic, 24.0, 0.0001);
+        CHECK_FALSE(editor.hasChanges());
+
+        // Les valeurs explicitement éditées gardent la priorité.
+        editor.get(2).numberValue = 4.0;
+        gain = 5.0;
+        editor.refreshUnchanged();
+        CHECK_TRUE(editor.apply());
+        CHECK_NEAR(gain, 4.0, 0.0001);
+
+        // Un rejet ne perd pas le brouillon ni les évolutions du processus.
+        editor.get(1).integerValue = 0;
+        CHECK_FALSE(editor.validate());
+        gain = 6.0;
+        editor.refreshUnchanged();
+        CHECK_FALSE(editor.validate());
+        CHECK_TRUE(timeout == 45);
+        editor.get(1).integerValue = 60;
+        CHECK_TRUE(editor.apply());
+        CHECK_NEAR(gain, 6.0, 0.0001);
     }
 
     void testMenuStructure()
@@ -2549,10 +2709,16 @@ int main()
         "interface RTC DS3231",
         testRTCInterface);
 
+    TestHarness::run(
+        "enregistrement du menu horloge",
+        testRTCMenuApply);
+
     TestHarness::run("menu ADC indisponible au demarrage", testUnavailableAdcMenuReading);
     TestHarness::run(
         "éditeur de paramètres",
         testParameterEditor);
+
+    TestHarness::run("brouillons pendant la régulation", testLiveMenuDrafts);
 
     TestHarness::run(
         "structure du menu",

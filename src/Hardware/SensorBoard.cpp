@@ -219,8 +219,6 @@ void SensorBoard::startContinuous()
     gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
 
     pauseInterrupts = false;
-
-    Serial.println("ok");
 }
 
 
@@ -329,30 +327,22 @@ double_t SensorBoard::getAdcTemperature() {
  * @return double_t Résistance en Ohms
  */
 double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
+    
     const uint8_t channel = channelFor(rtdSensor);
 
     if (channel >= MAX_RTD)
         return NAN;
 
-    const CalibrationProfile& calibration =
-        calibrationFor(rtdSensor.settings.type);
+    const CalibrationProfile& calibration = calibrationFor(rtdSensor.settings.type);
 
-    const double_t gain =
-        measurementGain(rtdSensor.settings.wiring);
+    const double_t gain = measurementGain(rtdSensor.settings.wiring);
 
-    const double_t correctedValue =
-        rtdSensor.readValue() -
-        settings.zeroOffset[channel];
+    const double_t correctedValue = rtdSensor.readValue() - settings.zeroOffset[channel];
 
-    double_t Rrtd =
-        correctedValue *
-        calibration.refResistanceValue /
-        (ADC_FULL_SCALE * gain);
+    double_t Rrtd = correctedValue * calibration.refResistanceValue / (ADC_FULL_SCALE * gain);
 
     // Compensation de la mesure en fonction de la température
-    const double_t ppm =
-        (adcTemperature - calibration.calTemperatureADC) *
-        calibration.systemPPMCoeff;
+    //const double_t ppm = (adcTemperature - calibration.calTemperatureADC) * calibration.systemPPMCoeff;
 
     //Rrtd = Rrtd * (1 + ppm/1000000.0);
 

@@ -3,6 +3,7 @@
 
 #include <hmi/MenuBuilder.h>
 #include <hmi/ParameterEditor.h>
+#include <Hardware/RTC.h>
 
 #include <menu.h>
 #include <menuIO/adafruitGfxOut.h>
@@ -18,7 +19,10 @@ public:
         {
             None,
             Exit,
-            Action
+            Action,
+            ClockOpened,
+            ClockValidate,
+            ClockClosed
         };
 
         Type type = Type::None;
@@ -37,6 +41,9 @@ public:
     void move(int32_t direction);
     EnterResult enter();
     void poll();
+    void updateClockDisplay(const RTC::DateTime& dateTime, bool valid);
+    void clockParametersApplied(bool saved);
+    void refresh();
 
     bool isInitialized() const;
 
@@ -53,7 +60,7 @@ private:
         MAX_PARAMETERS +
         MenuBuilder::MAX_ACTIONS +
         (2 * (MAX_GROUPS - 1)) +
-        1;
+        4; // Quitter, les deux lignes de l'horloge et Valider.
     static constexpr size_t MAX_SELECTION_OPTIONS =
         ParameterList::MAX_SELECTION_OPTIONS;
 
@@ -78,6 +85,12 @@ private:
     Menu::menuNode* menuNodes[MAX_GROUPS] = {};
     Menu::Exit* backItems[MAX_GROUPS] = {};
     Menu::Exit* quitItem = nullptr;
+    MenuBuilder::GroupId clockGroup = MenuBuilder::INVALID_GROUP;
+    Menu::prompt* clockDateItem = nullptr;
+    Menu::prompt* clockTimeItem = nullptr;
+    Menu::prompt* clockValidateItem = nullptr;
+    char clockDateLabel[LABEL_LENGTH] = "Date : --/--/----";
+    char clockTimeLabel[LABEL_LENGTH] = "Heure : --:--:--";
 
     Menu::idx_t menuItemCounts[MAX_GROUPS] = {};
     size_t menuItemOffsets[MAX_GROUPS] = {};

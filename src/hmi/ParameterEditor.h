@@ -18,9 +18,12 @@ class ParameterEditor
 {
 public:
     void begin(const ParameterList& parameters);
-    void capture();
+    void capture(const char* ownerKey = nullptr);
     bool validate() const;
     bool apply();
+    bool hasChanges(const char* ownerKey = nullptr) const;
+    // À appeler sur le cœur de contrôle avant de valider le menu.
+    void refreshUnchanged();
 
     size_t count() const;
     ParameterDraft& get(size_t index);
@@ -32,7 +35,9 @@ public:
 
 private:
     ParameterDraft drafts[MAX_PARAMETERS];
+    double_t capturedValues[MAX_PARAMETERS] = {};
     size_t draftCount = 0;
+    bool isChanged(size_t index) const;
 };
 
 #endif

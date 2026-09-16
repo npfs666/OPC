@@ -1,14 +1,33 @@
-# OPC
+# OPC — Open Process Controller
 
 OPC est un framework embarqué pour construire des régulateurs sur une carte
-à RP2040. Il conserve une approche proche d'Arduino : une installation décrit
-ses capteurs, ses mesures, sa régulation, ses sorties et son écran d'accueil,
+OPC. La cible actuellement configurée est la Raspberry Pi Pico 2 (`rpipico2`,
+RP2350), avec Arduino et PlatformIO. Il conserve une approche proche d'Arduino :
+une installation décrit ses capteurs, ses mesures, sa régulation, ses sorties et son écran d'accueil,
 tandis que le framework gère le cycle d'acquisition, le menu et la sécurité.
 
-Le matériel actuel regroupe notamment trois entrées RTD, un ADS1120 et ses
-multiplexeurs, un BME280, un écran ST7789, un encodeur rotatif et des sorties
-relais. Le projet sert de base à des thermostats, régulateurs solaires, PID ou
+La révision OPC v0.2 utilise trois entrées de mesure multiplexées, un ADS1120,
+un expandeur MCP23017, un écran ST7789 de 240 × 240 pixels, un encodeur rotatif
+et six broches de sortie. Le firmware intègre aussi le BMP580 pour la pression
+et le DS3231 pour l'horloge ; des classes de mesure BME280 restent disponibles.
+Le projet sert de base à des thermostats, régulateurs solaires, PID ou
 psychromètres personnalisés.
+
+## Application actuellement sélectionnée
+
+[`src/main.cpp`](src/main.cpp) instancie `TestInstallation`, une installation
+de développement qui assemble, avec ses valeurs par défaut :
+
+- un thermocouple de type K sur l'entrée 1 ;
+- une PT100 quatre fils sur l'entrée 2 ;
+- un BMP580, nécessaire au démarrage de cette installation ;
+- un calcul d'humidité relative psychrométrique à partir des deux températures
+  et de la pression.
+
+Les régulateurs, actionneurs et relais de cette installation sont actuellement
+commentés : elle ne pilote aucune sortie. Son écran affiche `T1`, `T2` et `HR`,
+mais `T1` pointe encore vers l'ancienne mesure RTD non enregistrée et affiche
+donc `--.-`. La mesure thermocouple est bien enregistrée dans le processus.
 
 ## Architecture
 
@@ -25,7 +44,10 @@ Le traitement suit cette chaîne :
 Une classe dérivée d'`Installation` assemble ces objets et dessine son écran
 d'accueil. `OPC` reçoit cette installation par référence et s'occupe du reste :
 acquisition sur le cœur de contrôle, interface sur le second cœur, menu,
-configuration persistante et échanges inter-cœurs.
+configuration persistante et échanges inter-cœurs. Le cœur 0 exécute
+l'acquisition et le contrôle ; le cœur 1 gère l'interface et l'affichage.
+Les écrans lisent une copie des mesures et sorties (`ProcessSnapshot`),
+capturée sous mutex, pour éviter de lire des données en cours de modification.
 
 Une sortie se raccorde à un actionneur par une seule opération :
 
@@ -48,6 +70,10 @@ Les principaux dossiers sont :
 - `examples/MinimalInstallation` : création minimale d'une installation.
 
 ## Choisir une installation
+
+Les templates disponibles sont `ThermostatInstallation` (une PT100 et un
+relais), `SolarInstallation` (trois PT100 et un relais de pompe) et
+`PIDInstallation` (une PT100, un PID et un relais à commande temporelle).
 
 L'installation doit vivre aussi longtemps qu'`OPC`, car le framework en
 conserve une référence. Elle est donc généralement créée au niveau global dans
@@ -104,7 +130,7 @@ stockés dans leur propre sous-menu.
 
 Quand la rampe est activée, la consigne appliquée part de la première mesure
 valide puis rejoint progressivement la consigne cible. Elle est figée pendant
-une pause du menu ou une mesure invalide, afin de ne pas rattraper brutalement
+l'application des réglages ou une mesure invalide, afin de ne pas rattraper brutalement
 le temps perdu. L'autotune utilise directement sa consigne cible et ignore la
 rampe.
 
@@ -124,9 +150,9 @@ applique les valeurs éditées, ferme le menu et démarre l'essai ; elle n'est n
 un paramètre ni une valeur persistante. Si la désactivation du PID ne peut pas
 être sauvegardée, l'essai est annulé et la sortie reste sûre.
 
-La sortie oscille ensuite sans bloquer la boucle de contrôle. Ouvrir le menu
-pendant l'essai suffit à l'annuler, car le framework met alors les sorties en
-sécurité. Une mesure invalide, une sortie de la plage sûre, un timeout ou des
+La sortie oscille ensuite sans bloquer la boucle de contrôle. La consultation
+du menu laisse l'essai continuer. L'application de réglages modifiés ou
+l'exécution d'une action interrompt l'essai et met les sorties en sécurité. Une mesure invalide, une sortie de la plage sûre, un timeout ou des
 oscillations instables arrêtent également la commande. L'état sûr du relais est
 verrouillé à `OFF` dans ce template.
 
@@ -136,8 +162,8 @@ succès, `Kp`, `Ki` et `Kd` sont copiés ensemble dans le PID principal puis
 sauvegardés automatiquement. Le PID reste volontairement arrêté : relire les
 gains dans `Regulateur > PID`, puis passer `Régulation active` à `Oui` pour
 démarrer la régulation. Si le stockage signale un échec sur le port série, les
-gains restent disponibles en mémoire vive ; ouvrir puis quitter le menu permet
-de tenter une nouvelle sauvegarde avant de redémarrer la carte.
+gains restent disponibles en mémoire vive ; une nouvelle modification de
+paramètre suivie de la fermeture du menu permet de retenter la sauvegarde.
 
 L'essai par relais suit automatiquement le mode choisi et applique ensuite les
 règles PID classiques de Ziegler-Nichols. Ces règles peuvent être agressives :
@@ -165,18 +191,27 @@ appartient bien à l'installation sélectionnée.
 
 ## Compiler et tester
 
-Le projet utilise PlatformIO. Depuis la racine :
+Le projet utilise le cœur Arduino Earle Philhower et la plateforme
+`maxgerhardt/platform-raspberrypi`. Les dépendances sont déclarées dans
+[`platformio.ini`](platformio.ini) et installées par PlatformIO. Depuis la
+racine, compiler explicitement la révision actuelle :
 
 ```sh
-pio run -e pico
+pio run -e opc_v02
 ```
 
 Pour téléverser puis ouvrir le port série à 115200 bauds :
 
 ```sh
-pio run -e pico -t upload
-pio device monitor -b 115200
+pio run -e opc_v02 -t upload
+pio device monitor -e opc_v02 -b 115200
 ```
+
+Le téléversement utilise `picotool` et 1 Mio de flash est réservé au système
+de fichiers. L'environnement `opc_v01` existe encore, mais son ancien brochage
+à macros ne fournit pas les espaces de noms `Board::...` utilisés par le code
+actuel : il nécessite une adaptation avant utilisation. L'ancien environnement
+`pico`, encore cité dans le README de l'exemple minimal, n'existe plus.
 
 Les tests hôte nécessitent `g++` et ne demandent pas de carte connectée :
 
@@ -184,16 +219,42 @@ Les tests hôte nécessitent `g++` et ne demandent pas de carte connectée :
 bash test/host/run_tests.sh
 ```
 
-Ils couvrent les principaux calculs, régulateurs, paramètres et l'ordre de
-traitement. L'ADS1120, les multiplexeurs, LittleFS et l'USB nécessitent encore
-des tests d'intégration sur une carte réelle.
+Le script utilise C++17 et accepte un autre compilateur via `CXX`. Les tests
+couvrent notamment les conversions PT100 et thermocouples, la compensation de
+jonction froide, la psychrométrie, les mesures BME280, le DS3231, les régulateurs,
+l'autotune, les paramètres, les snapshots et le watchdog. Ils utilisent des
+doublures matérielles ; l'ADS1120, les multiplexeurs, LittleFS et l'USB
+nécessitent encore des tests d'intégration sur une carte réelle.
 
 ## Menu et configuration USB
 
-Le clic sur l'encodeur ouvre le menu. Les modifications sont faites sur une
-copie, puis validées, appliquées et sauvegardées à la sortie. Un paramètre
+Le clic sur l'encodeur ouvre le menu sans interrompre l'acquisition ni la
+régulation. Le cœur de contrôle prépare une copie des paramètres ; les
+modifications du menu restent sur cette copie pendant la navigation. Elles
+sont automatiquement validées, appliquées et sauvegardées à la sortie ou
+après inactivité (10 s par défaut, réglable dans `Divers > Menu`), sans bouton
+« Appliquer ». Une consultation sans modification ne provoque ni pause, ni
+réinitialisation du PID, ni sauvegarde.
+
+Lorsqu'il y a des modifications ou une action à exécuter, les sorties sont
+mises en sécurité pendant l'application et la sauvegarde. L'acquisition
+redémarre ensuite et la régulation reprend avec de nouvelles mesures valides.
+Un brouillon invalide reste dans le menu pour correction, sans interrompre
+la régulation en cours. Les valeurs calculées pendant la navigation, notamment
+les gains issus de l'autotune, sont conservées si elles n'ont pas été éditées.
+Une valeur explicitement éditée dans le menu prend la priorité. Un paramètre
 `readOnly` est seulement non éditable dans le menu : le firmware peut le
 calculer et il peut être restauré depuis `config.json`.
+
+`Divers > Horloge` affiche la date et l'heure actuelles sur les deux premières
+lignes, rafraîchies chaque seconde. Les champs suivants règlent l'année, le mois,
+le jour, l'heure, les minutes et les secondes (années 2000 à 2099, format 24 h).
+Le bouton `Valider`, placé avant `Quitter`, écrit les modifications ensemble
+dans le DS3231 et laisse le menu ouvert. `Quitter` et l'expiration du timeout
+abandonnent les modifications non validées, même si un champ est encore en édition.
+Une simple consultation ne réécrit pas l'horloge. Une date impossible ou une
+erreur I²C laisse le menu ouvert avec `Erreur date / RTC` et conserve la saisie
+pour correction ou nouvel essai. Ces champs ne sont pas sauvegardés dans LittleFS.
 
 LittleFS conserve la configuration interne. Quand la Pico est reliée à un PC,
 le firmware expose aussi un petit volume USB contenant une copie stable nommée
@@ -211,20 +272,37 @@ enregistrée à nouveau.
 
 ## État et limites actuelles
 
-- La cible PlatformIO configurée est la Raspberry Pi Pico RP2040 et le brochage
-  correspond à la carte OPC actuelle.
-- La chaîne matérielle et les templates sont actuellement centrés sur les
-  PT100. Le type PT1000 reste déclaré, mais n'est pas le chemin matériel validé.
+- Le brochage actuel est défini dans
+  [`Pinout_v0.2.h`](src/Hardware/Boards/Pinout_v0.2.h). L'espace de noms
+  `Board::Rp2040` conserve son nom historique malgré la cible Pico 2.
+- La mesure de température RTD est implémentée pour les PT100. Le routage
+  matériel, la mesure de résistance et la calibration PT1000 existent, mais
+  leur conversion en température reste désactivée dans `TemperatureRTD`.
+- Les thermocouples B, E, J, K, N, R, S et T disposent de conversions fondées
+  sur les polynômes NIST, sans extrapolation hors domaine. Le type B est limité
+  à 250–1820 °C pour la température mesurée. Le routage thermocouple impose
+  deux fils et adapte le gain ADC au type sélectionné.
+- La compensation de jonction froide utilise la température interne de
+  l'ADS1120, corrigée par `Divers > Calibration > Thermocouples > C.J. offset`.
+  Ce menu affiche aussi `Temp. ADC`. La précision réelle dépend donc notamment
+  de l'écart de température entre l'ADC et le raccordement du thermocouple.
 - La sortie physique implémentée est le relais tout-ou-rien. PWM et Modbus sont
   prévus comme extensions de l'abstraction `Output`.
 - `Divers > Calibration` contient un profil PT100 et un profil PT1000. Chaque
   profil conserve sa résistance de référence effective, la valeur de l'étalon,
   et la température de calibration. Le sous-menu commun `Zeros ADC` conserve
   un zéro propre à chacune des trois entrées. Les actions `Mesurer N0` utilisent
-  un shunt au connecteur et l'action `Remettre les N0 à zéro` efface les trois
+  un shunt au connecteur et l'action `RAZ des N0` efface les trois
   corrections en une fois. L'action `Calibrer Rref (E1)` utilise ensuite
   l'étalon branché en quatre fils sur l'entrée 1. Une mesure instable, saturée
   ou hors plage est rejetée sans remplacer la calibration précédente.
+- Le coefficient thermique de calibration est enregistré, mais sa correction
+  dans le calcul de résistance est actuellement commentée.
+- `Input > Timeout mesures` met les sorties en sécurité en l'absence de
+  nouvelles acquisitions (30 s par défaut, réglable de 10 à 300 s).
+  Un watchdog matériel distinct surveille la progression des deux cœurs et
+  redémarre la carte en cas de blocage ; son délai est fixé à 8 s dans
+  [`SystemWatchdog.h`](src/SystemWatchdog.h).
 - Les dimensions des listes sont fixes afin d'éviter l'allocation dynamique sur
   le microcontrôleur. Leurs limites sont regroupées dans
   `src/Hardware/pinout.h`.

@@ -230,9 +230,11 @@ void ProcessControl::captureSnapshot(
  */
 void ProcessControl::printCSVPsychro(Stream& stream) const {
 
-    stream.print(measurements[4]->getValue());
+    stream.print(measurements[2]->getValue(),3);
     stream.print(";");
-    stream.println(measurements[7]->getValue());
+    stream.print(measurements[4]->getValue(),3);
+    stream.print(";");
+    stream.println(measurements[5]->getValue(),3);
 }
 
 void ProcessControl::print(Stream& stream) const

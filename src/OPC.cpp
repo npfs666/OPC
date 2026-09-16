@@ -109,7 +109,7 @@ void OPC::initBMP580()
     Wire1.setSCL(Board::Rp2040::I2C_SCL);
 
     bmp580Initialized =
-        bmp580.begin(BMP5XX_ALTERNATIVE_ADDRESS, &Wire1);
+        bmp580.begin(Board::BMP::ADDRESS, &Wire1);
 
     if (!bmp580Initialized)
     {
@@ -210,6 +210,17 @@ void OPC::controlPoll()
 {
     storage.poll();
 
+    if (millis() - lastClockRefresh >= 1000)
+    {
+        lastClockRefresh = millis();
+        RTC::DateTime dateTime;
+        const bool valid = clock.readDateTime(dateTime);
+        mutex_enter_blocking(&processDataMutex);
+        sharedClockDateTime = dateTime;
+        sharedClockValid = valid;
+        mutex_exit(&processDataMutex);
+    }
+
     if (configurationSavePending &&
         !acquisitionPausedForMenu)
     {
@@ -282,7 +293,10 @@ bool OPC::initMeasurements()
         return false;
     }
 
-    if (!userInstall.completeParameterRegistration())
+    clock.registerParameters(userInstall.getParameters());
+
+    if (!userInstall.completeParameterRegistration() ||
+        userInstall.getParameters().hasError())
     {
         Serial.println(
             "Framework parameter registration failed");
@@ -344,8 +358,6 @@ void OPC::initMenu()
     if (menu.isInitialized())
         return;
 
-    parameterEditor.capture();
-
     if (!userInstall.buildMenu(
             menuDefinition) ||
         !input.addMenuActions(
@@ -401,11 +413,11 @@ void OPC::requestMenu()
     pendingMenuAction =
         MenuBuilder::NO_ACTION;
 
-    uiState = UIState::PauseRequested;
+    uiState = UIState::CaptureRequested;
 
     rp2040.fifo.push(
         interCoreMessageValue(
-            InterCoreMessage::PauseAcquisition));
+            InterCoreMessage::CaptureMenuParameters));
 }
 
 void OPC::requestParameterApply(
@@ -422,6 +434,13 @@ void OPC::requestParameterApply(
 
     menu.close();
 
+    if (clockMenuOpen)
+    {
+        // Le timeout abandonne les champs de l'horloge non validés.
+        parameterEditor.capture(RTC::MENU_OWNER_KEY);
+        clockMenuOpen = false;
+    }
+
     pendingMenuAction = actionId;
 
     uiState = UIState::ApplyRequested;
@@ -436,6 +455,15 @@ void OPC::requestParameterApply(
     rp2040.fifo.push(
         interCoreMessageValue(
             InterCoreMessage::ApplyMenuParameters));
+}
+
+void OPC::requestClockApply()
+{
+    uiState = UIState::ClockApplyRequested;
+    // Les brouillons restent figés jusqu'à la réponse du cœur contrôle.
+    __dmb();
+    rp2040.fifo.push(interCoreMessageValue(
+        InterCoreMessage::ApplyClockParameters));
 }
 
 void OPC::uiPoll()
@@ -478,6 +506,38 @@ void OPC::uiPoll()
     if (clicked)
         enterResult = menu.enter();
 
+    if (enterResult.type == ArduinoMenuUI::EnterResult::Type::ClockOpened)
+    {
+        clockMenuOpen = true;
+        uiState = UIState::ClockCaptureRequested;
+        __dmb();
+        rp2040.fifo.push(interCoreMessageValue(
+            InterCoreMessage::CaptureClockParameters));
+        return;
+    }
+
+    if (enterResult.type == ArduinoMenuUI::EnterResult::Type::ClockValidate)
+    {
+        requestClockApply();
+        return;
+    }
+
+    if (enterResult.type == ArduinoMenuUI::EnterResult::Type::ClockClosed)
+    {
+        // Aucun accès au DS3231 : restaurer les derniers champs capturés.
+        parameterEditor.capture(RTC::MENU_OWNER_KEY);
+        clockMenuOpen = false;
+    }
+
+    if (clockMenuOpen)
+    {
+        mutex_enter_blocking(&processDataMutex);
+        const RTC::DateTime dateTime = sharedClockDateTime;
+        const bool valid = sharedClockValid;
+        mutex_exit(&processDataMutex);
+        menu.updateClockDisplay(dateTime, valid);
+    }
+
     menu.poll();
 
     const uint32_t now = millis();
@@ -510,31 +570,45 @@ void OPC::handleControlMessage(
 {
     switch (message)
     {
-    case InterCoreMessage::PauseAcquisition:
-        if (!acquisitionPausedForMenu)
-        {
-            input.pause();
-            input.resetAcquisition();
-
-            mutex_enter_blocking(
-                &processDataMutex);
-
-            controller.forceSafeOutputs();
-            controlOutputsEnabled = false;
-
-            userInstall.onMenuOpened();
-
-            mutex_exit(&processDataMutex);
-
-            acquisitionPausedForMenu = true;
-        }
-
-        /* Rend les valeurs préparées visibles avant la capture du menu. */
+    case InterCoreMessage::CaptureClockParameters:
         __dmb();
+        if (menuSessionOpen)
+        {
+            clock.onMenuOpened();
+            parameterEditor.capture(RTC::MENU_OWNER_KEY);
+        }
+        __dmb();
+        rp2040.fifo.push(interCoreMessageValue(
+            InterCoreMessage::ClockParametersCaptured));
+        break;
 
-        rp2040.fifo.push(
-            interCoreMessageValue(
-                InterCoreMessage::AcquisitionPaused));
+    case InterCoreMessage::ApplyClockParameters:
+    {
+        __dmb();
+        const bool saved = menuSessionOpen &&
+            clock.applyMenuParameters(parameterEditor);
+        __dmb();
+        rp2040.fifo.push(interCoreMessageValue(saved
+            ? InterCoreMessage::ClockParametersApplied
+            : InterCoreMessage::ClockParametersRejected));
+        break;
+    }
+
+    case InterCoreMessage::CaptureMenuParameters:
+        if (menuSessionOpen)
+            break;
+
+        mutex_enter_blocking(&processDataMutex);
+        userInstall.onMenuOpened();
+        clock.onMenuOpened();
+        parameterEditor.capture();
+        menuSessionOpen = true;
+        mutex_exit(&processDataMutex);
+
+        // Le cœur UI possède ensuite les brouillons jusqu'à la fermeture.
+        __dmb();
+        rp2040.fifo.push(interCoreMessageValue(
+            InterCoreMessage::MenuParametersCaptured));
         break;
 
     case InterCoreMessage::ApplyMenuParameters:
@@ -552,13 +626,29 @@ void OPC::handleControlMessage(
         pendingMenuAction =
             MenuBuilder::NO_ACTION;
 
-        if (!acquisitionPausedForMenu)
+        if (!menuSessionOpen)
         {
             rp2040.fifo.push(
                 interCoreMessageValue(
                     InterCoreMessage::MenuParametersRejected));
             break;
         }
+
+        // Une consultation seule ne touche ni au PID ni à l'acquisition.
+        if (!parameterEditor.hasChanges() &&
+            actionId == MenuBuilder::NO_ACTION &&
+            !acquisitionPausedForMenu)
+        {
+            menuSessionOpen = false;
+            __dmb();
+            rp2040.fifo.push(interCoreMessageValue(
+                InterCoreMessage::MenuParametersApplied));
+            break;
+        }
+
+        // Préserver les valeurs calculées pendant la navigation (autotune,
+        // diagnostics...) si l'utilisateur ne les a pas modifiées.
+        parameterEditor.refreshUnchanged();
 
         if (!parameterEditor.validate() ||
             !input.validateParameters(
@@ -566,8 +656,7 @@ void OPC::handleControlMessage(
             !controller.validateParameters(
                 parameterEditor) ||
             !userInstall.validateParameters(
-                parameterEditor) ||
-            !parameterEditor.apply())
+                parameterEditor))
         {
             rp2040.fifo.push(
                 interCoreMessageValue(
@@ -575,11 +664,20 @@ void OPC::handleControlMessage(
             break;
         }
 
-        mutex_enter_blocking(
-            &processDataMutex);
+        input.pause();
+        input.resetAcquisition();
+        acquisitionPausedForMenu = true;
+
+        mutex_enter_blocking(&processDataMutex);
+        controller.forceSafeOutputs();
+        controlOutputsEnabled = false;
+        sharedProcessSnapshot = ProcessSnapshot{};
 
         const bool outputsApplied =
-            controller.applyOutputSettings();
+            parameterEditor.apply() && controller.applyOutputSettings();
+
+        if (outputsApplied)
+            userInstall.onParametersApplied();
 
         mutex_exit(&processDataMutex);
 
@@ -590,8 +688,6 @@ void OPC::handleControlMessage(
                     InterCoreMessage::MenuParametersRejected));
             break;
         }
-
-        userInstall.onParametersApplied();
 
         bool actionSucceeded = true;
         bool sensorBoardAction = false;
@@ -666,6 +762,7 @@ void OPC::handleControlMessage(
         input.startContinuous();
 
         acquisitionPausedForMenu = false;
+        menuSessionOpen = false;
         controlOutputsEnabled = false;
         lastMeasurementTime = millis();
 
@@ -689,6 +786,28 @@ void OPC::handleUIMessage(
 {
     switch (message)
     {
+    case InterCoreMessage::ClockParametersCaptured:
+        if (uiState != UIState::ClockCaptureRequested)
+            break;
+        __dmb();
+        menu.refresh();
+        lastMenuActivity = millis();
+        uiState = UIState::Menu;
+        break;
+
+    case InterCoreMessage::ClockParametersApplied:
+    case InterCoreMessage::ClockParametersRejected:
+    {
+        if (uiState != UIState::ClockApplyRequested)
+            break;
+        __dmb();
+        const bool saved = message == InterCoreMessage::ClockParametersApplied;
+        menu.clockParametersApplied(saved);
+        lastMenuActivity = millis();
+        uiState = UIState::Menu;
+        break;
+    }
+
     case InterCoreMessage::ParametersReady:
         initMenu();
         copyProcessSnapshot();
@@ -722,9 +841,9 @@ void OPC::handleUIMessage(
         break;
     }
 
-    case InterCoreMessage::AcquisitionPaused:
+    case InterCoreMessage::MenuParametersCaptured:
         if (uiState !=
-                UIState::PauseRequested)
+                UIState::CaptureRequested)
         {
             break;
         }
@@ -732,7 +851,6 @@ void OPC::handleUIMessage(
         /* Le cœur contrôle a préparé l'état avant son acquittement. */
         __dmb();
 
-        parameterEditor.capture();
         menu.show();
 
         lastMenuActivity = millis();
@@ -757,9 +875,6 @@ void OPC::handleUIMessage(
         }
 
         copyProcessSnapshot();
-
-        displayProcessSnapshot =
-            ProcessSnapshot{};
 
         uiState = UIState::Home;
         showHomeScreen(true);
