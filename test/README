@@ -16,6 +16,7 @@ Ils couvrent actuellement :
 - les régulateurs thermostat, solaire et PID en chauffage/refroidissement,
   dont l'autotune par relais dans les deux sens ;
 - le timeout, la stabilité des oscillations et le verrouillage sûr des relais ;
+- les sorties PWM : rapport cyclique, polarité, fréquence commune, menu et repli ;
 - l'éditeur de paramètres et la séparation des menus PID/autotune ;
 - les actions de menu non persistantes et l'événement de nouveaux gains ;
 - l'ordre régulateur, actionneur, sortie et snapshot.

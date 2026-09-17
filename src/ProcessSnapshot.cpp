@@ -1,7 +1,48 @@
 #include <ProcessSnapshot.h>
 
 #include <Measurements/Measurement.h>
+#include <Inputs/DigitalInput.h>
 #include <Outputs/Output.h>
+
+size_t ProcessSnapshot::inputCount() const
+{
+    return digitalInputSampleCount;
+}
+
+const DigitalInputSample* ProcessSnapshot::inputAt(size_t index) const
+{
+    if (index >= digitalInputSampleCount)
+        return nullptr;
+
+    return &digitalInputSamples[index];
+}
+
+const DigitalInputSample* ProcessSnapshot::find(
+    const DigitalInput& input) const
+{
+    for (size_t i = 0; i < digitalInputSampleCount; i++)
+    {
+        if (digitalInputSamples[i].source == &input)
+            return &digitalInputSamples[i];
+    }
+
+    return nullptr;
+}
+
+bool ProcessSnapshot::add(const DigitalInput& input)
+{
+    if (digitalInputSampleCount >= MAX_DIGITAL_INPUTS)
+        return false;
+
+    DigitalInputSample& sample =
+        digitalInputSamples[digitalInputSampleCount++];
+
+    sample.source = &input;
+    sample.active = input.isActive();
+    sample.valid = input.isValid();
+    sample.sampledAt = input.sampledAt();
+    return true;
+}
 
 size_t ProcessSnapshot::measurementCount() const
 {
@@ -66,6 +107,7 @@ uint32_t ProcessSnapshot::capturedAt() const
 
 void ProcessSnapshot::clear(uint32_t now)
 {
+    digitalInputSampleCount = 0;
     measurementSampleCount = 0;
     outputSampleCount = 0;
     captureTime = now;

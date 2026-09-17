@@ -31,6 +31,9 @@ fi
     -I"${project_dir}/src" \
     "${project_dir}/test/host/test_main.cpp" \
     "${project_dir}/test/host/test_thermocouple.cpp" \
+    "${project_dir}/test/host/test_pwm.cpp" \
+    "${project_dir}/test/host/test_digital_input.cpp" \
+    "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
     "${project_dir}/src/Hardware/Sensor.cpp" \
@@ -48,8 +51,10 @@ fi
     "${project_dir}/src/Measurements/Temperature/TemperatureRTD.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureTC.cpp" \
     "${project_dir}/src/Outputs/Actuator.cpp" \
+    "${project_dir}/src/Outputs/ActuatorPWM.cpp" \
     "${project_dir}/src/Outputs/Output.cpp" \
     "${project_dir}/src/Outputs/RelayOutput.cpp" \
+    "${project_dir}/src/Outputs/PWMOutput.cpp" \
     "${project_dir}/src/Physics/PT100.cpp" \
     "${project_dir}/src/Physics/Thermocouple.cpp" \
     "${project_dir}/src/Physics/Psychrometrics.cpp" \

@@ -6,6 +6,7 @@
 #include <Hardware/pinout.h>
 
 class Actuator;
+class DigitalInput;
 class Measurement;
 class Output;
 class ParameterEditor;
@@ -20,6 +21,7 @@ public:
     ProcessControl();
 
     bool add(Measurement& measurement);
+    bool add(DigitalInput& input);
     bool add(Regulator& regulator);
     bool add(Actuator& actuator);
 
@@ -35,6 +37,12 @@ public:
         uint32_t now);
 
     void poll(uint32_t now);
+
+    // Acquisition indépendante du cycle ADC et de l'activation des sorties.
+    void pollInputs(uint32_t now);
+
+    // Actualise uniquement les entrées, sans modifier les mesures/sorties.
+    void captureInputSnapshot(ProcessSnapshot& destination) const;
 
     void resume(uint32_t now);
 
@@ -62,6 +70,9 @@ public:
         const ParameterEditor& editor) const;
 
 private:
+
+    DigitalInput* digitalInputs[MAX_DIGITAL_INPUTS] = {};
+    uint8_t digitalInputCount = 0;
 
     Measurement* measurements[MAX_MEASUREMENTS];
     uint8_t measurementCount;

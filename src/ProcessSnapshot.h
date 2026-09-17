@@ -8,9 +8,23 @@
 #include <cstdint>
 
 class Measurement;
+class DigitalInput;
 class Output;
 class ProcessControl;
 class ProcessSnapshot;
+
+struct DigitalInputSample
+{
+    bool active = false;
+    bool valid = false;
+    // Date de dernière lecture, indépendante de capturedAt().
+    uint32_t sampledAt = 0;
+
+private:
+    friend class ProcessSnapshot;
+
+    const DigitalInput* source = nullptr;
+};
 
 struct MeasurementSample
 {
@@ -39,6 +53,12 @@ private:
 class ProcessSnapshot
 {
 public:
+    size_t inputCount() const;
+
+    const DigitalInputSample* inputAt(size_t index) const;
+
+    const DigitalInputSample* find(const DigitalInput& input) const;
+
     size_t measurementCount() const;
 
     const MeasurementSample* measurementAt(
@@ -62,6 +82,8 @@ private:
 
     void clear(uint32_t now);
 
+    bool add(const DigitalInput& input);
+
     bool add(
         const Measurement& measurement);
 
@@ -69,6 +91,8 @@ private:
         const Output& output);
 
     MeasurementSample measurementSamples[MAX_MEASUREMENTS] = {};
+    DigitalInputSample digitalInputSamples[MAX_DIGITAL_INPUTS] = {};
+    size_t digitalInputSampleCount = 0;
     OutputSample outputSamples[MAX_REGISTERED_OUTPUTS] = {};
     size_t measurementSampleCount = 0;
     size_t outputSampleCount = 0;

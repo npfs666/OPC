@@ -11,10 +11,11 @@
  */
 #include <OPC.h>
 #include <SystemWatchdog.h>
-#include <testInstallation.h>
+#include <Templates/testInstallation.h>
 #include <Templates/ThermostatInstallation.h>
 #include <Templates/SolarInstallation.h>
 #include <Templates/PIDInstallation.h>
+#include <Templates/TestIO.h>
 #include <hardware/sync.h>
 
 

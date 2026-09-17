@@ -42,12 +42,14 @@ namespace Board
         inline constexpr uint8_t ROTENC_CLIC= 28;
 
         // Sorties
-        inline constexpr uint8_t OUTPUT_1 = 21;
-        inline constexpr uint8_t OUTPUT_2 = 20;
-        inline constexpr uint8_t OUTPUT_3 = 26;
-        inline constexpr uint8_t OUTPUT_4 = 27;
-        inline constexpr uint8_t OUTPUT_5 = 8;
-        inline constexpr uint8_t OUTPUT_6 = 9;
+        inline constexpr uint8_t OUTPUT_1 = 21; // Relais 1
+        inline constexpr uint8_t OUTPUT_2 = 20; // Relais 2
+        inline constexpr uint8_t OUTPUT_3 = 26; // PWM 1
+        inline constexpr uint8_t OUTPUT_4 = 27; // PWM 2
+
+        // Entrées numériques isolées (ISO1212)
+        inline constexpr uint8_t DIGITAL_INPUT_1 = 8;
+        inline constexpr uint8_t DIGITAL_INPUT_2 = 9;
     }
 
     namespace Mcp23017

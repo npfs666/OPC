@@ -1,6 +1,7 @@
 #include <ProcessControl.h>
 
 #include <Measurements/Measurement.h>
+#include <Inputs/DigitalInput.h>
 #include <Outputs/Actuator.h>
 #include <Outputs/Output.h>
 #include <ProcessSnapshot.h>
@@ -13,6 +14,36 @@ ProcessControl::ProcessControl()
     regulatorCount = 0;
     actuatorCount = 0;
     outputCount = 0;
+}
+
+bool ProcessControl::add(DigitalInput& input)
+{
+    if (digitalInputCount >= MAX_DIGITAL_INPUTS)
+        return false;
+
+    for (uint8_t i = 0; i < digitalInputCount; i++)
+    {
+        if (digitalInputs[i] == &input)
+            return false;
+    }
+
+    digitalInputs[digitalInputCount++] = &input;
+    return true;
+}
+
+void ProcessControl::pollInputs(uint32_t now)
+{
+    for (uint8_t i = 0; i < digitalInputCount; i++)
+        digitalInputs[i]->poll(now);
+}
+
+void ProcessControl::captureInputSnapshot(
+    ProcessSnapshot& destination) const
+{
+    destination.digitalInputSampleCount = 0;
+
+    for (uint8_t i = 0; i < digitalInputCount; i++)
+        destination.add(*digitalInputs[i]);
 }
 
 bool ProcessControl::add(Measurement& measurement)
@@ -111,6 +142,8 @@ bool ProcessControl::connect(
 void ProcessControl::updateMeasurementsAndRegulators(
     uint32_t now)
 {
+    pollInputs(now);
+
     for (uint8_t i = 0; i < measurementCount; i++)
     {
         if (measurements[i] != nullptr)
@@ -203,6 +236,7 @@ void ProcessControl::captureSnapshot(
     uint32_t now) const
 {
     destination.clear(now);
+    captureInputSnapshot(destination);
 
     for (uint8_t i = 0; i < measurementCount; i++)
     {
@@ -241,6 +275,12 @@ void ProcessControl::print(Stream& stream) const
 {
     //stream.println();
     stream.println(F("===== Process Control ====="));
+
+    if (digitalInputCount > 0)
+        stream.println(F("-------Digital inputs-----"));
+
+    for (uint8_t i = 0; i < digitalInputCount; i++)
+        digitalInputs[i]->print(stream);
 
     stream.println(F("-------Measurements-------"));
     for (uint8_t i = 0; i < measurementCount; i++)
@@ -281,6 +321,9 @@ void ProcessControl::print(Stream& stream) const
 
 void ProcessControl::registerParameters(ParameterList& list)
 {
+    for (uint8_t i = 0; i < digitalInputCount; i++)
+        digitalInputs[i]->registerParameters(list);
+
     for (size_t i = 0; i < regulatorCount; i++)
     {
         regulators[i]->registerParameters(list);

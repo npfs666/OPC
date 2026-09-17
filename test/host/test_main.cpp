@@ -2654,6 +2654,8 @@ namespace
 }
 
 void runThermocoupleTests();
+void runPWMTests();
+void runDigitalInputTests();
 
 int main()
 {
@@ -2805,6 +2807,8 @@ int main()
         testSystemWatchdogRequiresBothCores);
 
     runThermocoupleTests();
+    runPWMTests();
+    runDigitalInputTests();
 
     return TestHarness::finish();
 }

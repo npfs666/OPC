@@ -75,9 +75,6 @@ OPC::OPC(Installation& installation)
       userInstall(installation)
 {
     mutex_init(&processDataMutex);
-    //pinMode(LCD_RESET, OUTPUT);
-    //digitalWrite(LCD_RESET, 1);
-
 }
 
 
@@ -156,13 +153,12 @@ void OPC::handleISRButton()
 
 bool OPC::newMeasurement()
 {
-    if(!input.newMeasurement)
+    if (!input.newMeasurement)
         return false;
 
     input.newMeasurement = false;
-    
-    // Faire la MAJ des mesures (conversion data -> mesure)
-    unsigned long times = millis();
+
+    const uint32_t times = millis();
 
     mutex_enter_blocking(
         &processDataMutex);
@@ -208,6 +204,12 @@ bool OPC::newMeasurement()
 
 void OPC::controlPoll()
 {
+    // Les entrées restent accessibles même lorsque les sorties sont arrêtées.
+    mutex_enter_blocking(&processDataMutex);
+    controller.pollInputs(millis());
+    controller.captureInputSnapshot(sharedProcessSnapshot);
+    mutex_exit(&processDataMutex);
+
     storage.poll();
 
     if (millis() - lastClockRefresh >= 1000)

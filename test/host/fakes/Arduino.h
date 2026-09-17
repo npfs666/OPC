@@ -8,13 +8,29 @@
 using byte = uint8_t;
 
 constexpr uint8_t OUTPUT = 1;
+constexpr uint8_t INPUT = 0;
+constexpr int LOW = 0;
+constexpr int HIGH = 1;
 
-inline void pinMode(uint8_t, uint8_t)
+namespace FakeDigitalIO
 {
+    inline uint8_t modes[256] = {};
+    inline int levels[256] = {};
 }
 
-inline void digitalWrite(uint8_t, bool)
+inline void pinMode(uint8_t pin, uint8_t mode)
 {
+    FakeDigitalIO::modes[pin] = mode;
+}
+
+inline void digitalWrite(uint8_t pin, bool level)
+{
+    FakeDigitalIO::levels[pin] = level ? HIGH : LOW;
+}
+
+inline int digitalRead(uint8_t pin)
+{
+    return FakeDigitalIO::levels[pin];
 }
 
 class Stream
