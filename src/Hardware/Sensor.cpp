@@ -220,9 +220,11 @@ void Sensor::registerParameters(ParameterList& list)
         settings.offset,
         -5,
         5,
-        0.01,
+        0.1,
         3,
-        "°C");
+        "°C",
+        false,
+        0.001);
 
     parameters.addSelection(
         "sensor.samples",

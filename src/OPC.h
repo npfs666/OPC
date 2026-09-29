@@ -35,6 +35,8 @@ public:
 
     void initSerial();
     void initDisplay();
+    void initI2C();
+    void initRTC();
     void initBMP580();
     void initSensorBoard();
     void initRotenc();
@@ -105,6 +107,7 @@ private:
     bool menuSessionOpen = false;
     bool controlOutputsEnabled = false;
     bool bmp580Initialized = false;
+    bool sensorBoardInitialized = false;
     bool configurationSavePending = false;
     uint32_t lastMeasurementTime = 0;
 

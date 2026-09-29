@@ -1,0 +1,5 @@
+j'ai fait baisser la température de la boîte avec la Rcal 100 à l'exterieur pour voir de combien change la mesure d'OPC en fonction de la t°c
+
+Avec le programme test.py, la conclusion c'est que OPC bouge d'environ -1ppm/10°K, c'est beaucoup trop peu pour faire une affirmation et une correction.
+
+il faudrait faire un essai avec un delta plus grand et aller aussi dans les valeurs haute de température. 0-5°C et 30°C+

@@ -100,11 +100,15 @@ void OPC::initDisplay()
     tft.fillScreen(ST77XX_BLACK);
 }
 
-void OPC::initBMP580()
-{
+void OPC::initI2C() {
+
     Wire1.setSDA(Board::Rp2040::I2C_SDA);
     Wire1.setSCL(Board::Rp2040::I2C_SCL);
+    Wire1.setClock(400000);
+}
 
+void OPC::initBMP580()
+{
     bmp580Initialized =
         bmp580.begin(Board::BMP::ADDRESS, &Wire1);
 
@@ -127,12 +131,11 @@ void OPC::initSensorBoard()
     pinMode(Board::Rp2040::DC_DC_PWM,OUTPUT);
     digitalWrite(Board::Rp2040::DC_DC_PWM,HIGH);
 
-    input.init();
+    sensorBoardInitialized = input.init();
+}
 
-    //Wire1.setSDA(Board::Rp2040::I2C_SDA);
-    //Wire1.setSCL(Board::Rp2040::I2C_SCL);
+void OPC::initRTC() {
     clock.begin(Board::Rp2040::I2C_SDA, Board::Rp2040::I2C_SCL, Wire1);
-    
 }
 
 
@@ -166,8 +169,12 @@ bool OPC::newMeasurement()
     if (!controlOutputsEnabled)
         controller.resume(times);
 
-    controller.updateMeasurementsAndRegulators(
-        times);
+    {
+        // Lecture BMP580 sur Wire1, partagé avec l'ISR ADC.
+        SensorBoard::SharedBusGuard busGuard;
+        controller.updateMeasurementsAndRegulators(
+            times);
+    }
 
     controller.captureSnapshot(
         sharedProcessSnapshot,
@@ -216,7 +223,11 @@ void OPC::controlPoll()
     {
         lastClockRefresh = millis();
         RTC::DateTime dateTime;
-        const bool valid = clock.readDateTime(dateTime);
+        bool valid;
+        {
+            SensorBoard::SharedBusGuard busGuard;
+            valid = clock.readDateTime(dateTime);
+        }
         mutex_enter_blocking(&processDataMutex);
         sharedClockDateTime = dateTime;
         sharedClockValid = valid;
@@ -270,6 +281,14 @@ void OPC::controlPoll()
 
 bool OPC::initMeasurements()
 {
+    // Sans le MCP23017, le routage analogique est inconnu : mesures fausses.
+    if (!sensorBoardInitialized)
+    {
+        Serial.println(
+            "Sensor board (MCP23017) unavailable");
+        return false;
+    }
+
     if (userInstall.requiresBMP580() &&
         !bmp580Initialized)
     {
@@ -576,7 +595,10 @@ void OPC::handleControlMessage(
         __dmb();
         if (menuSessionOpen)
         {
-            clock.onMenuOpened();
+            {
+                SensorBoard::SharedBusGuard busGuard;
+                clock.onMenuOpened();
+            }
             parameterEditor.capture(RTC::MENU_OWNER_KEY);
         }
         __dmb();
@@ -587,8 +609,12 @@ void OPC::handleControlMessage(
     case InterCoreMessage::ApplyClockParameters:
     {
         __dmb();
-        const bool saved = menuSessionOpen &&
-            clock.applyMenuParameters(parameterEditor);
+        bool saved = false;
+        if (menuSessionOpen)
+        {
+            SensorBoard::SharedBusGuard busGuard;
+            saved = clock.applyMenuParameters(parameterEditor);
+        }
         __dmb();
         rp2040.fifo.push(interCoreMessageValue(saved
             ? InterCoreMessage::ClockParametersApplied
@@ -602,7 +628,10 @@ void OPC::handleControlMessage(
 
         mutex_enter_blocking(&processDataMutex);
         userInstall.onMenuOpened();
-        clock.onMenuOpened();
+        {
+            SensorBoard::SharedBusGuard busGuard;
+            clock.onMenuOpened();
+        }
         parameterEditor.capture();
         menuSessionOpen = true;
         mutex_exit(&processDataMutex);
@@ -827,7 +856,11 @@ void OPC::handleUIMessage(
             &processDataMutex);
 
         controller.print(bufferedOutput);
+        // Vieille méthode de print pour un CSV
         //controller.printCSVPsychro(bufferedOutput);
+
+        // Juste une méthode temporaire pour avoir la temp de l'ADC sur un sweep
+        bufferedOutput.printf("ADC_temp : %.2f\n", input.getAdcTemperature());
 
         mutex_exit(&processDataMutex);
 

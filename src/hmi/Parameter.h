@@ -137,6 +137,9 @@ struct Parameter
             double_t minimum;
             double_t maximum;
             double_t step;
+            // Si positif, step devient le premier pas et tuneStep le pas fin.
+            // Zéro conserve le réglage automatique de l'interface.
+            double_t tuneStep;
 
             uint8_t decimals;
 

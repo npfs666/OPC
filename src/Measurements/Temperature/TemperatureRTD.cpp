@@ -31,13 +31,13 @@ void TemperatureRTD::update()
     switch(resistance->getSensor().settings.type)
     {
         case Sensor::Type::Pt100:
-            temperature = PT100::getResistanceToTemperature(
+            temperature = PT100::getResistanceToTemperatureNewton(
                 resistance->getValue());
             break;
 
         case Sensor::Type::Pt1000:
             // Même courbe que la PT100, avec une résistance dix fois plus grande.
-            temperature = PT100::getResistanceToTemperature(
+            temperature = PT100::getResistanceToTemperatureNewton(
                 resistance->getValue() / 10.0);
             break;
 

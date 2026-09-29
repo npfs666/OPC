@@ -76,6 +76,8 @@ void setup()
 {
 	systemWatchdog.begin();
 
+    opc.initI2C();
+    opc.initRTC();
 	opc.initSensorBoard();
     opc.initBMP580();
 

@@ -188,13 +188,13 @@ bool ADS1120::readInternalTemp(
 void ADS1120::sendCommand(uint8_t command)
 {
   digitalWrite(cs, LOW);
-  delay(2);
+  delayMicroseconds(2);
   digitalWrite(cs, HIGH);
-  delay(2);
+  delayMicroseconds(2);
   digitalWrite(cs, LOW);
-  delay(2);
+  delayMicroseconds(2);
   HW_SPI->transfer(command);
-  delay(2);
+  delayMicroseconds(2);
   digitalWrite(cs, HIGH);
 }
 

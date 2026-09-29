@@ -41,10 +41,14 @@ SensorBoard::SensorBoard()
 
 /**
  * @brief Variables init and ADC init
+ *
+ * @return false si le MCP23017 des multiplexeurs ne répond pas
  */
-void SensorBoard::init()
+bool SensorBoard::init()
 {
-    mux.begin();
+    const bool muxReady = mux.begin();
+
+    // L'ADC est initialisé dans tous les cas pour laisser le SPI dans un état connu.
     adc.begin(Board::Rp2040::ADC_SPI,
                 Board::Rp2040::ADC_CLK,
                 Board::Rp2040::ADC_MISO,
@@ -52,6 +56,8 @@ void SensorBoard::init()
                 Board::Rp2040::ADC_CS,
                 Board::Rp2040::ADC_DRDY);
     adc.setOpMode(0);
+
+    return muxReady;
 }
 
 
@@ -341,6 +347,7 @@ double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
     double_t Rrtd = correctedValue * calibration.refResistanceValue / (ADC_FULL_SCALE * gain);
 
     // Compensation de la mesure en fonction de la température
+    // Je suis incapable de mesurer une différence notable sur la version  0.3
     //const double_t ppm = (adcTemperature - calibration.calTemperatureADC) * calibration.systemPPMCoeff;
 
     //Rrtd = Rrtd * (1 + ppm/1000000.0);

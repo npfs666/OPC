@@ -159,7 +159,7 @@ bool TestInstallation::begin(
 
     rtd1Resistance.begin("RTD1", board, input1);
     rtd1Temperature.begin("TempRTD1", rtd1Resistance);
-    tcTemp.begin("TempTC", input1);
+    //tcTemp.begin("TempTC", input1);
 
     rtd2Resistance.begin("RTD2", board, input2);
     rtd2Temperature.begin("TempRTD2", rtd2Resistance);

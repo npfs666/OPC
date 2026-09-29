@@ -12,7 +12,8 @@
 class AnalogMux
 {
 public:
-    void begin();
+    // Retourne false si le MCP23017 ne répond pas : le routage est alors inconnu.
+    bool begin();
 
     void enableChannel(uint8_t channel);
     void disableChannel(uint8_t channel);

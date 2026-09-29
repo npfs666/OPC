@@ -95,3 +95,83 @@ double_t PT100::getResistanceToTemperature(
                      2.0 * current +
                      next));
 }
+
+
+/**
+ * @brief Conversion d'une resistance en température en inversant l'équation
+ *        de Callendar-Van Dusen par la méthode de Newton-Raphson
+ *
+ *        T >= 0 °C : R(T) = R0 (1 + A.T + B.T²)
+ *        T <  0 °C : R(T) = R0 (1 + A.T + B.T² + C.(T - 100).T³)
+ *
+ * @param resistance Résistance de la PT100 en ohms
+ * @return double_t temperature in °C
+ */
+double_t PT100::getResistanceToTemperatureNewton(double_t resistance)
+{
+    constexpr double_t minimumTemperature = -200.0;
+    constexpr double_t maximumTemperature = 850.0;
+    constexpr double_t tolerance = 1e-6;
+    constexpr uint8_t maximumIterations = 20;
+
+    auto resistanceAt = [](double_t temperature) -> double_t
+    {
+        double_t ratio =
+            1.0 +
+            A * temperature +
+            B * temperature * temperature;
+
+        if (temperature < 0.0)
+        {
+            ratio += C * (temperature - 100.0) *
+                     temperature * temperature * temperature;
+        }
+
+        return R0 * ratio;
+    };
+
+    auto derivativeAt = [](double_t temperature) -> double_t
+    {
+        double_t derivative =
+            A +
+            2.0 * B * temperature;
+
+        if (temperature < 0.0)
+        {
+            derivative += C * (4.0 * temperature - 300.0) *
+                          temperature * temperature;
+        }
+
+        return R0 * derivative;
+    };
+
+    if (!std::isfinite(resistance) ||
+        resistance < resistanceAt(minimumTemperature) ||
+        resistance > resistanceAt(maximumTemperature))
+    {
+        return NAN;
+    }
+
+    /*
+     * Point de départ : approximation linéaire, déjà à
+     * quelques degrés de la solution sur toute la plage.
+     */
+    double_t temperature =
+        (resistance / R0 - 1.0) / A;
+
+    for (uint8_t i = 0; i < maximumIterations; i++)
+    {
+        const double_t step =
+            (resistanceAt(temperature) - resistance) /
+            derivativeAt(temperature);
+
+        temperature -= step;
+
+        if (std::fabs(step) < tolerance)
+        {
+            return temperature;
+        }
+    }
+
+    return NAN;
+}

@@ -35,7 +35,8 @@ bool ParameterList::Writer::addDouble(
     double_t step,
     uint8_t decimals,
     const char* unit,
-    bool readOnly)
+    bool readOnly,
+    double_t tuneStep)
 {
     return list != nullptr &&
            list->remember(
@@ -49,7 +50,8 @@ bool ParameterList::Writer::addDouble(
                    step,
                    decimals,
                    unit,
-                   readOnly));
+                   readOnly,
+                   tuneStep));
 }
 
 bool ParameterList::Writer::addDouble(
@@ -276,12 +278,16 @@ bool ParameterList::addDouble(
     double_t step,
     uint8_t decimals,
     const char* unit,
-    bool readOnly)
+    bool readOnly,
+    double_t tuneStep)
 {
     if (!(minimum <= maximum))
         return false;
 
     if (!(step > 0.0))
+        return false;
+
+    if (!(tuneStep >= 0.0 && tuneStep <= step))
         return false;
 
     if (decimals > 3)
@@ -310,6 +316,7 @@ bool ParameterList::addDouble(
     parameter->data.number.minimum = minimum;
     parameter->data.number.maximum = maximum;
     parameter->data.number.step = step;
+    parameter->data.number.tuneStep = tuneStep;
     parameter->data.number.decimals = decimals;
     parameter->data.number.unit = unit;
 

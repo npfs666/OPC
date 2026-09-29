@@ -769,18 +769,22 @@ Menu::prompt* ArduinoMenuUI::createNumberItem(
     const double_t maximum = parameter.data.number.maximum;
     const double_t fineStep =
         parameter.data.number.step;
+    const double_t configuredTuneStep =
+        parameter.data.number.tuneStep;
 
     const bool hasFineAdjustment =
         parameter.data.number.decimals > 0 &&
         fineStep < 1.0;
 
     const double_t coarseStep =
-        hasFineAdjustment
+        hasFineAdjustment && configuredTuneStep == 0.0
             ? 1.0
             : fineStep;
 
     const double_t tuneStep =
-        hasFineAdjustment
+        configuredTuneStep > 0.0
+            ? configuredTuneStep
+            : hasFineAdjustment
             ? fineStep
             : 0.0;
 

@@ -102,7 +102,8 @@ public:
             double_t step,
             uint8_t decimals,
             const char* unit = nullptr,
-            bool readOnly = false);
+            bool readOnly = false,
+            double_t tuneStep = 0.0);
 
         bool addDouble(
             const char* key,
@@ -386,7 +387,8 @@ private:
         double_t step,
         uint8_t decimals,
         const char* unit,
-        bool readOnly);
+        bool readOnly,
+        double_t tuneStep = 0.0);
 
     bool addSelection(
         const ParameterOwner& owner,

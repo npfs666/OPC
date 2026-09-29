@@ -8,10 +8,39 @@
 #include<Hardware/AnalogMux.h>
 #include <Configurable.h>
 #include <hmi/MenuBuilder.h>
+#include <hardware/irq.h>
 
 class SensorBoard: public Configurable {
 
 public:
+
+    /**
+     * L'ISR DRDY commande le MCP23017 sur Wire1, bus partagé avec le DS3231
+     * et le BMP580. Ce garde masque les IRQ GPIO du cœur courant pendant un
+     * accès Wire1 hors ISR. Le front DRDY reste mémorisé et l'ISR s'exécute
+     * dès la levée du masque.
+     */
+    class SharedBusGuard
+    {
+    public:
+        SharedBusGuard()
+            : wasEnabled(irq_is_enabled(IO_IRQ_BANK0))
+        {
+            irq_set_enabled(IO_IRQ_BANK0, false);
+        }
+
+        ~SharedBusGuard()
+        {
+            if (wasEnabled)
+                irq_set_enabled(IO_IRQ_BANK0, true);
+        }
+
+        SharedBusGuard(const SharedBusGuard&) = delete;
+        SharedBusGuard& operator=(const SharedBusGuard&) = delete;
+
+    private:
+        const bool wasEnabled;
+    };
 
     struct CalibrationProfile
     {
@@ -51,7 +80,7 @@ public:
     volatile bool newMeasurement=false;    // ADC has finished accumulating values, data is readable
     
     SensorBoard();
-    void init();
+    bool init();
     bool addSensor(Sensor& sensor);
     void startContinuous();
     void pause();

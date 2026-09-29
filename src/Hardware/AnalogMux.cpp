@@ -3,13 +3,14 @@
 #include <Arduino.h>
 #include <Hardware/pinout.h>
 
-void AnalogMux::begin()
+bool AnalogMux::begin()
 {
     Wire1.setSDA(Board::Rp2040::I2C_SDA);
     Wire1.setSCL(Board::Rp2040::I2C_SCL);
 
     if (!mcp.begin_I2C(Board::Mcp23017::ADDRESS, &Wire1)) {
         Serial.println("Error MCP init.");
+        return false;
     }
 
     // Au démarrage le MCP23017 à tous ses pins en entrées.
@@ -35,6 +36,8 @@ void AnalogMux::begin()
 
     resetMeasurementMode();
     resetMeasurementType();
+
+    return true;
 }
 
 void AnalogMux::enableChannel(uint8_t channel)
