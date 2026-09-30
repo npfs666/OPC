@@ -26,8 +26,11 @@ struct ParameterDiscreteStorage<Discrete, true>
 class ParameterList
 {
 public:
+    // Une plage horaire consomme à elle seule 11 options (jours).
     static constexpr size_t MAX_SELECTION_OPTIONS =
-        2 * MAX_PARAMETERS;
+        3 * MAX_PARAMETERS;
+
+    static constexpr uint16_t MINUTES_PER_DAY = 24 * 60;
 
     class Writer
     {
@@ -112,6 +115,19 @@ public:
             const char* unit,
             bool readOnly,
             uint8_t decimals = 3);
+
+        /**
+         * Heure de la journée, en minutes depuis minuit (0 à 1439).
+         *
+         * Le menu l'affiche HH:MM : la molette règle d'abord l'heure,
+         * un clic passe aux minutes, par pas de step.
+         */
+        bool addTime(
+            const char* key,
+            const char* name,
+            uint16_t& minutes,
+            uint16_t step = 5,
+            bool readOnly = false);
 
         template<typename Discrete, size_t OptionCount>
         bool addSelection(
@@ -375,7 +391,9 @@ private:
         int32_t maximum,
         int32_t step,
         const char* unit,
-        bool readOnly);
+        bool readOnly,
+        Parameter::IntegerFormat format =
+            Parameter::IntegerFormat::Plain);
 
     bool addDouble(
         const ParameterOwner& owner,

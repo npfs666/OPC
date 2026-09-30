@@ -2,11 +2,18 @@
 
 #include <Arduino.h>
 #include <Measurements/Temperature/Temperature.h>
+#include <Regulator/TimeSchedule.h>
 #include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
 
 #include <cmath>
 #include <cstring>
+
+namespace
+{
+    // Évite les cycles courts de la décharge autour de la température vacances.
+    constexpr double_t DISCHARGE_HYSTERESIS = 2.0;
+}
 
 SolarRegulator::SolarRegulator()
 {
@@ -44,7 +51,56 @@ void SolarRegulator::begin(
     settings.maximumTankTemperature = 80.0;
     settings.minimumCollectorTemperature = 20.0;
 
+    settings.holidayMode = false;
+    settings.holidayTankTemperature = 50.0;
+
+    holidaySchedule = nullptr;
     running = false;
+    discharging = false;
+}
+
+void SolarRegulator::setHolidaySchedule(
+    const TimeSchedule& schedule)
+{
+    holidaySchedule = &schedule;
+}
+
+bool SolarRegulator::isDischarging() const
+{
+    return discharging;
+}
+
+/*
+ * Décharge : le bas du ballon (côté échangeur) cède sa chaleur au capteur
+ * plus froid. Mêmes deltas que la charge, dans l'autre sens.
+ */
+bool SolarRegulator::updateDischarge(
+    double_t collectorTemperature,
+    double_t bottomTemperature)
+{
+    bool nightWindow = false;
+
+    if (!settings.holidayMode ||
+        holidaySchedule == nullptr ||
+        !holidaySchedule->isActive(nightWindow) ||
+        !nightWindow)
+    {
+        return false;
+    }
+
+    const double_t delta =
+        bottomTemperature - collectorTemperature;
+
+    if (!discharging)
+    {
+        return bottomTemperature >=
+                   settings.holidayTankTemperature +
+                   DISCHARGE_HYSTERESIS &&
+               delta >= settings.startDelta;
+    }
+
+    return bottomTemperature > settings.holidayTankTemperature &&
+           delta > settings.stopDelta;
 }
 
 void SolarRegulator::update(uint32_t now)
@@ -65,6 +121,7 @@ void SolarRegulator::update(uint32_t now)
             tankBottom->getValue()))
     {
         running = false;
+        discharging = false;
         invalidateCommand();
         return;
     }
@@ -108,12 +165,19 @@ void SolarRegulator::update(uint32_t now)
         running = false;
     }
 
-    writeCommand(running ? 1.0 : 0.0);
+    discharging =
+        !running &&
+        updateDischarge(
+            collectorTemperature,
+            bottomTemperature);
+
+    writeCommand(running || discharging ? 1.0 : 0.0);
 }
 
 void SolarRegulator::resume(uint32_t now)
 {
     running = false;
+    discharging = false;
     Regulator::resume(now);
 }
 
@@ -166,6 +230,24 @@ void SolarRegulator::registerParameters(
         0.5,
         1,
         "°C");
+
+    if (holidaySchedule == nullptr)
+        return;
+
+    parameters.addBool(
+        "holiday_mode",
+        "Mode vacances",
+        settings.holidayMode);
+
+    parameters.addDouble(
+        "holiday_tank_temperature",
+        "Temp. vacances",
+        settings.holidayTankTemperature,
+        20.0,
+        80.0,
+        0.5,
+        1,
+        "°C");
 }
 
 bool SolarRegulator::validateParameters(
@@ -214,6 +296,9 @@ void SolarRegulator::print(Stream& stream) const
     stream.print(tankTop->printValue(), tankTop->printDecimals());
     stream.print(" | Tbas : ");
     stream.print(tankBottom->printValue(), tankBottom->printDecimals());
+
+    if (settings.holidayMode)
+        stream.print(discharging ? " | Vacances : decharge" : " | Vacances");
 
     stream.println(' ');
 }

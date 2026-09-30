@@ -2,6 +2,7 @@
 #define PROCESS_SNAPSHOT_H
 
 #include <Hardware/pinout.h>
+#include <Hardware/RTC.h>
 
 #include <cmath>
 #include <cstddef>
@@ -77,6 +78,12 @@ public:
 
     uint32_t capturedAt() const;
 
+    /** Heure du DS3231 ; valid est faux si elle est inconnue. */
+    const ClockSample& clock() const;
+
+    /** Vrai si une régulation a besoin de l'heure (programme en mode Auto). */
+    bool clockRequired() const;
+
 private:
     friend class ProcessControl;
 
@@ -97,6 +104,8 @@ private:
     size_t measurementSampleCount = 0;
     size_t outputSampleCount = 0;
     uint32_t captureTime = 0;
+    ClockSample clockSample;
+    bool clockNeeded = false;
 };
 
 #endif

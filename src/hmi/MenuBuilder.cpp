@@ -70,6 +70,11 @@ MenuBuilder::GroupId MenuBuilder::addSubmenu(
 
     groupsUsed++;
 
+    entries[entriesUsed++] = Entry{
+        Entry::Kind::Group,
+        id
+    };
+
     return id;
 }
 
@@ -95,6 +100,11 @@ bool MenuBuilder::addParameters(
     ownerBindings[ownerBindingsUsed] = OwnerBinding{
         ownerKey,
         group
+    };
+
+    entries[entriesUsed++] = Entry{
+        Entry::Kind::Owner,
+        static_cast<uint16_t>(ownerBindingsUsed)
     };
 
     ownerBindingsUsed++;
@@ -152,6 +162,11 @@ size_t MenuBuilder::actionCount() const
     return actionsUsed;
 }
 
+size_t MenuBuilder::entryCount() const
+{
+    return entriesUsed;
+}
+
 const MenuBuilder::Group* MenuBuilder::getGroup(
     GroupId id) const
 {
@@ -180,6 +195,15 @@ const MenuBuilder::Action* MenuBuilder::getAction(
         return nullptr;
 
     return &actions[index];
+}
+
+const MenuBuilder::Entry* MenuBuilder::getEntry(
+    size_t index) const
+{
+    if (index >= entriesUsed)
+        return nullptr;
+
+    return &entries[index];
 }
 
 const MenuBuilder::Action* MenuBuilder::findAction(
@@ -272,6 +296,7 @@ void MenuBuilder::reset()
     groupsUsed = 0;
     ownerBindingsUsed = 0;
     actionsUsed = 0;
+    entriesUsed = 0;
 }
 
 bool MenuBuilder::isValidText(const char* text)

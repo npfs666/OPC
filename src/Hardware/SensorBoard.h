@@ -82,6 +82,7 @@ public:
     SensorBoard();
     bool init();
     bool addSensor(Sensor& sensor);
+    uint8_t sensorCount() const { return numSensors; }
     void startContinuous();
     void pause();
     void restart();

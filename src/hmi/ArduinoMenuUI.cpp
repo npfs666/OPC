@@ -9,6 +9,57 @@ namespace
 {
     constexpr uint16_t COLOR_GREY = 0x8410;
 
+    /*
+     * Heure de la journée en minutes, affichée HH:MM.
+     * Premier réglage : heures, en boucle. Après un clic : minutes, par pas
+     * de tune(), sans modifier l'heure.
+     */
+    class TimeOfDayField : public Menu::menuField<int32_t>
+    {
+    public:
+        using Menu::menuField<int32_t>::menuField;
+
+        Menu::idx_t printReflex(Menu::menuOut& out) const override
+        {
+            const int32_t minutes =
+                constrain(reflex, int32_t{0}, int32_t{24 * 60 - 1});
+
+            char text[6];
+            snprintf(
+                text,
+                sizeof(text),
+                "%02ld:%02ld",
+                static_cast<long>(minutes / 60),
+                static_cast<long>(minutes % 60));
+
+            return static_cast<Menu::idx_t>(out.print(text));
+        }
+
+        void stepit(int direction) override
+        {
+            direction *= Menu::options->invertFieldKeys ? -1 : 1;
+            dirty = true;
+
+            const int32_t current =
+                constrain(target(), int32_t{0}, int32_t{24 * 60 - 1});
+
+            int32_t hour = current / 60;
+            int32_t minute = current % 60;
+
+            if (tunning)
+            {
+                const int32_t step = tune() > 0 ? tune() : 1;
+                minute = ((minute / step) * step + direction * step + 60) % 60;
+            }
+            else
+            {
+                hour = (hour + direction + 24) % 24;
+            }
+
+            target() = hour * 60 + minute;
+        }
+    };
+
     const Menu::colorDef<uint16_t> MENU_COLORS[Menu::nColors] = {
         {
             {ST77XX_BLACK, ST77XX_BLACK},
@@ -478,20 +529,6 @@ bool ArduinoMenuUI::buildMenuTree(
             &menuItems[menuItemOffsets[i]]);
     }
 
-    for (size_t i = 1; i < groupCount; i++)
-    {
-        const MenuBuilder::Group* group =
-            menuDefinition.getGroup(
-                static_cast<MenuBuilder::GroupId>(i));
-
-        if (!appendMenuItem(
-                group->parent,
-                menuNodes[i]))
-        {
-            return false;
-        }
-    }
-
     if (clockGroup != MenuBuilder::INVALID_GROUP &&
         (!appendMenuItem(clockGroup, clockDateItem) ||
          !appendMenuItem(clockGroup, clockTimeItem)))
@@ -499,16 +536,53 @@ bool ArduinoMenuUI::buildMenuTree(
         return false;
     }
 
-    for (size_t i = 0; i < parameterCount; i++)
+    // Sous-menus et paramètres apparaissent dans leur ordre de déclaration.
+    for (size_t e = 0; e < menuDefinition.entryCount(); e++)
     {
-        if (parameterItems[i] == nullptr)
-            continue;
+        const MenuBuilder::Entry* entry =
+            menuDefinition.getEntry(e);
 
-        if (!appendMenuItem(
-                parameterGroups[i],
-                parameterItems[i]))
-        {
+        if (entry == nullptr)
             return false;
+
+        if (entry->kind == MenuBuilder::Entry::Kind::Group)
+        {
+            const MenuBuilder::Group* group =
+                menuDefinition.getGroup(entry->index);
+
+            if (group == nullptr ||
+                !appendMenuItem(
+                    group->parent,
+                    menuNodes[entry->index]))
+            {
+                return false;
+            }
+
+            continue;
+        }
+
+        const MenuBuilder::OwnerBinding* binding =
+            menuDefinition.getOwnerBinding(entry->index);
+
+        if (binding == nullptr)
+            return false;
+
+        for (size_t i = 0; i < parameterCount; i++)
+        {
+            if (parameterItems[i] == nullptr ||
+                std::strcmp(
+                    editor.get(i).parameter->ownerKey,
+                    binding->ownerKey) != 0)
+            {
+                continue;
+            }
+
+            if (!appendMenuItem(
+                    parameterGroups[i],
+                    parameterItems[i]))
+            {
+                return false;
+            }
         }
     }
 
@@ -645,6 +719,19 @@ Menu::prompt* ArduinoMenuUI::createItem(
             unit,
             unitLabels[index],
             UNIT_LENGTH);
+
+        if (parameter.data.integer.format ==
+            Parameter::IntegerFormat::TimeOfDay)
+        {
+            return new TimeOfDayField(
+                draft.integerValue,
+                labels[index],
+                unitLabels[index],
+                parameter.data.integer.minimum,
+                parameter.data.integer.maximum,
+                60,
+                parameter.data.integer.step);
+        }
 
         return new Menu::menuField<int32_t>(
             draft.integerValue,

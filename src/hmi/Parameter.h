@@ -52,6 +52,14 @@ struct ParameterOwner
      * sans être écrits dans la configuration persistante.
      */
     bool persistent = true;
+
+    /*
+     * Optionnel : propriétaire dont le sous-menu contiendra celui-ci.
+     * Il doit avoir enregistré ses paramètres auparavant.
+     *
+     * Exemple : "prog_eclairage" pour la plage "prog_eclairage.p1"
+     */
+    const char* parentOwnerKey = nullptr;
 };
 
 struct Parameter
@@ -62,6 +70,13 @@ struct Parameter
         Integer,
         Double,
         Selection
+    };
+
+    enum class IntegerFormat : uint8_t
+    {
+        Plain,
+        // Minutes depuis minuit, affichées HH:MM.
+        TimeOfDay
     };
 
     const char* categoryKey = nullptr;
@@ -78,6 +93,9 @@ struct Parameter
      * Nom affiché de l'objet propriétaire.
      */
     const char* ownerName = nullptr;
+
+    /* Voir ParameterOwner::parentOwnerKey. */
+    const char* parentOwnerKey = nullptr;
 
     /*
      * Identifiant stable du paramètre dans l'objet.
@@ -130,6 +148,8 @@ struct Parameter
             int32_t step;
 
             const char* unit;
+
+            IntegerFormat format;
         } integer;
 
         struct Number
@@ -157,7 +177,8 @@ struct Parameter
                 0,
                 0,
                 1,
-                nullptr
+                nullptr,
+                IntegerFormat::Plain
             }
         {
         }

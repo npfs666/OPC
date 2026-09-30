@@ -77,11 +77,12 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
     - `dewPoint()` utilise encore 17,27/237,7.
     - Il manque la formule sur glace quand le bulbe humide passe sous 0 °C, et un coefficient psychrométrique réglable.
     - `constrain(0,100)` masque les incohérences, par exemple un bulbe humide plus chaud que le sec.
-11. ⬜ **Limites du PID** (`PID.cpp`).
-    - `KD_MAX = 100` fait échouer l'autotune d'un process lent. Exemple : Ku = 1,3 et Tu = 3600 s donnent Kd ≈ 350.
-    - `Ki` n'a que 3 décimales : une valeur de 0,0004 s'affiche 0,000, et le pas de 0,001 empêche de la régler.
-    - La consigne est limitée à 0–80 °C, alors que le thermostat accepte 0–200 °C.
-    - L'intégrale est remise à zéro à chaque application du menu : pas de transfert *bumpless*.
+11. ✅ **Limites du PID**.
+    - Les gains sont passés en forme standard Kp / Ti / Td (secondes), avec des plages Ti ≤ 100 000 s et Td ≤ 10 000 s.
+    - La consigne va de −50 à 250 °C par défaut, et chaque installation peut la changer avec `setSetpointLimits()`.
+    - Reprise sans à-coup : l'intégrale est conservée à la reprise, sur une mesure invalide et au changement de gains.
+    - Ajouts : filtre sur la dérivée (Td/10), et anti-windup corrigé (la sortie atteint bien la saturation).
+    - Autotune : choix de la règle de calcul, Tyreus-Luyben par défaut.
 12. ⬜ **Restauration « tout ou rien »** (`Storage::readConfiguration`).
     - Un seul paramètre hors plage, ou une liste d'options modifiée, invalide tout le fichier.
     - Les calibrations (Rref, N0) sont alors perdues en silence.

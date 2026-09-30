@@ -10,7 +10,8 @@ s'exécutent sans carte connectée :
 Ils couvrent actuellement :
 
 - la validation et la propagation des mesures BME280 ;
-- le driver et l'interface du DS3231 (date, heure 24 h, alarme et erreurs I2C) ;
+- le driver et l'interface du DS3231 (date, heure 24 h, alarme et erreurs I2C),
+  le fuseau horaire et l'heure d'été européenne (DS3231 en UTC) ;
 - l'interpolation PT100 et la conversion en température PT100/PT1000 ;
 - les calculs psychrométriques ;
 - les régulateurs thermostat, solaire et PID en chauffage/refroidissement,
@@ -20,6 +21,11 @@ Ils couvrent actuellement :
 - l'éditeur de paramètres et la séparation des menus PID/autotune ;
 - les actions de menu non persistantes et l'événement de nouveaux gains ;
 - l'ordre régulateur, actionneur, sortie et snapshot.
+- la programmation horaire : plages, jours, passage de minuit, modes forcés,
+  heure inconnue, paramètres HH:MM et sous-menus imbriqués ;
+- le thermostat et le PID programmés (consigne réduite, arrêt, autotune
+  prioritaire) et la décharge nocturne solaire en mode vacances ;
+- la détection de l'alerte horloge dans le snapshot.
 
 Les tests qui dépendent réellement de l'ADS1120, des multiplexeurs, de
 LittleFS ou de l'USB devront être ajoutés comme tests d'intégration sur Pico.

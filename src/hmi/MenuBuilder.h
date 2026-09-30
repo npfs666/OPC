@@ -9,15 +9,17 @@
 class MenuBuilder
 {
 public:
-    using GroupId = uint8_t;
+    using GroupId = uint16_t;
     using ActionId = uint8_t;
 
-    static constexpr GroupId INVALID_GROUP = UINT8_MAX;
+    static constexpr GroupId INVALID_GROUP = UINT16_MAX;
     static constexpr ActionId NO_ACTION = 0;
     static constexpr size_t MAX_GROUPS =
         1 + (2 * MAX_PARAMETERS);
     static constexpr size_t MAX_OWNER_BINDINGS = MAX_PARAMETERS;
     static constexpr size_t MAX_ACTIONS = 16;
+    static constexpr size_t MAX_ENTRIES =
+        MAX_GROUPS + MAX_OWNER_BINDINGS;
 
     static_assert(
         MAX_GROUPS < INVALID_GROUP,
@@ -42,6 +44,22 @@ public:
         const char* key = nullptr;
         const char* name = nullptr;
         GroupId group = INVALID_GROUP;
+    };
+
+    /*
+     * Ordre de déclaration des sous-menus et des paramètres.
+     * Le menu affiche les éléments d'un groupe dans cet ordre.
+     */
+    struct Entry
+    {
+        enum class Kind : uint8_t
+        {
+            Group,
+            Owner
+        };
+
+        Kind kind = Kind::Group;
+        uint16_t index = 0;
     };
 
     bool begin(const char* rootName);
@@ -72,6 +90,7 @@ public:
     size_t groupCount() const;
     size_t ownerBindingCount() const;
     size_t actionCount() const;
+    size_t entryCount() const;
 
     const Group* getGroup(GroupId id) const;
 
@@ -79,6 +98,8 @@ public:
         size_t index) const;
 
     const Action* getAction(size_t index) const;
+
+    const Entry* getEntry(size_t index) const;
 
     const Action* findAction(ActionId id) const;
 
@@ -98,10 +119,12 @@ private:
     Group groups[MAX_GROUPS] = {};
     OwnerBinding ownerBindings[MAX_OWNER_BINDINGS] = {};
     Action actions[MAX_ACTIONS] = {};
+    Entry entries[MAX_ENTRIES] = {};
 
     size_t groupsUsed = 0;
     size_t ownerBindingsUsed = 0;
     size_t actionsUsed = 0;
+    size_t entriesUsed = 0;
 };
 
 #endif

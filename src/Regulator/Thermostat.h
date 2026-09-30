@@ -2,9 +2,11 @@
 #define THERMOSTAT_H
 
 #include <Regulator/Regulator.h>
+#include <Regulator/ScheduledSetpoint.h>
 #include <Regulator/SetpointRamp.h>
 
 class Temperature;
+class TimeSchedule;
 
 class Thermostat : public Regulator
 {
@@ -24,6 +26,7 @@ public:
 
     Settings settings;
     SetpointRamp setpointRamp;
+    ScheduledSetpoint scheduledSetpoint;
 
     Thermostat();
 
@@ -32,6 +35,16 @@ public:
         const char* key,
         const char* name,
         Temperature& temperature);
+
+    /**
+     * Option : consigne pendant les plages du programme, reducedSetpoint
+     * (ou arrêt, réglable) en dehors. À appeler après begin(), avant
+     * l'enregistrement des paramètres. Le programme doit aussi être ajouté
+     * au ProcessControl.
+     */
+    void setSchedule(
+        const TimeSchedule& schedule,
+        double_t reducedSetpoint);
 
     void update(uint32_t now);
     void resume(uint32_t now) override;

@@ -86,6 +86,25 @@ bool Installation::buildMenu(
             continue;
         }
 
+        // Sous-menu placé dans celui de son propriétaire parent.
+        if (parameter->parentOwnerKey != nullptr)
+        {
+            const MenuBuilder::GroupId parent =
+                menu.findGroupForOwner(
+                    parameter->parentOwnerKey);
+
+            if (parent == MenuBuilder::INVALID_GROUP ||
+                !addOwner(
+                    parent,
+                    *parameter,
+                    true))
+            {
+                return false;
+            }
+
+            continue;
+        }
+
         if (sameText(
                 parameter->categoryKey,
                 "calibration") ||

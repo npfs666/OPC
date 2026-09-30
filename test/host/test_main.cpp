@@ -763,8 +763,8 @@ namespace
         pid.begin("pid", measurement);
         pid.settings.setpoint = 30.0;
         pid.settings.kp = 0.1;
-        pid.settings.ki = 0.0;
-        pid.settings.kd = 0.0;
+        pid.settings.ti = 0.0;
+        pid.settings.td = 0.0;
         pid.setpointRamp.settings.enabled = true;
         pid.setpointRamp.settings.risingRate = 1.0;
 
@@ -918,8 +918,8 @@ namespace
                 PID::Mode::Heating);
         pid.settings.setpoint = 10.0;
         pid.settings.kp = 0.1;
-        pid.settings.ki = 0.0;
-        pid.settings.kd = 0.0;
+        pid.settings.ti = 0.0;
+        pid.settings.td = 0.0;
 
         measurement.setReading(5.0);
         pid.update(0);
@@ -955,8 +955,8 @@ namespace
 
         pid.settings.setpoint = 10.0;
         pid.settings.kp = 0.1;
-        pid.settings.ki = 0.0;
-        pid.settings.kd = 0.0;
+        pid.settings.ti = 0.0;
+        pid.settings.td = 0.0;
 
         measurement.setReading(15.0);
         pid.update(0);
@@ -1023,27 +1023,27 @@ namespace
         CHECK_TRUE(
             pid.setMode(PID::Mode::Cooling));
 
-        pid.settings.setpoint = 10.0;
-        pid.settings.kp = 0.0;
-        pid.settings.ki = 0.0;
-        pid.settings.kd = 1.0;
+        // Td = 10 s : filtre de constante 1 s, soit un facteur 0,5 à dt = 1 s.
+        pid.settings.setpoint = 7.0;
+        pid.settings.kp = 0.1;
+        pid.settings.ti = 0.0;
+        pid.settings.td = 10.0;
 
         measurement.setReading(10.0);
         pid.update(0);
 
-        measurement.setReading(11.0);
         pid.update(1000);
-        CHECK_NEAR(
-            pid.readCommand(),
-            1.0,
-            0.0001);
+        CHECK_NEAR(pid.readCommand(), 0.3, 0.0001);
 
-        measurement.setReading(10.5);
+        // Mesure en hausse : en refroidissement, la dérivée augmente la
+        // commande. Filtrée : 0,05 au lieu de 0,1 sans filtre.
+        measurement.setReading(10.1);
         pid.update(2000);
-        CHECK_NEAR(
-            pid.readCommand(),
-            0.0,
-            0.0001);
+        CHECK_NEAR(pid.readCommand(), 0.36, 0.0001);
+
+        // Mesure stable : la contribution dérivée décroît progressivement.
+        pid.update(3000);
+        CHECK_NEAR(pid.readCommand(), 0.335, 0.0001);
     }
 
     void testCoolingPIDAntiWindup()
@@ -1055,26 +1055,31 @@ namespace
         CHECK_TRUE(
             pid.setMode(PID::Mode::Cooling));
 
+        // Kp/Ti = 0,1 par °C et par seconde.
         pid.settings.setpoint = 10.0;
-        pid.settings.kp = 0.0;
-        pid.settings.ki = 0.1;
-        pid.settings.kd = 0.0;
+        pid.settings.kp = 0.1;
+        pid.settings.ti = 1.0;
+        pid.settings.td = 0.0;
 
-        measurement.setReading(15.0);
+        measurement.setReading(14.0);
         pid.update(0);
 
         pid.update(1000);
-        CHECK_NEAR(pid.readCommand(), 0.5, 0.0001);
+        CHECK_NEAR(pid.readCommand(), 0.8, 0.0001);
 
+        // La commande atteint exactement la saturation au lieu de rester
+        // bloquée à 0,8, puis l'intégrale cesse de croître.
         pid.update(2000);
         CHECK_NEAR(pid.readCommand(), 1.0, 0.0001);
 
         pid.update(3000);
         CHECK_NEAR(pid.readCommand(), 1.0, 0.0001);
 
-        measurement.setReading(5.0);
+        // Sans emballement, la commande quitte la saturation dès l'inversion
+        // de l'erreur : P = -0,1 et intégrale 0,6 - 0,1.
+        measurement.setReading(9.0);
         pid.update(4000);
-        CHECK_NEAR(pid.readCommand(), 0.5, 0.0001);
+        CHECK_NEAR(pid.readCommand(), 0.4, 0.0001);
     }
 
     void testPIDRejectsInvalidMode()
@@ -1226,8 +1231,8 @@ namespace
             20.0,
             0.001);
         CHECK_NEAR(pid.settings.kp, result.kp, 0.0);
-        CHECK_NEAR(pid.settings.ki, result.ki, 0.0);
-        CHECK_NEAR(pid.settings.kd, result.kd, 0.0);
+        CHECK_NEAR(pid.settings.ti, result.ti, 0.0);
+        CHECK_NEAR(pid.settings.td, result.td, 0.0);
         CHECK_TRUE(
             pid.takeAutoTuneTuningsApplied());
         CHECK_FALSE(
@@ -1262,6 +1267,8 @@ namespace
         pid.autoTuneSettings.inputMax = 20.0;
         pid.autoTuneSettings.timeoutSeconds = 300;
         pid.autoTuneSettings.cycles = 2;
+        pid.autoTuneSettings.rule =
+            PID::AutoTuneRule::ZieglerNichols;
 
         CHECK_TRUE(pid.startAutoTune(0));
 
@@ -1330,26 +1337,161 @@ namespace
             result.kp,
             0.2646378698,
             0.000001);
+        // Ziegler-Nichols : Ti = Tu/2, Td = Tu/8.
         CHECK_NEAR(
-            result.ki,
-            0.0264637870,
+            result.ti,
+            10.0,
             0.000001);
         CHECK_NEAR(
-            result.kd,
-            0.6615946745,
+            result.td,
+            2.5,
             0.000001);
         CHECK_NEAR(
             pid.settings.kp,
             result.kp,
             0.0);
         CHECK_NEAR(
-            pid.settings.ki,
-            result.ki,
+            pid.settings.ti,
+            result.ti,
             0.0);
         CHECK_NEAR(
-            pid.settings.kd,
-            result.kd,
+            pid.settings.td,
+            result.td,
             0.0);
+    }
+
+    void testPIDAutotuneRules()
+    {
+        const struct
+        {
+            PID::AutoTuneRule rule;
+            double_t kp;
+            double_t ti;
+            double_t td;
+        } cases[] = {
+            {PID::AutoTuneRule::ZieglerNichols, 0.6 * 2.0, 50.0, 12.5},
+            {PID::AutoTuneRule::TyreusLuyben, 2.0 / 2.2, 220.0, 100.0 / 6.3},
+            {PID::AutoTuneRule::SomeOvershoot, 2.0 / 3.0, 50.0, 100.0 / 3.0},
+            {PID::AutoTuneRule::NoOvershoot, 0.4, 50.0, 100.0 / 3.0}
+        };
+
+        // Ku = 2, Tu = 100 s.
+        for (const auto& expected : cases)
+        {
+            PIDAutoTune::Result result;
+            CHECK_TRUE(PIDAutoTune::applyTuningRule(
+                expected.rule, 2.0, 100.0, result));
+            CHECK_NEAR(result.kp, expected.kp, 0.000001);
+            CHECK_NEAR(result.ti, expected.ti, 0.000001);
+            CHECK_NEAR(result.td, expected.td, 0.000001);
+        }
+
+        PIDAutoTune::Result result;
+        CHECK_FALSE(PIDAutoTune::applyTuningRule(
+            static_cast<PID::AutoTuneRule>(99), 2.0, 100.0, result));
+        CHECK_FALSE(PIDAutoTune::applyTuningRule(
+            PID::AutoTuneRule::TyreusLuyben, 0.0, 100.0, result));
+
+        // Règle par défaut prudente, et règle inconnue refusée au démarrage.
+        PIDAutoTune::Settings settings;
+        CHECK_TRUE(settings.rule == PID::AutoTuneRule::TyreusLuyben);
+
+        settings.rule = static_cast<PID::AutoTuneRule>(99);
+        CHECK_FALSE(PIDAutoTune::settingsAreValid(settings, 20.0, 0.0, 1.0));
+
+        // Process lent : Kd = 0,075 Ku Tu dépassait l'ancienne limite de 100.
+        FakeTemperature measurement;
+        PID pid;
+        pid.begin("pid", measurement);
+        CHECK_TRUE(pid.setTunings(0.6 * 1.3, 1800.0, 450.0));
+    }
+
+    void testPIDBumplessResume()
+    {
+        FakeTemperature measurement;
+        PID pid;
+
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 20.0;
+        pid.settings.kp = 0.1;
+        pid.settings.ti = 10.0;
+
+        // Erreur de 1 °C : l'intégrale gagne 0,01 par seconde.
+        measurement.setReading(19.0);
+        pid.update(0);
+
+        for (uint32_t t = 1000; t <= 20000; t += 1000)
+            pid.update(t);
+
+        // P = 0,1 et intégrale = 20 × 0,01.
+        CHECK_NEAR(pid.readCommand(), 0.3, 0.0001);
+
+        // Application du menu : sortie en sécurité, puis reprise.
+        pid.resume(21000);
+        CHECK_FALSE(pid.isCommandValid());
+
+        pid.update(22000);
+        CHECK_FALSE(pid.isCommandValid());
+
+        // L'intégrale est conservée : pas de retour brutal à P seul (0,1).
+        pid.update(23000);
+        CHECK_NEAR(pid.readCommand(), 0.31, 0.0001);
+
+        // Une mesure invalide suspend la commande sans perdre l'intégrale.
+        measurement.setReading(0.0, false);
+        pid.update(24000);
+        CHECK_FALSE(pid.isCommandValid());
+
+        measurement.setReading(19.0);
+        pid.update(25000);
+        pid.update(26000);
+        CHECK_NEAR(pid.readCommand(), 0.32, 0.0001);
+
+        // Changement de gains sans à-coup : l'intégrale ne dépend pas de Kp.
+        pid.settings.kp = 0.2;
+        pid.update(27000);
+        CHECK_NEAR(pid.readCommand(), 0.2 + 0.22 + 0.02, 0.0001);
+
+        // Changement de sens d'action : l'intégrale repart de zéro.
+        pid.settings.mode = PID::Mode::Cooling;
+        pid.update(28000);
+        CHECK_NEAR(pid.readCommand(), 0.0, 0.0001);
+
+        // Un PID arrêté puis réactivé repart d'une intégrale nulle.
+        pid.settings.mode = PID::Mode::Heating;
+        pid.settings.kp = 0.1;
+        pid.update(29000);
+        pid.settings.enabled = false;
+        pid.update(30000);
+        pid.settings.enabled = true;
+        pid.update(31000);
+        pid.update(32000);
+        CHECK_NEAR(pid.readCommand(), 0.11, 0.0001);
+    }
+
+    void testPIDSetpointLimits()
+    {
+        FakeTemperature measurement;
+        PID pid;
+        Parameter storage[10];
+        ParameterList parameters;
+
+        pid.begin("pid", measurement);
+        CHECK_FALSE(pid.setSetpointLimits(50.0, 20.0));
+        CHECK_TRUE(pid.setSetpointLimits(-20.0, 400.0));
+
+        parameters.begin(storage, 10);
+        pid.registerParameters(parameters);
+        CHECK_FALSE(parameters.hasError());
+
+        const Parameter* setpoint = parameters.find("pid", "setpoint");
+        CHECK_TRUE(setpoint != nullptr);
+        CHECK_NEAR(setpoint->data.number.minimum, -20.0, 0.0);
+        CHECK_NEAR(setpoint->data.number.maximum, 400.0, 0.0);
+
+        CHECK_TRUE(parameters.find("pid", "ti") != nullptr);
+        CHECK_TRUE(parameters.find("pid", "td") != nullptr);
+        CHECK_TRUE(parameters.find("pid", "ki") == nullptr);
     }
 
     void testCoolingPIDAutotuneUsesPhysicalLimits()
@@ -1606,7 +1748,8 @@ namespace
                 parameters,
                 "pid.autotune",
                 "PID autotune"));
-        CHECK_TRUE(parameters.count() == 17);
+        // 9 réglages d'essai + la règle de calcul des gains.
+        CHECK_TRUE(parameters.count() == 18);
 
         CHECK_TRUE(
             parameters.find(
@@ -1839,6 +1982,9 @@ namespace
 
         RTC clock;
 
+        // Accès aux registres bruts : heure locale = UTC (voir testRTCTimeZone).
+        clock.timeZone = {0.0, RTC::DstRule::None};
+
         CHECK_TRUE(clock.begin(8, 9, wire));
         CHECK_TRUE(wire.started);
         CHECK_TRUE(wire.sdaPin == 8);
@@ -1972,19 +2118,26 @@ namespace
             uninitializedClock.setDateTime(
                 updated));
 
-        Parameter storage[6];
+        Parameter storage[8];
         ParameterList parameters;
-        parameters.begin(storage, 6);
+        parameters.begin(storage, 8);
         clock.registerParameters(parameters);
 
-        CHECK_TRUE(parameters.count() == 6);
+        CHECK_TRUE(parameters.count() == 8);
+        CHECK_FALSE(parameters.hasError());
 
+        // Date et heure : saisie ponctuelle. Fuseau : configuration sauvegardée.
         for (size_t i = 0;
              i < parameters.count();
              i++)
         {
-            CHECK_FALSE(
-                parameters.get(i)->persistent);
+            const Parameter* parameter = parameters.get(i);
+
+            CHECK_TRUE(
+                parameter->persistent ==
+                (std::strcmp(
+                     parameter->ownerKey,
+                     RTC::TIME_ZONE_OWNER_KEY) == 0));
         }
 
         ParameterEditor editor;
@@ -2047,6 +2200,8 @@ namespace
     {
         TwoWire wire;
         RTC clock;
+        // Registres comparés en heure locale brute.
+        clock.timeZone = {0.0, RTC::DstRule::None};
         CHECK_TRUE(clock.begin(wire));
         RTC::DateTime initial;
         initial.year = 2024;
@@ -2055,9 +2210,10 @@ namespace
         initial.hour = 12;
         CHECK_TRUE(clock.setDateTime(initial));
 
-        Parameter storage[7];
+        // 6 champs date/heure + 2 réglages de fuseau, puis "other".
+        Parameter storage[9];
         ParameterList parameters;
-        parameters.begin(storage, 7);
+        parameters.begin(storage, 9);
         clock.registerParameters(parameters);
         int32_t otherValue = 10;
         CHECK_TRUE(parameters.forOwner({"other", "Autre", "other", "Autre"})
@@ -2065,13 +2221,13 @@ namespace
         ParameterEditor editor;
         editor.begin(parameters);
         editor.capture();
-        editor.get(6).integerValue = 20;
+        editor.get(8).integerValue = 20;
 
         // L'entrée dans Horloge recharge le RTC sans perdre les autres edits.
         CHECK_TRUE(clock.onMenuOpened());
         editor.capture(RTC::MENU_OWNER_KEY);
         CHECK_TRUE(editor.find(RTC::MENU_OWNER_KEY, "year")->integerValue == 2024);
-        CHECK_TRUE(editor.get(6).integerValue == 20);
+        CHECK_TRUE(editor.get(8).integerValue == 20);
         CHECK_TRUE(editor.hasChanges("other"));
         CHECK_FALSE(editor.hasChanges(RTC::MENU_OWNER_KEY));
 
@@ -2093,7 +2249,7 @@ namespace
         CHECK_FALSE(editor.hasChanges(RTC::MENU_OWNER_KEY));
         CHECK_TRUE(clock.validateParameters(editor));
         CHECK_TRUE(editor.hasChanges("other"));
-        CHECK_TRUE(editor.get(6).integerValue == 20);
+        CHECK_TRUE(editor.get(8).integerValue == 20);
 
         // Seul Valider écrit les champs dans le RTC.
         CHECK_TRUE(setClockDraft(editor, "day", 29));
@@ -2130,6 +2286,132 @@ namespace
         CHECK_TRUE(editor.apply());
         CHECK_TRUE(otherValue == 20);
         CHECK_FALSE(editor.hasChanges());
+    }
+
+    uint8_t toTestBcd(uint8_t value)
+    {
+        return static_cast<uint8_t>(
+            ((value / 10) << 4) | (value % 10));
+    }
+
+    /* Écrit une heure UTC dans les registres du DS3231 simulé. */
+    void setUtcRegisters(
+        TwoWire& wire,
+        uint16_t year,
+        uint8_t month,
+        uint8_t day,
+        uint8_t hour,
+        uint8_t minute)
+    {
+        wire.registers[0x00] = 0x00;
+        wire.registers[0x01] = toTestBcd(minute);
+        wire.registers[0x02] = toTestBcd(hour);
+        wire.registers[0x04] = toTestBcd(day);
+        wire.registers[0x05] = toTestBcd(month);
+        wire.registers[0x06] = toTestBcd(
+            static_cast<uint8_t>(year - 2000));
+    }
+
+    RTC::DateTime localDateTime(
+        uint16_t year,
+        uint8_t month,
+        uint8_t day,
+        uint8_t hour,
+        uint8_t minute)
+    {
+        RTC::DateTime dateTime;
+        dateTime.year = year;
+        dateTime.month = month;
+        dateTime.day = day;
+        dateTime.hour = hour;
+        dateTime.minute = minute;
+        return dateTime;
+    }
+
+    void testRTCTimeZone()
+    {
+        TwoWire wire;
+        RTC clock;
+
+        // Réglage par défaut : France, UTC+1 et heure d'été européenne.
+        CHECK_NEAR(clock.timeZone.utcOffsetHours, 1.0, 0.0001);
+        CHECK_TRUE(clock.timeZone.dst == RTC::DstRule::Europe);
+        CHECK_TRUE(clock.begin(wire));
+
+        RTC::DateTime local;
+
+        // Passage à l'heure d'été 2026 : 29 mars, 01:00 UTC.
+        setUtcRegisters(wire, 2026, 3, 29, 0, 59);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 1 && local.minute == 59);
+        CHECK_FALSE(local.summerTime);
+
+        setUtcRegisters(wire, 2026, 3, 29, 1, 0);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 3 && local.minute == 0);
+        CHECK_TRUE(local.summerTime);
+
+        // Retour à l'heure d'hiver 2026 : 25 octobre, 01:00 UTC.
+        setUtcRegisters(wire, 2026, 10, 25, 0, 59);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 2 && local.minute == 59);
+        CHECK_TRUE(local.summerTime);
+
+        setUtcRegisters(wire, 2026, 10, 25, 1, 0);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 2 && local.minute == 0);
+        CHECK_FALSE(local.summerTime);
+
+        // Changement d'année et jour de la semaine en heure locale.
+        setUtcRegisters(wire, 2026, 12, 31, 23, 30);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.year == 2027);
+        CHECK_TRUE(local.month == 1);
+        CHECK_TRUE(local.day == 1);
+        CHECK_TRUE(local.hour == 0 && local.minute == 30);
+        CHECK_TRUE(local.dayOfWeek == 5);
+
+        // Écriture : le DS3231 reçoit l'heure UTC.
+        CHECK_TRUE(clock.setDateTime(localDateTime(2026, 9, 30, 14, 0)));
+        CHECK_TRUE(wire.registers[0x02] == 0x12);
+        CHECK_TRUE(wire.registers[0x04] == 0x30);
+
+        CHECK_TRUE(clock.setDateTime(localDateTime(2026, 1, 15, 8, 0)));
+        CHECK_TRUE(wire.registers[0x02] == 0x07);
+
+        // Heure répétée d'octobre : l'heure d'été est retenue.
+        CHECK_TRUE(clock.setDateTime(localDateTime(2026, 10, 25, 2, 30)));
+        CHECK_TRUE(wire.registers[0x02] == 0x00);
+        CHECK_TRUE(wire.registers[0x01] == 0x30);
+
+        // Heure sautée de mars : 02:30 devient 03:30 (heure d'été).
+        CHECK_TRUE(clock.setDateTime(localDateTime(2026, 3, 29, 2, 30)));
+        CHECK_TRUE(wire.registers[0x02] == 0x01);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 3 && local.minute == 30);
+
+        // Une date locale qui tomberait avant 2000 en UTC est refusée.
+        const auto beforeInvalidDate = wire.registers;
+        CHECK_FALSE(clock.setDateTime(localDateTime(2000, 1, 1, 0, 30)));
+        CHECK_TRUE(wire.registers == beforeInvalidDate);
+
+        // Autres fuseaux, sans heure d'été.
+        clock.timeZone = {-5.0, RTC::DstRule::None};
+        setUtcRegisters(wire, 2026, 7, 1, 3, 0);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.month == 6 && local.day == 30);
+        CHECK_TRUE(local.hour == 22);
+        CHECK_FALSE(local.summerTime);
+
+        clock.timeZone = {5.75, RTC::DstRule::None};
+        setUtcRegisters(wire, 2026, 7, 1, 0, 0);
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 5 && local.minute == 45);
+
+        // Un décalage invalide est borné, jamais propagé.
+        clock.timeZone = {NAN, RTC::DstRule::None};
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 0 && local.minute == 0);
     }
 
     void testUnavailableAdcMenuReading()
@@ -2748,6 +3030,7 @@ namespace
 void runThermocoupleTests();
 void runPWMTests();
 void runDigitalInputTests();
+void runScheduleTests();
 
 int main()
 {
@@ -2836,6 +3119,18 @@ int main()
         testCoolingPIDAutotune);
 
     TestHarness::run(
+        "règles de réglage autotune",
+        testPIDAutotuneRules);
+
+    TestHarness::run(
+        "PID reprise sans à-coup",
+        testPIDBumplessResume);
+
+    TestHarness::run(
+        "PID plage de consigne et gains Ti/Td",
+        testPIDSetpointLimits);
+
+    TestHarness::run(
         "limites autotune PID refroidissement",
         testCoolingPIDAutotuneUsesPhysicalLimits);
 
@@ -2879,6 +3174,10 @@ int main()
         "enregistrement du menu horloge",
         testRTCMenuApply);
 
+    TestHarness::run(
+        "fuseau horaire et heure d'été RTC",
+        testRTCTimeZone);
+
     TestHarness::run("menu ADC indisponible au demarrage", testUnavailableAdcMenuReading);
     TestHarness::run(
         "éditeur de paramètres",
@@ -2913,6 +3212,7 @@ int main()
     runThermocoupleTests();
     runPWMTests();
     runDigitalInputTests();
+    runScheduleTests();
 
     return TestHarness::finish();
 }

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include <Hardware/pinout.h>
+#include <Hardware/RTC.h>
 
 class Actuator;
 class DigitalInput;
@@ -41,10 +42,16 @@ public:
     // Acquisition indépendante du cycle ADC et de l'activation des sorties.
     void pollInputs(uint32_t now);
 
-    // Actualise uniquement les entrées, sans modifier les mesures/sorties.
+    // Actualise les entrées et l'heure, sans modifier les mesures/sorties.
     void captureInputSnapshot(ProcessSnapshot& destination) const;
 
     void resume(uint32_t now);
+
+    /** Mise à jour par OPC, sur le cœur contrôle, environ chaque seconde. */
+    void updateClock(const ClockSample& sample);
+
+    /** Heure courante pour les régulateurs horaires (TimeSchedule). */
+    const ClockSample& clock() const;
 
     bool beginOutputs();
 
@@ -70,6 +77,8 @@ public:
         const ParameterEditor& editor) const;
 
 private:
+
+    ClockSample clockSample;
 
     DigitalInput* digitalInputs[MAX_DIGITAL_INPUTS] = {};
     uint8_t digitalInputCount = 0;

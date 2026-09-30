@@ -33,6 +33,7 @@ fi
     "${project_dir}/test/host/test_thermocouple.cpp" \
     "${project_dir}/test/host/test_pwm.cpp" \
     "${project_dir}/test/host/test_digital_input.cpp" \
+    "${project_dir}/test/host/test_schedule.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -62,9 +63,11 @@ fi
     "${project_dir}/src/Regulator/PID.cpp" \
     "${project_dir}/src/Regulator/PIDAutoTune.cpp" \
     "${project_dir}/src/Regulator/Regulator.cpp" \
+    "${project_dir}/src/Regulator/ScheduledSetpoint.cpp" \
     "${project_dir}/src/Regulator/SetpointRamp.cpp" \
     "${project_dir}/src/Regulator/SolarRegulator.cpp" \
     "${project_dir}/src/Regulator/Thermostat.cpp" \
+    "${project_dir}/src/Regulator/TimeSchedule.cpp" \
     "${project_dir}/src/SystemWatchdog.cpp" \
     -o "${binary}"
 

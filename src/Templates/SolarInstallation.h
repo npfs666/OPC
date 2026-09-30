@@ -12,6 +12,8 @@
 #include <Outputs/RelayOutput.h>
 
 #include <Regulator/SolarRegulator.h>
+#include <Regulator/Thermostat.h>
+#include <Regulator/TimeSchedule.h>
 
 class Adafruit_BMP5xx;
 class ProcessControl;
@@ -19,6 +21,11 @@ class SensorBoard;
 
 /**
  * Exemple d'installation pour un chauffe-eau solaire.
+ *
+ * - Relais 1 : pompe solaire, avec décharge nocturne en mode vacances
+ *   (programme « Décharge nuit ») ;
+ * - Relais 2 : résistance d'appoint, thermostat sur le haut du ballon actif
+ *   uniquement pendant le programme « Heures creuses ».
  *
  * Ce template n'est pas sélectionné par OPC. Il peut être copié,
  * renommé et adapté avant de remplacer l'installation utilisateur.
@@ -33,6 +40,8 @@ public:
         SensorBoard& board,
         Adafruit_BMP5xx& bmp580,
         ProcessControl& process) override;
+
+    void captureHomeScreenState() override;
 
     void printHomeScreen(
         HomeScreenContext& context) override;
@@ -58,6 +67,19 @@ private:
     // Commande de la pompe
     ActuatorOnOff pump;
     RelayOutput pumpRelay;
+
+    // Décharge nocturne (mode vacances)
+    TimeSchedule holidaySchedule;
+
+    // Appoint électrique en heures creuses
+    TimeSchedule offPeakSchedule;
+    Thermostat backupHeater;
+    ActuatorOnOff heater;
+    RelayOutput heaterRelay;
+
+    // Copie pour le cœur UI, faite par captureHomeScreenState().
+    bool homeDischarging = false;
+    bool homeHolidayMode = false;
 };
 
 #endif

@@ -218,6 +218,9 @@ bool PIDAutoTune::settingsAreValid(
         return false;
     }
 
+    if (!ruleIsSupported(settings.rule))
+        return false;
+
     if (!std::isfinite(settings.outputLow) ||
         !std::isfinite(settings.outputHigh) ||
         !std::isfinite(settings.noiseBand) ||
@@ -260,6 +263,75 @@ bool PIDAutoTune::settingsAreValid(
         settings.timeoutSeconds >
             settings.minimumCycleSeconds *
                 (settings.cycles + 1UL);
+}
+
+bool PIDAutoTune::ruleIsSupported(TuningRule rule)
+{
+    return
+        rule == TuningRule::ZieglerNichols ||
+        rule == TuningRule::TyreusLuyben ||
+        rule == TuningRule::SomeOvershoot ||
+        rule == TuningRule::NoOvershoot;
+}
+
+bool PIDAutoTune::applyTuningRule(
+    TuningRule rule,
+    double_t ultimateGain,
+    double_t ultimatePeriodSeconds,
+    Result& result)
+{
+    if (!std::isfinite(ultimateGain) ||
+        !std::isfinite(ultimatePeriodSeconds) ||
+        ultimateGain <= 0.0 ||
+        ultimatePeriodSeconds <= 0.0)
+    {
+        return false;
+    }
+
+    double_t gainRatio = 0.0;
+    double_t integralRatio = 0.0;
+    double_t derivativeRatio = 0.0;
+
+    switch (rule)
+    {
+    case TuningRule::ZieglerNichols:
+        gainRatio = 0.6;
+        integralRatio = 0.5;
+        derivativeRatio = 0.125;
+        break;
+
+    case TuningRule::TyreusLuyben:
+        gainRatio = 1.0 / 2.2;
+        integralRatio = 2.2;
+        derivativeRatio = 1.0 / 6.3;
+        break;
+
+    case TuningRule::SomeOvershoot:
+        gainRatio = 1.0 / 3.0;
+        integralRatio = 0.5;
+        derivativeRatio = 1.0 / 3.0;
+        break;
+
+    case TuningRule::NoOvershoot:
+        gainRatio = 0.2;
+        integralRatio = 0.5;
+        derivativeRatio = 1.0 / 3.0;
+        break;
+
+    default:
+        return false;
+    }
+
+    result.ultimateGain = ultimateGain;
+    result.ultimatePeriodSeconds = ultimatePeriodSeconds;
+    result.kp = gainRatio * ultimateGain;
+    result.ti = integralRatio * ultimatePeriodSeconds;
+    result.td = derivativeRatio * ultimatePeriodSeconds;
+
+    return
+        std::isfinite(result.kp) &&
+        std::isfinite(result.ti) &&
+        std::isfinite(result.td);
 }
 
 void PIDAutoTune::clearMeasurements()
@@ -482,36 +554,25 @@ bool PIDAutoTune::tryFinish()
          activeSettings.outputLow) /
         2.0;
 
-    result.ultimateGain =
+    const double_t ultimateGain =
         4.0 * relayAmplitude /
         (PI_VALUE * effectiveAmplitude);
 
-    result.ultimatePeriodSeconds =
+    const double_t ultimatePeriodSeconds =
         averagePeriodMs / 1000.0;
 
-    /* Forme parallèle du PID Ziegler-Nichols classique. */
-    result.kp =
-        0.6 * result.ultimateGain;
+    Result tuned;
 
-    result.ki =
-        1.2 * result.ultimateGain /
-        result.ultimatePeriodSeconds;
-
-    result.kd =
-        0.075 * result.ultimateGain *
-        result.ultimatePeriodSeconds;
-
-    if (!std::isfinite(result.ultimateGain) ||
-        !std::isfinite(result.kp) ||
-        !std::isfinite(result.ki) ||
-        !std::isfinite(result.kd) ||
-        result.ultimateGain <= 0.0 ||
-        result.kp < 0.0 ||
-        result.ki < 0.0 ||
-        result.kd < 0.0)
+    if (!applyTuningRule(
+            activeSettings.rule,
+            ultimateGain,
+            ultimatePeriodSeconds,
+            tuned))
     {
         return false;
     }
+
+    result = tuned;
 
     status = Status::Succeeded;
     error = Error::None;

@@ -45,6 +45,14 @@ void Thermostat::begin(
     settings.setpoint = 20.0;
     settings.hysteresis = 1.0;
     setpointRamp.begin();
+    scheduledSetpoint.begin();
+}
+
+void Thermostat::setSchedule(
+    const TimeSchedule& schedule,
+    double_t reducedSetpoint)
+{
+    scheduledSetpoint.attach(schedule, reducedSetpoint);
 }
 
 void Thermostat::update(uint32_t now)
@@ -62,9 +70,20 @@ void Thermostat::update(uint32_t now)
     const double_t value =
         temperature->getValue();
 
+    double_t target = settings.setpoint;
+
+    if (!scheduledSetpoint.update(
+            settings.setpoint,
+            target))
+    {
+        setpointRamp.restart();
+        invalidateCommand();
+        return;
+    }
+
     if (!setpointRamp.update(
             now,
-            settings.setpoint,
+            target,
             value))
     {
         invalidateCommand();
@@ -135,6 +154,14 @@ void Thermostat::print(Stream& stream) const {
     stream.print(" | Hyst : ");
     stream.print(settings.hysteresis);
 
+    if (scheduledSetpoint.isAttached())
+    {
+        stream.print(" | Prog : ");
+        stream.print(
+            ScheduledSetpoint::stateName(
+                scheduledSetpoint.state()));
+    }
+
     stream.println(' ');
 }
 
@@ -157,6 +184,14 @@ void Thermostat::registerParameters(ParameterList& list) {
         "setpoint",
         "Consigne",
         settings.setpoint,
+        0.0,
+        200.0,
+        0.1,
+        1,
+        "°C");
+
+    scheduledSetpoint.registerParameters(
+        parameters,
         0.0,
         200.0,
         0.1,

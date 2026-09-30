@@ -28,6 +28,15 @@ public:
 
     const char* getUnit() const override;
 
+    /**
+     * Vrai si la régulation dépend de l'heure du DS3231. Une heure inconnue
+     * affiche alors une alerte à la place de l'écran d'accueil.
+     */
+    virtual bool requiresClock() const
+    {
+        return false;
+    }
+
     void registerParameters(
         ParameterList& list) override
     {

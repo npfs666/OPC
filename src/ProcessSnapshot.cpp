@@ -105,6 +105,16 @@ uint32_t ProcessSnapshot::capturedAt() const
     return captureTime;
 }
 
+const ClockSample& ProcessSnapshot::clock() const
+{
+    return clockSample;
+}
+
+bool ProcessSnapshot::clockRequired() const
+{
+    return clockNeeded;
+}
+
 void ProcessSnapshot::clear(uint32_t now)
 {
     digitalInputSampleCount = 0;

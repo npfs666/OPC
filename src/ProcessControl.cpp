@@ -41,6 +41,14 @@ void ProcessControl::captureInputSnapshot(
     ProcessSnapshot& destination) const
 {
     destination.digitalInputSampleCount = 0;
+    destination.clockSample = clockSample;
+    destination.clockNeeded = false;
+
+    for (uint8_t i = 0; i < regulatorCount; i++)
+    {
+        if (regulators[i]->requiresClock())
+            destination.clockNeeded = true;
+    }
 
     for (uint8_t i = 0; i < digitalInputCount; i++)
         destination.add(*digitalInputs[i]);
@@ -172,6 +180,16 @@ void ProcessControl::resume(uint32_t now)
 
     for (uint8_t i = 0; i < actuatorCount; i++)
         actuators[i]->resume(now);
+}
+
+void ProcessControl::updateClock(const ClockSample& sample)
+{
+    clockSample = sample;
+}
+
+const ClockSample& ProcessControl::clock() const
+{
+    return clockSample;
 }
 
 bool ProcessControl::beginOutputs()

@@ -26,6 +26,43 @@ bool ParameterList::Writer::addBool(
                    readOnly));
 }
 
+bool ParameterList::Writer::addTime(
+    const char* key,
+    const char* name,
+    uint16_t& minutes,
+    uint16_t step,
+    bool readOnly)
+{
+    if (list == nullptr)
+        return false;
+
+    if (minutes >= MINUTES_PER_DAY ||
+        step == 0 ||
+        step > 60)
+    {
+        return list->remember(false);
+    }
+
+    const ParameterDiscreteBinding binding{
+        &minutes,
+        &readDiscrete<uint16_t>,
+        &writeDiscrete<uint16_t>
+    };
+
+    return list->remember(
+        list->addInteger(
+            owner,
+            key,
+            name,
+            binding,
+            0,
+            MINUTES_PER_DAY - 1,
+            step,
+            nullptr,
+            readOnly,
+            Parameter::IntegerFormat::TimeOfDay));
+}
+
 bool ParameterList::Writer::addDouble(
     const char* key,
     const char* name,
@@ -233,7 +270,8 @@ bool ParameterList::addInteger(
     int32_t maximum,
     int32_t step,
     const char* unit,
-    bool readOnly)
+    bool readOnly,
+    Parameter::IntegerFormat format)
 {
     if (binding.target == nullptr ||
         binding.read == nullptr ||
@@ -264,6 +302,7 @@ bool ParameterList::addInteger(
     parameter->data.integer.maximum = maximum;
     parameter->data.integer.step = step;
     parameter->data.integer.unit = unit;
+    parameter->data.integer.format = format;
 
     return true;
 }
@@ -440,6 +479,7 @@ Parameter* ParameterList::create(
     parameter.categoryName = owner.categoryName;
     parameter.ownerKey = owner.ownerKey;
     parameter.ownerName = owner.ownerName;
+    parameter.parentOwnerKey = owner.parentOwnerKey;
     parameter.key = key;
     parameter.name = name;
     parameter.type = type;
@@ -463,7 +503,12 @@ bool ParameterList::isValidOwner(
     return isValidText(owner.categoryKey) &&
            isValidText(owner.categoryName) &&
            isValidText(owner.ownerKey) &&
-           isValidText(owner.ownerName);
+           isValidText(owner.ownerName) &&
+           (owner.parentOwnerKey == nullptr ||
+            (isValidText(owner.parentOwnerKey) &&
+             std::strcmp(
+                 owner.parentOwnerKey,
+                 owner.ownerKey) != 0));
 }
 
 bool ParameterList::remember(bool result)

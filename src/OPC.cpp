@@ -218,7 +218,14 @@ void OPC::handleISRButton()
 
 bool OPC::newMeasurement()
 {
-    if (!input.newMeasurement)
+    // Sans entrée analogique, l'ADC ne cadence rien : cycle fixe.
+    const bool sensorlessCycle =
+        controlCycleStarted &&
+        input.sensorCount() == 0 &&
+        !acquisitionPausedForMenu &&
+        millis() - lastMeasurementTime >= SENSORLESS_CYCLE_MS;
+
+    if (!input.newMeasurement && !sensorlessCycle)
         return false;
 
     input.newMeasurement = false;
@@ -271,6 +278,40 @@ bool OPC::newMeasurement()
     return true;
 }
 
+void OPC::refreshClock()
+{
+    lastClockRefresh = millis();
+
+    RTC::DateTime dateTime;
+    bool readOk;
+    bool oscillatorRunning = false;
+    {
+        SensorBoard::SharedBusGuard busGuard;
+        readOk = clock.readDateTime(dateTime);
+
+        if (readOk && !clock.isTimeValid(oscillatorRunning))
+            readOk = false;
+    }
+
+    // Une erreur I2C isolée ne doit pas arrêter les programmations : la
+    // dernière heure lue reste utilisée quelques secondes.
+    if (readOk)
+        clockReadFailures = 0;
+    else if (clockReadFailures < CLOCK_READ_FAILURES_TOLERATED)
+    {
+        clockReadFailures++;
+        return;
+    }
+
+    mutex_enter_blocking(&processDataMutex);
+    sharedClockDateTime = dateTime;
+    sharedClockValid = readOk;
+    // Heure perdue (OSF, pile vide) : les programmations horaires s'arrêtent.
+    controller.updateClock(
+        ClockSample{dateTime, readOk && oscillatorRunning});
+    mutex_exit(&processDataMutex);
+}
+
 void OPC::controlPoll()
 {
     // Les entrées restent accessibles même lorsque les sorties sont arrêtées.
@@ -282,19 +323,7 @@ void OPC::controlPoll()
     storage.poll();
 
     if (millis() - lastClockRefresh >= 1000)
-    {
-        lastClockRefresh = millis();
-        RTC::DateTime dateTime;
-        bool valid;
-        {
-            SensorBoard::SharedBusGuard busGuard;
-            valid = clock.readDateTime(dateTime);
-        }
-        mutex_enter_blocking(&processDataMutex);
-        sharedClockDateTime = dateTime;
-        sharedClockValid = valid;
-        mutex_exit(&processDataMutex);
-    }
+        refreshClock();
 
     if (configurationSavePending &&
         !acquisitionPausedForMenu)
@@ -413,7 +442,10 @@ bool OPC::initMeasurements()
     controlOutputsEnabled = false;
     lastMeasurementTime = millis();
 
+    refreshClock();
+
     input.startContinuous();
+    controlCycleStarted = true;
 
     return true;
 }
@@ -510,9 +542,68 @@ void OPC::copyProcessSnapshot()
     mutex_exit(&processDataMutex);
 }
 
+void OPC::showClockAlert()
+{
+    constexpr uint16_t COLOR_ORANGE = 0xFD20;
+    constexpr uint16_t COLOR_GREY = 0x8410;
+
+    tft.cp437(true);
+    tft.setTextWrap(false);
+    tft.setTextSize(2);
+    tft.fillScreen(ST77XX_BLACK);
+
+    tft.fillRect(0, 0, tft.width(), 32, COLOR_ORANGE);
+    tft.setTextColor(ST77XX_BLACK, COLOR_ORANGE);
+    tft.setCursor(STARTUP_ERROR_MARGIN, 9);
+    tft.print("ALERTE HORLOGE");
+
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    int16_t y = printWrapped(tft, "Heure inconnue", 50, 1);
+
+    y += 6;
+
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    y = printWrapped(
+        tft, "Régulations programmées à l'arrêt, leurs sorties en sécurité.", y, 4);
+
+    y += 6;
+
+    tft.setTextColor(COLOR_GREY, ST77XX_BLACK);
+    printWrapped(tft, "Pile du DS3231 à vérifier.", y, 2);
+
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    printWrapped(tft, "Clic : Divers > Horloge", 212, 1);
+}
+
 void OPC::showHomeScreen(
     bool fullRefresh)
 {
+    const bool clockAlert =
+        displayProcessSnapshot.clockRequired() &&
+        !displayProcessSnapshot.clock().valid;
+
+    if (clockAlert)
+    {
+        if (!clockAlertShown || fullRefresh)
+            showClockAlert();
+
+        if (!clockAlertShown)
+        {
+            Serial.println(
+                "Alerte horloge : heure inconnue, programmations arretees");
+        }
+
+        clockAlertShown = true;
+        return;
+    }
+
+    // Retour à l'accueil normal après réglage de l'heure.
+    if (clockAlertShown)
+    {
+        clockAlertShown = false;
+        fullRefresh = true;
+    }
+
     HomeScreenContext context{
         tft,
         displayProcessSnapshot,

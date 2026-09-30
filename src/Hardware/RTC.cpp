@@ -3,6 +3,8 @@
 #include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
 
+#include <cmath>
+
 namespace
 {
     constexpr uint8_t HOUR_12_MODE = 0x40;
@@ -20,6 +22,146 @@ namespace
     constexpr uint8_t STATUS_EN32KHZ = 0x08;
     constexpr uint8_t STATUS_A2F = 0x02;
     constexpr uint8_t STATUS_A1F = 0x01;
+
+    constexpr int32_t SECONDS_PER_DAY = 86400;
+    constexpr int32_t SECONDS_PER_HOUR = 3600;
+
+    constexpr double_t MINIMUM_UTC_OFFSET_HOURS = -12.0;
+    constexpr double_t MAXIMUM_UTC_OFFSET_HOURS = 14.0;
+
+    constexpr ParameterOption DST_OPTIONS[] = {
+        {static_cast<int32_t>(RTC::DstRule::None), "Aucune"},
+        {static_cast<int32_t>(RTC::DstRule::Europe), "Europe"}
+    };
+
+    /*
+     * Jours depuis le 01/01/1970 (calendrier grégorien).
+     * Algorithme de H. Hinnant, "chrono-compatible low-level date algorithms".
+     */
+    int32_t daysFromCivil(
+        int32_t year,
+        uint32_t month,
+        uint32_t day)
+    {
+        year -= month <= 2 ? 1 : 0;
+
+        const int32_t era =
+            (year >= 0 ? year : year - 399) / 400;
+        const uint32_t yearOfEra =
+            static_cast<uint32_t>(year - era * 400);
+        const uint32_t dayOfYear =
+            (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 +
+            day - 1;
+        const uint32_t dayOfEra =
+            yearOfEra * 365 + yearOfEra / 4 -
+            yearOfEra / 100 + dayOfYear;
+
+        return era * 146097 +
+               static_cast<int32_t>(dayOfEra) - 719468;
+    }
+
+    void civilFromDays(
+        int32_t days,
+        int32_t& year,
+        uint32_t& month,
+        uint32_t& day)
+    {
+        days += 719468;
+
+        const int32_t era =
+            (days >= 0 ? days : days - 146096) / 146097;
+        const uint32_t dayOfEra =
+            static_cast<uint32_t>(days - era * 146097);
+        const uint32_t yearOfEra =
+            (dayOfEra - dayOfEra / 1460 +
+             dayOfEra / 36524 - dayOfEra / 146096) / 365;
+        const uint32_t dayOfYear =
+            dayOfEra -
+            (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100);
+        const uint32_t shiftedMonth =
+            (5 * dayOfYear + 2) / 153;
+
+        day = dayOfYear - (153 * shiftedMonth + 2) / 5 + 1;
+        month = shiftedMonth < 10
+            ? shiftedMonth + 3
+            : shiftedMonth - 9;
+        year = static_cast<int32_t>(yearOfEra) + era * 400 +
+               (month <= 2 ? 1 : 0);
+    }
+
+    int64_t toSeconds(const RTC::DateTime& dateTime)
+    {
+        return static_cast<int64_t>(
+                   daysFromCivil(
+                       dateTime.year,
+                       dateTime.month,
+                       dateTime.day)) *
+                   SECONDS_PER_DAY +
+               dateTime.hour * SECONDS_PER_HOUR +
+               dateTime.minute * 60 +
+               dateTime.second;
+    }
+
+    /* Retourne false hors de la plage 2000-2099 acceptée par le DS3231. */
+    bool fromSeconds(
+        int64_t seconds,
+        RTC::DateTime& dateTime)
+    {
+        int64_t days = seconds / SECONDS_PER_DAY;
+        int64_t secondOfDay = seconds % SECONDS_PER_DAY;
+
+        if (secondOfDay < 0)
+        {
+            secondOfDay += SECONDS_PER_DAY;
+            days--;
+        }
+
+        int32_t year = 0;
+        uint32_t month = 0;
+        uint32_t day = 0;
+
+        civilFromDays(
+            static_cast<int32_t>(days),
+            year,
+            month,
+            day);
+
+        if (year < 2000 || year > 2099)
+            return false;
+
+        dateTime.year = static_cast<uint16_t>(year);
+        dateTime.month = static_cast<uint8_t>(month);
+        dateTime.day = static_cast<uint8_t>(day);
+        dateTime.hour = static_cast<uint8_t>(
+            secondOfDay / SECONDS_PER_HOUR);
+        dateTime.minute = static_cast<uint8_t>(
+            (secondOfDay / 60) % 60);
+        dateTime.second = static_cast<uint8_t>(
+            secondOfDay % 60);
+        dateTime.dayOfWeek = RTC::calculateDayOfWeek(
+            dateTime.year,
+            dateTime.month,
+            dateTime.day);
+
+        return true;
+    }
+
+    /* Jour (depuis 1970) du dernier dimanche du mois. */
+    int32_t lastSunday(
+        int32_t year,
+        uint32_t month)
+    {
+        const int32_t lastDay =
+            month == 12
+                ? daysFromCivil(year + 1, 1, 1) - 1
+                : daysFromCivil(year, month + 1, 1) - 1;
+
+        // 01/01/1970 était un jeudi ; 0 = dimanche.
+        const int32_t weekday =
+            ((lastDay % 7) + 7 + 4) % 7;
+
+        return lastDay - weekday;
+    }
 }
 
 bool RTC::begin(
@@ -72,6 +214,108 @@ bool RTC::isInitialized() const
 }
 
 bool RTC::readDateTime(DateTime& dateTime) const
+{
+    DateTime utc;
+
+    return readDeviceDateTime(utc) &&
+           utcToLocal(utc, dateTime);
+}
+
+bool RTC::setDateTime(
+    const DateTime& dateTime)
+{
+    DateTime utc;
+
+    return initialized &&
+           isValidDateTime(dateTime) &&
+           localToUtc(dateTime, utc) &&
+           writeDeviceDateTime(utc);
+}
+
+int32_t RTC::standardOffsetSeconds() const
+{
+    double_t hours = timeZone.utcOffsetHours;
+
+    if (!std::isfinite(hours))
+        hours = 0.0;
+
+    hours = constrain(
+        hours,
+        MINIMUM_UTC_OFFSET_HOURS,
+        MAXIMUM_UTC_OFFSET_HOURS);
+
+    // Arrondi à la minute.
+    return static_cast<int32_t>(lround(hours * 60.0)) * 60;
+}
+
+bool RTC::isSummerTime(int64_t utcSeconds) const
+{
+    if (timeZone.dst != DstRule::Europe)
+        return false;
+
+    DateTime utc;
+
+    if (!fromSeconds(utcSeconds, utc))
+        return false;
+
+    // Changements à 01:00 UTC, simultanés dans toute l'Union européenne.
+    const int64_t start =
+        static_cast<int64_t>(lastSunday(utc.year, 3)) *
+            SECONDS_PER_DAY +
+        SECONDS_PER_HOUR;
+
+    const int64_t end =
+        static_cast<int64_t>(lastSunday(utc.year, 10)) *
+            SECONDS_PER_DAY +
+        SECONDS_PER_HOUR;
+
+    return utcSeconds >= start && utcSeconds < end;
+}
+
+bool RTC::utcToLocal(
+    const DateTime& utc,
+    DateTime& local) const
+{
+    const int64_t utcSeconds = toSeconds(utc);
+    const bool summerTime = isSummerTime(utcSeconds);
+
+    DateTime converted;
+
+    if (!fromSeconds(
+            utcSeconds +
+                standardOffsetSeconds() +
+                (summerTime ? SECONDS_PER_HOUR : 0),
+            converted))
+    {
+        return false;
+    }
+
+    converted.summerTime = summerTime;
+    local = converted;
+
+    return true;
+}
+
+bool RTC::localToUtc(
+    const DateTime& local,
+    DateTime& utc) const
+{
+    const int64_t standardSeconds =
+        toSeconds(local) - standardOffsetSeconds();
+
+    // Essai en heure d'été d'abord : l'heure répétée d'octobre est ainsi
+    // lue comme la première des deux.
+    const int64_t summerSeconds =
+        standardSeconds - SECONDS_PER_HOUR;
+
+    return fromSeconds(
+        isSummerTime(summerSeconds)
+            ? summerSeconds
+            : standardSeconds,
+        utc);
+}
+
+bool RTC::readDeviceDateTime(DateTime& dateTime) const
 {
     if (!initialized)
         return false;
@@ -140,7 +384,7 @@ bool RTC::readDateTime(DateTime& dateTime) const
     return true;
 }
 
-bool RTC::setDateTime(
+bool RTC::writeDeviceDateTime(
     const DateTime& dateTime)
 {
     if (!initialized ||
@@ -177,24 +421,21 @@ bool RTC::setTime(
     uint8_t minute,
     uint8_t second)
 {
-    if (!initialized ||
-        hour > 23 ||
+    DateTime dateTime;
+
+    if (hour > 23 ||
         minute > 59 ||
-        second > 59)
+        second > 59 ||
+        !readDateTime(dateTime))
     {
         return false;
     }
 
-    const uint8_t registers[3] = {
-        toBcd(second),
-        toBcd(minute),
-        toBcd(hour)
-    };
+    dateTime.hour = hour;
+    dateTime.minute = minute;
+    dateTime.second = second;
 
-    return device.writeRegisters(
-        DS3231::Register::Seconds,
-        registers,
-        sizeof(registers));
+    return setDateTime(dateTime);
 }
 
 bool RTC::setDate(
@@ -202,28 +443,19 @@ bool RTC::setDate(
     uint8_t month,
     uint8_t day)
 {
-    if (!initialized ||
-        !isValidDate(year, month, day))
+    DateTime dateTime;
+
+    if (!isValidDate(year, month, day) ||
+        !readDateTime(dateTime))
     {
         return false;
     }
 
-    const uint8_t registers[4] = {
-        calculateDayOfWeek(
-            year,
-            month,
-            day),
-        toBcd(day),
-        toBcd(month),
-        toBcd(
-            static_cast<uint8_t>(
-                year - 2000))
-    };
+    dateTime.year = year;
+    dateTime.month = month;
+    dateTime.day = day;
 
-    return device.writeRegisters(
-        DS3231::Register::DayOfWeek,
-        registers,
-        sizeof(registers));
+    return setDateTime(dateTime);
 }
 
 bool RTC::isTimeValid(bool& valid) const
@@ -286,7 +518,8 @@ bool RTC::setAlarm(const Alarm& alarm)
     {
         DateTime currentDateTime;
 
-        if (!readDateTime(currentDateTime) ||
+        // Le jour de la semaine interne du DS3231 suit la date UTC.
+        if (!readDeviceDateTime(currentDateTime) ||
             !device.writeRegister(
                 DS3231::Register::DayOfWeek,
                 currentDateTime.dayOfWeek))
@@ -443,6 +676,30 @@ void RTC::registerParameters(
         59,
         1,
         "s");
+
+    // Sauvegardé : le DS3231 reste en UTC, seul l'affichage change.
+    auto timeZoneParameters = list.forOwner({
+        "miscellaneous",
+        "Divers",
+        TIME_ZONE_OWNER_KEY,
+        "Fuseau horaire"
+    });
+
+    timeZoneParameters.addDouble(
+        "utc_offset",
+        "Décalage UTC",
+        timeZone.utcOffsetHours,
+        MINIMUM_UTC_OFFSET_HOURS,
+        MAXIMUM_UTC_OFFSET_HOURS,
+        0.25,
+        2,
+        "h");
+
+    timeZoneParameters.addSelection(
+        "dst",
+        "Heure d'été",
+        timeZone.dst,
+        DST_OPTIONS);
 }
 
 bool RTC::validateParameters(

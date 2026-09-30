@@ -10,9 +10,37 @@
 
 namespace
 {
-    constexpr double_t KP_MAX = 10.0;
-    constexpr double_t KI_MAX = 0.1;
-    constexpr double_t KD_MAX = 100.0;
+    // Kp : fraction de sortie par unité de mesure. Ti et Td en secondes.
+    constexpr double_t KP_MIN = 0.01;
+    constexpr double_t KP_MAX = 100.0;
+    constexpr double_t TI_MAX = 100000.0;
+    constexpr double_t TD_MAX = 10000.0;
+
+    constexpr double_t DEFAULT_SETPOINT_MIN = -50.0;
+    constexpr double_t DEFAULT_SETPOINT_MAX = 250.0;
+
+    constexpr ParameterOption AUTOTUNE_RULE_OPTIONS[] = {
+        {
+            static_cast<int32_t>(
+                PID::AutoTuneRule::TyreusLuyben),
+            "Tyreus-Luyben"
+        },
+        {
+            static_cast<int32_t>(
+                PID::AutoTuneRule::NoOvershoot),
+            "Sans dépass."
+        },
+        {
+            static_cast<int32_t>(
+                PID::AutoTuneRule::SomeOvershoot),
+            "Peu dépass."
+        },
+        {
+            static_cast<int32_t>(
+                PID::AutoTuneRule::ZieglerNichols),
+            "Z-N classique"
+        }
+    };
 
     constexpr ParameterOption PID_MODE_OPTIONS[] = {
         {
@@ -36,16 +64,16 @@ namespace
 
     bool tuningsAreSupported(
         double_t kp,
-        double_t ki,
-        double_t kd)
+        double_t ti,
+        double_t td)
     {
         return
             std::isfinite(kp) &&
-            std::isfinite(ki) &&
-            std::isfinite(kd) &&
-            kp >= 0.0 && kp <= KP_MAX &&
-            ki >= 0.0 && ki <= KI_MAX &&
-            kd >= 0.0 && kd <= KD_MAX;
+            std::isfinite(ti) &&
+            std::isfinite(td) &&
+            kp >= KP_MIN && kp <= KP_MAX &&
+            ti >= 0.0 && ti <= TI_MAX &&
+            td >= 0.0 && td <= TD_MAX;
     }
 
     bool readNumberDraft(
@@ -92,6 +120,30 @@ namespace
         }
 
         value = draft->integerValue;
+
+        return true;
+    }
+
+    bool readSelectionDraft(
+        const ParameterEditor& editor,
+        const char* ownerKey,
+        const char* parameterKey,
+        int32_t& value)
+    {
+        const ParameterDraft* draft =
+            editor.find(
+                ownerKey,
+                parameterKey);
+
+        if (draft == nullptr ||
+            draft->parameter == nullptr ||
+            draft->parameter->type !=
+                Parameter::Type::Selection)
+        {
+            return false;
+        }
+
+        value = draft->selectionValue;
 
         return true;
     }
@@ -180,6 +232,9 @@ void PID::begin(
     settings = Settings{};
     autoTuneSettings = AutoTuneSettings{};
     setpointRamp.begin();
+    scheduledSetpoint.begin();
+    setpointMinimum = DEFAULT_SETPOINT_MIN;
+    setpointMaximum = DEFAULT_SETPOINT_MAX;
     autoTuneParametersRegistered = false;
     autoTuneTuningsApplied = false;
     autoTuneOwnerKey = nullptr;
@@ -189,12 +244,43 @@ void PID::begin(
 
 void PID::resetController()
 {
-    integral = 0.0;
+    integralTerm = 0.0;
+    integralMode = settings.mode;
+    holdController();
+}
+
+void PID::holdController()
+{
+    filteredDerivative = 0.0;
     previousMeasurement = 0.0;
     previousTime = 0;
     initialized = false;
 
     invalidateCommand();
+}
+
+bool PID::setSetpointLimits(
+    double_t minimum,
+    double_t maximum)
+{
+    if (!std::isfinite(minimum) ||
+        !std::isfinite(maximum) ||
+        minimum >= maximum)
+    {
+        return false;
+    }
+
+    setpointMinimum = minimum;
+    setpointMaximum = maximum;
+
+    return true;
+}
+
+void PID::setSchedule(
+    const TimeSchedule& schedule,
+    double_t reducedSetpoint)
+{
+    scheduledSetpoint.attach(schedule, reducedSetpoint);
 }
 
 void PID::reset()
@@ -248,24 +334,26 @@ bool PID::setMode(Mode mode)
 
 bool PID::setTunings(
     double_t kp,
-    double_t ki,
-    double_t kd)
+    double_t ti,
+    double_t td)
 {
     if (autoTune.isActive() ||
         !tuningsAreSupported(
             kp,
-            ki,
-            kd))
+            ti,
+            td))
     {
         return false;
     }
 
     settings.kp = kp;
-    settings.ki = ki;
-    settings.kd = kd;
+    settings.ti = ti;
+    settings.td = td;
 
     autoTune.reset();
-    resetController();
+
+    // Intégrale conservée : le changement de gains se fait sans à-coup.
+    holdController();
 
     return true;
 }
@@ -287,7 +375,8 @@ bool PID::setOutputLimits(
     settings.outputMin = minimum;
     settings.outputMax = maximum;
 
-    resetController();
+    // L'intégrale sera ramenée dans les nouvelles limites au prochain calcul.
+    holdController();
 
     return true;
 }
@@ -386,8 +475,8 @@ bool PID::controlSettingsAreValid() const
         std::isfinite(settings.setpoint) &&
         tuningsAreSupported(
             settings.kp,
-            settings.ki,
-            settings.kd) &&
+            settings.ti,
+            settings.td) &&
         std::isfinite(settings.outputMin) &&
         std::isfinite(settings.outputMax) &&
         settings.outputMin >= 0.0 &&
@@ -426,12 +515,12 @@ void PID::update(uint32_t now)
 
             if (tuningsAreSupported(
                     result.kp,
-                    result.ki,
-                    result.kd))
+                    result.ti,
+                    result.td))
             {
                 settings.kp = result.kp;
-                settings.ki = result.ki;
-                settings.kd = result.kd;
+                settings.ti = result.ti;
+                settings.td = result.td;
                 autoTuneTuningsApplied = true;
             }
             else
@@ -465,22 +554,42 @@ void PID::update(uint32_t now)
 
     if (!settings.enabled)
     {
+        // Une réactivation (menu ou start()) repart d'une intégrale nulle.
         setpointRamp.restart();
-        invalidateCommand();
+        resetController();
         return;
     }
 
-    if (!measurementValid ||
-        !controlSettingsAreValid())
+    double_t target = settings.setpoint;
+
+    // Arrêt programmé : l'intégrale repart de zéro à la plage suivante.
+    if (!scheduledSetpoint.update(
+            settings.setpoint,
+            target))
+    {
+        setpointRamp.restart();
+        resetController();
+        return;
+    }
+
+    if (!controlSettingsAreValid())
     {
         setpointRamp.resume(now);
         resetController();
         return;
     }
 
+    // Mesure invalide : sortie en sécurité, intégrale gardée pour la reprise.
+    if (!measurementValid)
+    {
+        setpointRamp.resume(now);
+        holdController();
+        return;
+    }
+
     if (!setpointRamp.update(
             now,
-            settings.setpoint,
+            target,
             processValue))
     {
         resetController();
@@ -498,13 +607,19 @@ void PID::updateAutomatic(
     double_t processValue,
     double_t activeSetpoint)
 {
-    if (settings.ki <= 0.0)
-        integral = 0.0;
+    // Une intégrale accumulée dans l'autre sens d'action n'a plus de sens.
+    if (settings.ti <= 0.0 ||
+        integralMode != settings.mode)
+    {
+        integralTerm = 0.0;
+        integralMode = settings.mode;
+    }
 
     if (!initialized)
     {
         previousMeasurement = processValue;
         previousTime = now;
+        filteredDerivative = 0.0;
         initialized = true;
         invalidateCommand();
         return;
@@ -528,17 +643,36 @@ void PID::updateAutomatic(
         (activeSetpoint -
          processValue);
 
-    const double_t derivative =
+    // Dérivée sur la mesure : un changement de consigne ne crée pas de pic.
+    const double_t rawDerivative =
         actionSign *
         (-(processValue -
            previousMeasurement) /
          dt);
 
+    if (settings.td > 0.0)
+    {
+        // Filtre du premier ordre : limite l'effet du bruit de mesure.
+        const double_t filterTime =
+            settings.td /
+            DERIVATIVE_FILTER_RATIO;
+
+        filteredDerivative +=
+            (dt / (filterTime + dt)) *
+            (rawDerivative - filteredDerivative);
+    }
+    else
+    {
+        filteredDerivative = 0.0;
+    }
+
     const double_t proportionalTerm =
         settings.kp * error;
 
     const double_t derivativeTerm =
-        settings.kd * derivative;
+        settings.kp *
+        settings.td *
+        filteredDerivative;
 
     if (!std::isfinite(proportionalTerm) ||
         !std::isfinite(derivativeTerm))
@@ -547,14 +681,16 @@ void PID::updateAutomatic(
         return;
     }
 
-    if (settings.ki > 0.0)
+    if (settings.ti > 0.0)
     {
         const double_t candidateIntegral =
-            integral + error * dt;
+            integralTerm +
+            settings.kp * error * dt /
+                settings.ti;
 
         const double_t candidateOutput =
             proportionalTerm +
-            settings.ki * candidateIntegral +
+            candidateIntegral +
             derivativeTerm;
 
         const bool outputInsideLimits =
@@ -574,18 +710,53 @@ void PID::updateAutomatic(
             error > 0.0;
 
         if (std::isfinite(candidateIntegral) &&
-            std::isfinite(candidateOutput) &&
-            (outputInsideLimits ||
-             unwindsHighSaturation ||
-             unwindsLowSaturation))
+            std::isfinite(candidateOutput))
         {
-            integral = candidateIntegral;
+            if (outputInsideLimits ||
+                unwindsHighSaturation ||
+                unwindsLowSaturation)
+            {
+                integralTerm = candidateIntegral;
+            }
+            else if (candidateOutput > settings.outputMax)
+            {
+                /*
+                 * Anti-windup : l'intégrale monte juste assez pour que la
+                 * commande atteigne la limite, sans jamais la dépasser.
+                 * Sans cela, la sortie pourrait rester bloquée sous la
+                 * saturation alors que l'erreur persiste.
+                 */
+                const double_t atLimit =
+                    settings.outputMax -
+                    proportionalTerm -
+                    derivativeTerm;
+
+                if (atLimit > integralTerm)
+                    integralTerm = atLimit;
+            }
+            else
+            {
+                const double_t atLimit =
+                    settings.outputMin -
+                    proportionalTerm -
+                    derivativeTerm;
+
+                if (atLimit < integralTerm)
+                    integralTerm = atLimit;
+            }
         }
+
+        // L'intégrale seule ne dépasse jamais la plage de sortie, même
+        // après une réduction des limites ou une reprise.
+        integralTerm = constrain(
+            integralTerm,
+            settings.outputMin,
+            settings.outputMax);
     }
 
     double_t output =
         proportionalTerm +
-        settings.ki * integral +
+        integralTerm +
         derivativeTerm;
 
     if (!std::isfinite(output))
@@ -622,7 +793,12 @@ void PID::resume(uint32_t now)
         settings.enabled = false;
     }
 
-    resetController();
+    /*
+     * Reprise sans à-coup après une application de réglages : l'intégrale
+     * reflète la charge du process et redonne tout de suite la bonne
+     * commande. Un PID arrêté la remettra à zéro à sa prochaine mise à jour.
+     */
+    holdController();
 }
 
 void PID::registerParameters(
@@ -655,9 +831,17 @@ void PID::registerParameters(
         "setpoint",
         "Consigne",
         settings.setpoint,
-        0.0,
-        80.0,
-        0.5,
+        setpointMinimum,
+        setpointMaximum,
+        0.1,
+        1,
+        inputUnit);
+
+    scheduledSetpoint.registerParameters(
+        parameters,
+        setpointMinimum,
+        setpointMaximum,
+        0.1,
         1,
         inputUnit);
 
@@ -665,31 +849,36 @@ void PID::registerParameters(
         "kp",
         "Kp",
         settings.kp,
-        0.0,
+        KP_MIN,
         KP_MAX,
         0.01,
         2,
         "1/°C");
 
+    // Premier pas de 10 s, puis réglage fin à la seconde.
     parameters.addDouble(
-        "ki",
-        "Ki",
-        settings.ki,
+        "ti",
+        "Ti",
+        settings.ti,
         0.0,
-        KI_MAX,
-        0.001,
-        3,
-        "1/(°C.s)");
+        TI_MAX,
+        10.0,
+        0,
+        "s",
+        false,
+        1.0);
 
     parameters.addDouble(
-        "kd",
-        "Kd",
-        settings.kd,
+        "td",
+        "Td",
+        settings.td,
         0.0,
-        KD_MAX,
-        0.1,
+        TD_MAX,
+        1.0,
         1,
-        "s/°C");
+        "s",
+        false,
+        0.1);
 
     parameters.addDouble(
         "output_min",
@@ -801,7 +990,12 @@ bool PID::registerAutoTuneParameters(
             autoTuneSettings.cycles,
             2,
             MAX_AUTOTUNE_CYCLES,
-            1);
+            1) &&
+        parameters.addSelection(
+            "autotune_rule",
+            "Règle",
+            autoTuneSettings.rule,
+            AUTOTUNE_RULE_OPTIONS);
 
     autoTuneParametersRegistered = registered;
     autoTuneOwnerKey =
@@ -849,6 +1043,7 @@ bool PID::validateParameters(
     int32_t timeoutSeconds = 0;
     int32_t minimumCycleSeconds = 0;
     int32_t cycles = 0;
+    int32_t rule = 0;
 
     if (!readNumberDraft(
             editor,
@@ -899,7 +1094,12 @@ bool PID::validateParameters(
             editor,
             autoTuneOwnerKey,
             "autotune_cycles",
-            cycles))
+            cycles) ||
+        !readSelectionDraft(
+            editor,
+            autoTuneOwnerKey,
+            "autotune_rule",
+            rule))
     {
         return false;
     }
@@ -907,10 +1107,15 @@ bool PID::validateParameters(
     if (timeoutSeconds < 0 ||
         minimumCycleSeconds < 0 ||
         cycles < 0 ||
-        cycles > UINT8_MAX)
+        cycles > UINT8_MAX ||
+        rule < 0 ||
+        rule > UINT8_MAX)
     {
         return false;
     }
+
+    tuneSettings.rule =
+        static_cast<AutoTuneRule>(rule);
 
     tuneSettings.timeoutSeconds =
         static_cast<uint32_t>(
@@ -985,6 +1190,14 @@ void PID::print(Stream& stream) const
     const AutoTuneStatus tuneStatus =
         autoTune.getStatus();
 
+    if (scheduledSetpoint.isAttached())
+    {
+        stream.print(" | Prog : ");
+        stream.print(
+            ScheduledSetpoint::stateName(
+                scheduledSetpoint.state()));
+    }
+
     if (!settings.enabled)
         stream.print(" | PID : stopped");
 
@@ -1019,6 +1232,13 @@ void PID::print(Stream& stream) const
             autoTune.getResult()
                 .ultimatePeriodSeconds,
             1);
+        stream.print('s');
+        stream.print(" | Kp : ");
+        stream.print(autoTune.getResult().kp, 3);
+        stream.print(" | Ti : ");
+        stream.print(autoTune.getResult().ti, 0);
+        stream.print("s | Td : ");
+        stream.print(autoTune.getResult().td, 1);
         stream.print('s');
     }
     else if (tuneStatus ==

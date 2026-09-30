@@ -86,6 +86,14 @@ private:
     static constexpr uint32_t STARTUP_ERROR_REPEAT_MS =
         5000;
 
+    // Période de régulation d'une installation sans entrée analogique.
+    static constexpr uint32_t SENSORLESS_CYCLE_MS =
+        1000;
+
+    // Lectures du DS3231 ratées tolérées avant de déclarer l'heure inconnue.
+    static constexpr uint8_t CLOCK_READ_FAILURES_TOLERATED =
+        3;
+
     enum class UIState : uint8_t
     {
         Starting,
@@ -115,6 +123,7 @@ private:
     bool bmp580Initialized = false;
     bool sensorBoardInitialized = false;
     bool configurationSavePending = false;
+    bool controlCycleStarted = false;
     uint32_t lastMeasurementTime = 0;
 
     // Écrit par le cœur contrôle avant StartupFailed, lu ensuite par le cœur UI.
@@ -130,6 +139,10 @@ private:
     RTC::DateTime sharedClockDateTime;
     bool sharedClockValid = false;
     uint32_t lastClockRefresh = 0;
+    uint8_t clockReadFailures = 0;
+
+    // Cœur UI uniquement.
+    bool clockAlertShown = false;
     uint8_t serialPrintBuffer[
         SERIAL_PRINT_BUFFER_SIZE] = {};
 
@@ -137,6 +150,9 @@ private:
     const char* startupErrorDetail() const;
     void printStartupError(Print& output) const;
     void showStartupError();
+
+    void refreshClock();
+    void showClockAlert();
 
     void copyProcessSnapshot();
 

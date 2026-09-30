@@ -25,10 +25,13 @@ namespace
     constexpr int16_t VALUE_X = 98;
     constexpr int16_t VALUE_HEIGHT = 30;
 
-    constexpr int16_t COLLECTOR_Y = 28;
-    constexpr int16_t TANK_TOP_Y = 80;
-    constexpr int16_t TANK_BOTTOM_Y = 132;
-    constexpr int16_t PUMP_Y = 188;
+    constexpr uint16_t COLOR_CYAN = 0x07FF;
+
+    constexpr int16_t COLLECTOR_Y = 16;
+    constexpr int16_t TANK_TOP_Y = 56;
+    constexpr int16_t TANK_BOTTOM_Y = 96;
+    constexpr int16_t PUMP_Y = 146;
+    constexpr int16_t HEATER_Y = 192;
 
     void printTemperature(
         Adafruit_GFX& display,
@@ -76,22 +79,19 @@ namespace
         display.print(unit);
     }
 
-    void printPumpState(
+    void printState(
         Adafruit_GFX& display,
-        bool pumpIsOn)
+        int16_t y,
+        const char* text,
+        uint16_t color)
     {
         display.fillRect(
             BORDER_SIZE,
-            PUMP_Y - 2,
+            y - 2,
             display.width() -
                 (2 * BORDER_SIZE),
             VALUE_HEIGHT + 4,
             COLOR_BLACK);
-
-        const char* text =
-            pumpIsOn
-                ? "POMPE : ON"
-                : "POMPE : OFF";
 
         constexpr int16_t CHARACTER_WIDTH = 18;
 
@@ -103,12 +103,10 @@ namespace
         display.setTextSize(3);
         display.setCursor(
             (display.width() - textWidth) / 2,
-            PUMP_Y);
+            y);
 
         display.setTextColor(
-            pumpIsOn
-                ? COLOR_GREEN
-                : COLOR_RED,
+            color,
             COLOR_BLACK);
 
         display.print(text);
@@ -232,6 +230,70 @@ bool SolarInstallation::begin(
         return fail("Relais pompe non relié à la pompe");
     }
 
+    // ----- Mode vacances : décharge du ballon la nuit -----
+
+    holidaySchedule.begin(
+        "holiday_night",
+        "Décharge nuit",
+        process.clock());
+
+    holidaySchedule.settings.slots[0] = {
+        TimeSchedule::Days::Everyday, 23 * 60, 6 * 60
+    };
+
+    solarRegulator.setHolidaySchedule(holidaySchedule);
+
+    // Le programme ne pilote pas de sortie : il sert au régulateur.
+    if (!process.add(holidaySchedule))
+        return fail("Programme vacances non enregistré");
+
+    // ----- Appoint électrique en heures creuses -----
+
+    offPeakSchedule.begin(
+        "off_peak",
+        "Heures creuses",
+        process.clock());
+
+    offPeakSchedule.settings.slots[0] = {
+        TimeSchedule::Days::Everyday, 22 * 60, 6 * 60
+    };
+
+    backupHeater.begin(
+        "backup_heater",
+        "Appoint",
+        tankTopTemperature);
+
+    backupHeater.settings.setpoint = 55.0;
+    backupHeater.settings.hysteresis = 5.0;
+
+    // Hors heures creuses, l'appoint est coupé.
+    backupHeater.setSchedule(offPeakSchedule, 45.0);
+    backupHeater.scheduledSetpoint.settings.outside =
+        ScheduledSetpoint::Outside::Off;
+
+    heater.begin(
+        "backup_heater_cmd",
+        "Appoint",
+        backupHeater);
+
+    heaterRelay.begin(
+        "backup_heater_relay",
+        "Relais appoint",
+        Board::Rp2040::OUTPUT_2,
+        true,
+        false);
+
+    // Une résistance ne doit jamais chauffer en état de repli.
+    heaterRelay.lockSafeState(false);
+
+    if (!process.add(offPeakSchedule) ||
+        !process.add(backupHeater) ||
+        !process.add(heater) ||
+        !process.connect(heater, heaterRelay))
+    {
+        return fail("Appoint électrique non relié");
+    }
+
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
@@ -239,6 +301,12 @@ bool SolarInstallation::begin(
         return fail("Paramètres solaires invalides");
 
     return true;
+}
+
+void SolarInstallation::captureHomeScreenState()
+{
+    homeDischarging = solarRegulator.isDischarging();
+    homeHolidayMode = solarRegulator.settings.holidayMode;
 }
 
 void SolarInstallation::printHomeScreen(
@@ -315,7 +383,27 @@ void SolarInstallation::printHomeScreen(
         pumpSample->healthy &&
         pumpSample->appliedCommand >= 0.5;
 
-    printPumpState(
+    if (pumpIsOn && homeDischarging)
+        printState(display, PUMP_Y, "DECHARGE", COLOR_CYAN);
+    else if (pumpIsOn)
+        printState(display, PUMP_Y, "POMPE : ON", COLOR_GREEN);
+    else if (homeHolidayMode)
+        printState(display, PUMP_Y, "VACANCES", COLOR_CYAN);
+    else
+        printState(display, PUMP_Y, "POMPE : OFF", COLOR_RED);
+
+    const OutputSample* heaterSample =
+        context.snapshot.find(
+            heaterRelay);
+
+    const bool heaterIsOn =
+        heaterSample != nullptr &&
+        heaterSample->healthy &&
+        heaterSample->appliedCommand >= 0.5;
+
+    printState(
         display,
-        pumpIsOn);
+        HEATER_Y,
+        heaterIsOn ? "APPOINT : ON" : "APPOINT : OFF",
+        heaterIsOn ? COLOR_ORANGE : COLOR_RED);
 }

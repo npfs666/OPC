@@ -9,10 +9,34 @@
 class ParameterEditor;
 class ParameterList;
 
+/**
+ * Horloge DS3231.
+ *
+ * Le DS3231 contient l'heure UTC. readDateTime() et setDateTime() travaillent
+ * en heure locale : le fuseau et l'heure d'été (timeZone) sont appliqués à
+ * chaque accès, sans jamais réécrire le DS3231 au changement d'heure.
+ */
 class RTC : public Configurable
 {
 public:
     static constexpr const char* MENU_OWNER_KEY = "rtc.clock";
+    static constexpr const char* TIME_ZONE_OWNER_KEY = "rtc.timezone";
+
+    enum class DstRule : uint8_t
+    {
+        None,
+        // Dernier dimanche de mars 01:00 UTC -> dernier dimanche d'octobre 01:00 UTC.
+        Europe
+    };
+
+    struct TimeZoneSettings
+    {
+        /* Décalage de l'heure d'hiver sur UTC. France : +1 h. */
+        double_t utcOffsetHours = 1.0;
+        DstRule dst = DstRule::Europe;
+    };
+
+    TimeZoneSettings timeZone;
 
     /**
      * L'heure est toujours exposée de 0 à 23 et toujours écrite en 24 h.
@@ -28,6 +52,9 @@ public:
         uint8_t hour = 0;
         uint8_t minute = 0;
         uint8_t second = 0;
+
+        /* Renseigné par readDateTime() : heure d'été en cours. */
+        bool summerTime = false;
     };
 
     enum class AlarmMode : uint8_t
@@ -63,7 +90,13 @@ public:
 
     bool isInitialized() const;
 
+    /** Heure locale (fuseau et heure d'été appliqués). */
     bool readDateTime(DateTime& dateTime) const;
+
+    /**
+     * Écrit une heure locale. Pendant l'heure répétée d'octobre, l'heure
+     * d'été est retenue ; une heure sautée en mars est décalée d'une heure.
+     */
     bool setDateTime(const DateTime& dateTime);
 
     bool setTime(
@@ -88,6 +121,7 @@ public:
 
     /**
      * Configure l'alarme 1. Une alarme par date se répète chaque mois.
+     * Les alarmes utilisent l'heure interne du DS3231, donc UTC.
      */
     bool setAlarm(const Alarm& alarm);
 
@@ -134,6 +168,21 @@ public:
         uint8_t day);
 
 private:
+    bool readDeviceDateTime(DateTime& utc) const;
+    bool writeDeviceDateTime(const DateTime& utc);
+
+    bool utcToLocal(
+        const DateTime& utc,
+        DateTime& local) const;
+
+    bool localToUtc(
+        const DateTime& local,
+        DateTime& utc) const;
+
+    int32_t standardOffsetSeconds() const;
+
+    bool isSummerTime(int64_t utcSeconds) const;
+
     bool readMenuDateTime(
         const ParameterEditor& editor,
         DateTime& dateTime) const;
@@ -161,6 +210,15 @@ private:
     DS3231 device;
     DateTime menuDateTime;
     bool initialized = false;
+};
+
+/** Dernière heure lue sur le DS3231, utilisée par la régulation. */
+struct ClockSample
+{
+    RTC::DateTime dateTime;
+
+    /* false si la lecture a échoué ou si l'oscillateur s'est arrêté (OSF). */
+    bool valid = false;
 };
 
 #endif
