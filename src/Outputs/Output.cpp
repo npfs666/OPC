@@ -1,8 +1,10 @@
 #include "Outputs/Output.h"
 
 #include <Arduino.h>
+#include <hmi/ParameterEditor.h>
 
 #include <cmath>
+#include <cstring>
 
 Output::Output()
 {
@@ -50,6 +52,34 @@ double_t Output::appliedCommand() const
 uint32_t Output::lastCommandAt() const
 {
     return lastCommandTime;
+}
+
+bool Output::pinIsUnique(
+    const ParameterEditor& editor,
+    const char* ownerKey)
+{
+    const ParameterDraft* pin = editor.find(ownerKey, "pin");
+
+    if (pin == nullptr)
+        return false;
+
+    // Deux sorties ne doivent pas piloter la même broche après édition.
+    for (size_t i = 0; i < editor.count(); i++)
+    {
+        const ParameterDraft& other = editor.get(i);
+        const Parameter* parameter = other.parameter;
+
+        if (&other != pin && parameter != nullptr &&
+            parameter->type == Parameter::Type::Selection &&
+            std::strcmp(parameter->categoryKey, "outputs") == 0 &&
+            std::strcmp(parameter->key, "pin") == 0 &&
+            other.selectionValue == pin->selectionValue)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void Output::setAppliedCommand(double_t value)

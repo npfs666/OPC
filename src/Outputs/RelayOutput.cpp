@@ -197,6 +197,9 @@ void RelayOutput::registerParameters(
 bool RelayOutput::validateParameters(
     const ParameterEditor& editor) const
 {
+    if (!pinIsUnique(editor, getConfigurationKey()))
+        return false;
+
     if (!safeStateLocked)
         return true;
 

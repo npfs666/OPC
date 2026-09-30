@@ -164,7 +164,7 @@ bool Sensor::isAccumulationHalfWay()
     if (settings.type == Type::Tc || settings.wiring != Wiring::ThreeWire)
         return false;
 
-    if (sampleCount == (settings.samples / 2))
+    if (sampleCount == (accumulationTarget() / 2))
         return true;
     else
         return false;
@@ -172,10 +172,18 @@ bool Sensor::isAccumulationHalfWay()
 
 bool Sensor::isAccumulationDone()
 {
-    if (sampleCount == settings.samples)
+    if (sampleCount == accumulationTarget())
         return true;
     else
         return false;
+}
+
+int32_t Sensor::accumulationTarget() const
+{
+    if (settings.type != Type::Tc)
+        return settings.samples * RTD_OVERSAMPLING;
+
+    return settings.samples;
 }
 
 void Sensor::registerParameters(ParameterList& list)

@@ -230,7 +230,7 @@ bool ThermostatInstallation::begin(
     if (!board.addSensor(
             temperatureInput))
     {
-        return false;
+        return fail("Sonde thermostat : entrée analogique indisponible");
     }
 
     temperatureResistance.begin(
@@ -247,7 +247,7 @@ bool ThermostatInstallation::begin(
         !process.add(
             temperature))
     {
-        return false;
+        return fail("Mesures thermostat non enregistrées");
     }
 
     thermostat.begin(
@@ -256,7 +256,7 @@ bool ThermostatInstallation::begin(
         temperature);
 
     if (!process.add(thermostat))
-        return false;
+        return fail("Thermostat non enregistré");
 
     relayActuator.begin(
         "thermostat_relay_actuator",
@@ -264,7 +264,7 @@ bool ThermostatInstallation::begin(
         thermostat);
 
     if (!process.add(relayActuator))
-        return false;
+        return fail("Commande thermostat non enregistrée");
 
     relayOutput.begin(
         "thermostat_relay",
@@ -277,7 +277,7 @@ bool ThermostatInstallation::begin(
             relayActuator,
             relayOutput))
     {
-        return false;
+        return fail("Relais thermostat non relié à la commande");
     }
 
     board.registerParameters(parameterList);
@@ -289,15 +289,11 @@ bool ThermostatInstallation::begin(
             RAMP_OWNER_NAME,
             "°C/min"))
     {
-        return false;
+        return fail("Paramètres rampe thermostat");
     }
 
     if (parameterList.hasError())
-    {
-        Serial.println(
-            "Thermostat installation parameter registration failed");
-        return false;
-    }
+        return fail("Paramètres thermostat invalides");
 
     return true;
 }

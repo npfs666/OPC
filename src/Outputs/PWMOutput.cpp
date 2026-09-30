@@ -9,7 +9,6 @@
 #include <hmi/ParameterList.h>
 
 #include <cmath>
-#include <cstring>
 
 namespace
 {
@@ -176,26 +175,5 @@ void PWMOutput::registerParameters(ParameterList& list)
 
 bool PWMOutput::validateParameters(const ParameterEditor& editor) const
 {
-    const ParameterDraft* pin = editor.find(getConfigurationKey(), "pin");
-
-    if (pin == nullptr)
-        return false;
-
-    // Deux sorties ne doivent pas piloter la même broche après édition.
-    for (size_t i = 0; i < editor.count(); i++)
-    {
-        const ParameterDraft& other = editor.get(i);
-        const Parameter* parameter = other.parameter;
-
-        if (&other != pin && parameter != nullptr &&
-            parameter->type == Parameter::Type::Selection &&
-            std::strcmp(parameter->categoryKey, "outputs") == 0 &&
-            std::strcmp(parameter->key, "pin") == 0 &&
-            other.selectionValue == pin->selectionValue)
-        {
-            return false;
-        }
-    }
-
-    return true;
+    return pinIsUnique(editor, getConfigurationKey());
 }

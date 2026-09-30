@@ -28,10 +28,10 @@ const char* MinimalInstallation::configurationKey() const
 
 bool MinimalInstallation::begin(
     SensorBoard& board,
-    Adafruit_BME280& bme,
+    Adafruit_BMP5xx& bmp580,
     ProcessControl& process)
 {
-    (void)bme;
+    (void)bmp580;
 
     temperatureInput.begin(
         "minimal_temperature_input",
@@ -41,8 +41,9 @@ bool MinimalInstallation::begin(
         16,
         0.0f);
 
+    // fail() affiche la cause sur l'écran d'erreur de démarrage.
     if (!board.addSensor(temperatureInput))
-        return false;
+        return fail("Sonde PT100 : entrée analogique indisponible");
 
     temperatureResistance.begin(
         "Resistance PT100",
@@ -56,13 +57,16 @@ bool MinimalInstallation::begin(
     if (!process.add(temperatureResistance) ||
         !process.add(temperature))
     {
-        return false;
+        return fail("Mesures PT100 non enregistrées");
     }
 
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
-    return !parameterList.hasError();
+    if (parameterList.hasError())
+        return fail("Paramètres invalides");
+
+    return true;
 }
 
 void MinimalInstallation::printHomeScreen(

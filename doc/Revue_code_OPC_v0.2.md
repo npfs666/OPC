@@ -42,31 +42,35 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 2. ✅ **`Serial.printf` sous mutex** (`OPC::handleUIMessage`, `PrintDataAvailable`).
    - Le cœur 1 écrivait sur l'USB en tenant `processDataMutex`, ce qui pouvait bloquer le cœur 0.
    - L'écriture passe maintenant par `bufferedOutput`.
-3. ⬜ **Deux relais peuvent piloter la même broche** (`RelayOutput::validateParameters`).
-   - La fonction ne vérifie que l'état sûr verrouillé. Seul `PWMOutput` contrôle les doublons de broche.
-   - Dans `TestIO` (2 relais), le menu permet de mettre les deux sur « Relais 1 ».
+3. ✅ **Deux relais pouvaient piloter la même broche**.
+   - Le contrôle des doublons est maintenant commun : `Output::pinIsUnique`, appelé par `RelayOutput` et `PWMOutput`.
+   - Il s'applique aux réglages faits dans le menu et au `config.json` restauré.
+   - Un doublon écrit directement dans le code d'une installation n'est pas contrôlé : c'est une erreur de l'utilisateur.
 4. ✅ **Échec d'initialisation du MCP23017 ignoré**.
    - `AnalogMux::begin()` et `SensorBoard::init()` renvoient maintenant `bool`.
    - `OPC::initMeasurements()` refuse de démarrer si le MCP est absent.
    - Reste ouvert : les erreurs I²C du MCP pendant l'acquisition, dans l'ISR, ne sont toujours pas vérifiées.
-5. ⬜ **Démarrage raté = écran noir** (`main.cpp`, `setup()`).
-   - Si `initMeasurements()` échoue, `ParametersReady` n'est jamais envoyé. L'UI reste en `Starting` sans message à l'écran.
-   - Les messages série émis avant la connexion USB sont perdus.
-6. ⬜ **`Resistance` toujours valide** (`Resistance::update`).
-   - `setValid(true)` est appelé même si `computeResistance` renvoie NaN.
-   - Correction : `setValid(std::isfinite(r))`.
+5. ✅ **Démarrage raté = écran noir**.
+   - Un échec de démarrage envoie `StartupFailed`, et le cœur UI affiche un écran « ERREUR DEMARRAGE » avec la cause (`StartupStatus.h`).
+   - Le message est répété toutes les 5 s sur le port série.
+   - Les installations précisent leur cause avec `Installation::fail("...")`, utilisé dans les templates PID, Thermostat et Solaire et dans l'exemple minimal.
+   - Les avertissements non bloquants ne sont pas traités, par choix.
+6. ✅ **`Resistance` était toujours valide**.
+   - La validité suit maintenant la valeur calculée, et la mesure est invalide si `begin()` n'a pas été appelé.
+   - `computeResistance` renvoie NaN pour une entrée thermocouple et pour une résistance ≤ 0.
+   - Tests hôte ajoutés, et le test PT1000 a été mis à jour pour Callendar–Van Dusen.
 7. ✅ **Constante `DATARATE_1000_SPS`** : elle valait 0x05 au lieu de 0x06.
 
 ### B. Risques de conception (à planifier)
 
 8. ⬜ (partiellement ✅) **ISR DRDY longue** (`SensorBoard::adcInterrupt`).
    - ✅ Les `delay(2)` de `ADS1120::sendCommand` ont été supprimés.
-   - ⬜ Wire1 tourne encore à 100 kHz. Passer à 400 kHz avec `Wire1.setClock(400000)` diviserait par 4 le temps des écritures MCP.
-   - ⬜ `readInternalTemp()` attend encore une conversion complète à 20 SPS, avec un timeout de 250 ms, **dans l'ISR**.
+   - ✅ Wire1 passé à 400 kHz (`OPC.cpp`).
+   - ✅ La température ADC n'est plus attendue dans l'ISR : elle devient la dernière étape du cycle (`startAdcTemperature`), lue à l'IRQ DRDY suivante.
    - ⬜ Il faudrait sortir le séquencement de l'ISR : l'ISR lit l'échantillon, une machine d'états dans `loop()` gère le routage.
 9. ✅ **Précision PT100** : la conversion passe maintenant par Callendar–Van Dusen avec Newton-Raphson (`PT100::getResistanceToTemperatureNewton`).
    - Mesure faite sur l'ancienne table : erreur de 15 mK à 100 °C, 71 mK à 266 °C, et aucune mesure au-delà de 266 °C.
-   - ⬜ Ajouter un test hôte sur les points IEC 60751 : 18,5201 Ω → −200 °C, 100 Ω → 0 °C, 138,5055 Ω → 100 °C, 247,0920 Ω → 400 °C, 390,4811 Ω → 850 °C.
+   - ✅ Test hôte ajouté sur les points IEC 60751 (`testPT100CallendarVanDusen`).
 10. ⬜ **Deux formules psychrométriques différentes** (`Psychrometrics.cpp`).
     - `relativeHumidity()` utilise Magnus 17,2694/238,3 avec un γ fixe.
     - `getRH()` utilise 17,27/237,3 avec un A calculé. C'est la seule qui sert.

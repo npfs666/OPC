@@ -23,6 +23,7 @@
 #include <Regulator/SetpointRamp.h>
 #include <Regulator/SolarRegulator.h>
 #include <Regulator/Thermostat.h>
+#include <StartupStatus.h>
 #include <SystemWatchdog.h>
 #include <hmi/MenuBuilder.h>
 #include <hmi/ParameterEditor.h>
@@ -58,6 +59,11 @@ namespace
         void printHomeScreen(
             HomeScreenContext&) override
         {
+        }
+
+        bool failForTest(const char* reason)
+        {
+            return fail(reason);
         }
 
         bool registerTestParameters()
@@ -495,6 +501,62 @@ namespace
                         200.01)));
     }
 
+    void testPT100CallendarVanDusen()
+    {
+        // Valeurs de référence IEC 60751 (PT100).
+        const struct { double ohms; double celsius; } points[] = {
+            {18.5201, -200.0},
+            {60.2558, -100.0},
+            {100.0, 0.0},
+            {138.5055, 100.0},
+            {247.0920, 400.0},
+            {390.4811, 850.0}
+        };
+
+        for (const auto& point : points)
+        {
+            CHECK_NEAR(
+                PT100::getResistanceToTemperatureNewton(point.ohms),
+                point.celsius,
+                0.001);
+        }
+
+        for (double ohms : {18.52, 390.482,
+                            std::numeric_limits<double>::quiet_NaN(),
+                            std::numeric_limits<double>::infinity()})
+        {
+            CHECK_TRUE(std::isnan(
+                PT100::getResistanceToTemperatureNewton(ohms)));
+        }
+    }
+
+    void testResistanceValidity()
+    {
+        SensorBoard board;
+        Sensor sensor("RTD", Sensor::Type::Pt100,
+                      Sensor::Wiring::FourWire, 16, 0.0f);
+
+        Resistance unbound;
+        unbound.update();
+        CHECK_FALSE(unbound.isValid());
+
+        Resistance resistance;
+        resistance.begin("Resistance", board, sensor);
+
+        board.resistanceOhms = 100.0;
+        resistance.update();
+        CHECK_TRUE(resistance.isValid());
+        CHECK_NEAR(resistance.getValue(), 100.0, 0.0001);
+
+        for (double ohms : {std::numeric_limits<double>::quiet_NaN(),
+                            std::numeric_limits<double>::infinity()})
+        {
+            board.resistanceOhms = ohms;
+            resistance.update();
+            CHECK_FALSE(resistance.isValid());
+        }
+    }
+
     void testRTDTemperatureConversion()
     {
         SensorBoard board;
@@ -515,18 +577,19 @@ namespace
             temperature.update();
         };
 
+        // Valeurs de référence IEC 60751 (PT1000).
         const struct { double ohms; double celsius; } points[] = {
             {1000.0, 0.0},
-            {803.06, -50.0},
+            {803.063, -50.0},
             {1385.055, 100.0},
-            {2000.0, 266.419}
+            {2809.775, 500.0},
+            {3904.81, 850.0}
         };
         for (const auto& point : points)
         {
             update(point.ohms);
             CHECK_TRUE(temperature.isValid());
-            // Tolérance tenant compte de l'approximation de la table PT100.
-            CHECK_NEAR(temperature.getValue(), point.celsius, 0.05);
+            CHECK_NEAR(temperature.getValue(), point.celsius, 0.005);
         }
 
         sensor.settings.offset = 1.25;
@@ -534,7 +597,8 @@ namespace
         CHECK_TRUE(temperature.isValid());
         CHECK_NEAR(temperature.getValue(), 1.25, 0.0001);
 
-        for (double ohms : {99.9, 2000.1,
+        // Hors plage −200..850 °C, ou valeur non finie.
+        for (double ohms : {185.2, 3904.82,
                             std::numeric_limits<double>::quiet_NaN(),
                             std::numeric_limits<double>::infinity()})
         {
@@ -2508,6 +2572,34 @@ namespace
                 installation.configurationKey()) != 0);
     }
 
+    void testStartupErrorReporting()
+    {
+        // Chaque cause de refus de démarrage a un titre et un détail affichables.
+        const StartupError errors[] = {
+            StartupError::SensorBoard,
+            StartupError::BMP580,
+            StartupError::ParameterStorage,
+            StartupError::Installation,
+            StartupError::ParameterRegistration,
+            StartupError::Outputs
+        };
+
+        for (StartupError error : errors)
+        {
+            const StartupErrorText text = startupErrorText(error);
+            CHECK_TRUE(text.title != nullptr && text.title[0] != '\0');
+            CHECK_TRUE(text.detail != nullptr && text.detail[0] != '\0');
+        }
+
+        MenuTestInstallation installation;
+        CHECK_TRUE(installation.failureReason() == nullptr);
+
+        CHECK_FALSE(installation.failForTest("Relais non relié"));
+        CHECK_TRUE(
+            installation.failureReason() != nullptr &&
+            strcmp(installation.failureReason(), "Relais non relié") == 0);
+    }
+
     void testOutputStateUpdatedBeforeSnapshot()
     {
         ProcessControl process;
@@ -2668,6 +2760,14 @@ int main()
         testPT100Interpolation);
 
     TestHarness::run(
+        "Callendar-Van Dusen PT100 (Newton)",
+        testPT100CallendarVanDusen);
+
+    TestHarness::run(
+        "validité de la mesure de résistance",
+        testResistanceValidity);
+
+    TestHarness::run(
         "conversion temperature PT100/PT1000",
         testRTDTemperatureConversion);
 
@@ -2793,6 +2893,10 @@ int main()
     TestHarness::run(
         "identité de l'installation",
         testInstallationIdentity);
+
+    TestHarness::run(
+        "erreurs de démarrage",
+        testStartupErrorReporting);
 
     TestHarness::run(
         "état sortie avant snapshot",

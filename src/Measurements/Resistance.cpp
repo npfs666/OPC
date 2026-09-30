@@ -2,6 +2,8 @@
 
 #include <Hardware/SensorBoard.h>
 
+#include <cmath>
+
 Resistance::Resistance()
 {
 }
@@ -18,12 +20,19 @@ void Resistance::begin(const char* name,
 
 void Resistance::update()
 {
-    /*Serial.print("ADC moyenne ");
-    Serial.println(m_sensor.readValue());
-    Serial.print("resistance ");
-    Serial.println(value());*/
-    setValue(board->computeResistance(*sensor));
-    setValid(true);
+    if (board == nullptr || sensor == nullptr)
+    {
+        setValid(false);
+        return;
+    }
+
+    const double_t resistance =
+        board->computeResistance(*sensor);
+
+    setValue(resistance);
+
+    // NaN : saturation, entrée non reliée à la carte ou valeur non physique.
+    setValid(std::isfinite(resistance));
 }
 
 Sensor& Resistance::getSensor()

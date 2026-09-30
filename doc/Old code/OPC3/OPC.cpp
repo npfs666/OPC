@@ -1,0 +1,211 @@
+#include "Hardware/pinout.h"
+#include "OPC.h"
+
+#include <SPI.h>
+#include <Wire.h>
+
+#include <Measurements/Resistance.h>
+#include <Measurements/Temperature/TemperatureRTD.h>
+#include <Measurements/Temperature/TemperatureBME.h>
+#include <Measurements/Humidity/HumidityBME.h>
+#include <Measurements/Pressure/PressureBME.h>
+#include <Measurements/Humidity/HumidityPsychrometer.h>
+#include <Regulator/Thermostat.h>
+
+OPC::OPC() : tft(&SPI1, LCD_CS, LCD_DC, LCD_RESET)
+{
+}
+
+void OPC::initSerial()
+{
+    Serial.begin(115200);
+
+    delay(1000);
+
+    Serial.println("Open Process Controller v0.3");
+}
+
+void OPC::initDisplay()
+{
+    SPI1.setSCK(LCD_SCK);
+    SPI1.setTX(LCD_MOSI);
+
+    tft.init(135, 240);
+    tft.setRotation(3);
+    tft.setSPISpeed(48000000);
+    tft.setTextWrap(false);
+    tft.cp437(true);
+    tft.fillScreen(ST77XX_BLACK);
+}
+
+void OPC::initBME280()
+{
+    Wire.setSDA(BME_SDA);
+    Wire.setSCL(BME_SCL);
+
+    bme.begin(0x76,&Wire);
+
+    bme.setSampling(
+        Adafruit_BME280::MODE_NORMAL,
+        Adafruit_BME280::SAMPLING_X16,
+        Adafruit_BME280::SAMPLING_X16,
+        Adafruit_BME280::SAMPLING_X16,
+        Adafruit_BME280::FILTER_OFF,
+        Adafruit_BME280::STANDBY_MS_0_5);
+}
+
+void OPC::initSensorBoard()
+{
+    // Set pin 23 HIGH to switch the pico DC-DC converter to PWM (improved ripple)
+	// Improves a lot measurement stability
+    pinMode(23,OUTPUT);
+    digitalWrite(23,HIGH);
+
+    input.init();
+}
+
+
+void OPC::initRotenc()
+{
+    pinMode(ROTENC_A,INPUT);
+
+    pinMode(ROTENC_B,INPUT);
+
+    pinMode(ROTENC_CLIC,INPUT);
+
+    /*attachInterrupt(
+        digitalPinToInterrupt(ROTENC_A),
+        IsrRotenc,
+        FALLING);
+
+    attachInterrupt(
+        digitalPinToInterrupt(ROTENC_CLIC),
+        IsrButton,
+        FALLING);*/
+}
+
+bool OPC::newMeasurement()
+{
+    if(!input.newMeasurement)
+        return false;
+
+    input.newMeasurement = false;
+  
+    // MAJ du BME280
+    //bme.takeForcedMeasurement(); // inutile maintenant, il fait sa mesure en auto et sleep.
+
+    // Faire la MAJ des mesures (conversion data -> mesure)
+    unsigned long times = millis();
+    controller.update(times);
+
+    // Sortie des affichage sur le port série -> On va éviter de print sur le CPU0
+    //controller.print(Serial);
+    //controller.printCSVPsychro(times);
+
+    return true;
+}
+
+void OPC::initMeasurements() {
+
+    // Déclaration des entrées de la carte de mesure
+    input.addSensor(Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0);
+    input.addSensor(Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0);
+    
+    // Déclaration des mesures, régulateurs, actionneur et sorties
+    auto* tempBME = new TemperatureBME("BME", bme);
+    controller.add(*tempBME);
+
+    auto* rhBME = new HumidityBME("BME", bme);
+    controller.add(*rhBME);
+
+    auto* paBME = new PressureBME("BME",bme);
+    controller.add(*paBME);
+
+    auto* r = new Resistance("rRTD 1", input, input.rtd[0]);
+    auto* t = new TemperatureRTD("TempRTD 1", *r);
+    t->display = true;
+    controller.add(*r);
+    controller.add(*t);
+
+    auto* r1 = new Resistance("rRTD 2", input, input.rtd[1]);
+    auto* t1 = new TemperatureRTD("TempRTD 2", *r1);
+    //r1->getSensor().settings.offset = 0.045;
+    t1->display = true;
+    controller.add(*r1);
+    controller.add(*t1);
+
+    auto* p = new Psychrometer(*t, *t1, *paBME);
+    auto* ph = new HumidityPsychrometer("RH psychrom", *p);
+    ph->display = true;
+    controller.add(*ph);
+
+    /*auto* thermos = new Thermostat("Thermos", *t1);
+    thermos->settings.setpoint = 25;
+    controller.add(*thermos);*/
+
+    input.startContinuous();
+}
+
+void OPC::menuPoll()
+{
+    //nav.poll();
+}
+
+void OPC::handleISRPause()
+{
+    if(!rp2040.fifo.available())
+        return;
+
+    switch(rp2040.fifo.pop())
+    {
+        case PAUSE_ADC_INTERRUPTS:
+
+            irq_set_enabled(13,false);
+
+            break;
+
+        case RESUME_ADC_INTERRUPTS:
+
+            irq_set_enabled(13,true);
+
+            //nav.exit();
+
+            break;
+    }
+}
+
+void OPC::displayMeasurements(Measurement* measurements, uint8_t count)
+{
+    Serial.println("Display measurements:");
+    for(uint8_t i = 0; i < count; i++)
+    {
+
+        /*Serial.print(measurements[i].name);
+        Serial.print(" = ");
+        Serial.print(measurements[i].value, 2);
+        Serial.print(" ");
+        Serial.println(measurements[i].unit);*/
+    }
+}
+
+void OPC::serialMeasurements(Measurement* measurements, uint8_t count)
+{
+    Serial.println("Serial measurements:");
+    for(uint8_t i = 0; i < count; i++)
+    {
+        /*Serial.print(measurements[i].name);
+        Serial.print(": ");
+        Serial.print(measurements[i].value, 2);
+        Serial.print(" ");
+        Serial.println(measurements[i].unit);*/
+    }
+    Serial.println();
+}
+
+void OPC::printScreen(int16_t x, int16_t y, uint8_t size, uint16_t color,const char* text) {
+
+    tft.setTextSize(4);
+    tft.setCursor(x, y);
+    tft.setTextColor(color, ST77XX_BLACK);
+    tft.printf(text);
+}

@@ -7,6 +7,23 @@
 
 class SensorBoard;
 
+/**
+ * Les RTD sont mesurées à 1000 SPS et non à 20 SPS : à 20 SPS le bruit de
+ * l'ADC (~0.12 LSB) est trop faible pour linéariser la quantification
+ * (1 LSB ≈ 0.016 °C en PT100 4 fils), la moyenne reste bloquée sur un code et
+ * la température évolue en escalier. À 1000 SPS le bruit (~1 LSB) sert de
+ * dithering et la moyenne résout bien en dessous du LSB.
+ *
+ * Le nombre d'échantillons configuré est multiplié par RTD_OVERSAMPLING pour
+ * garder la même durée d'intégration (16 × 50 = 800 éch. = 0.8 s = 40 périodes
+ * de 50 Hz, ce qui remplace le filtre FIR 50 Hz, inactif à ce débit).
+ */
+constexpr uint16_t RTD_OVERSAMPLING = 50;
+
+// Établissement après changement de voie : filtre d'entrée à 280 Hz
+// (τ ≈ 0.57 ms, ~7.5 ms pour 16 bits), avec marge.
+constexpr uint16_t RTD_DISCARDED_CONVERSIONS = 15;
+
 class Sensor : public Configurable
 {
 
@@ -69,6 +86,8 @@ private:
     friend class SensorBoard;
     SensorBoard* board = nullptr;
     bool saturated = false;
+
+    int32_t accumulationTarget() const;
 
     const char* ownerName = "";
     double_t nMinusOneValue;

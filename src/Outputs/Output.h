@@ -4,6 +4,7 @@
 #include <hmi/Displayable.h>
 #include <Configurable.h>
 
+class ParameterEditor;
 
 class Output : public Displayable, public Configurable
 {
@@ -43,6 +44,14 @@ public:
     }
 
 protected:
+    /**
+     * Vrai si aucune autre sortie n'utilise la même broche dans les
+     * brouillons (paramètres "pin" de la catégorie "outputs").
+     */
+    static bool pinIsUnique(
+        const ParameterEditor& editor,
+        const char* ownerKey);
+
     void setAppliedCommand(double_t value);
 
     double_t printValue() const override;

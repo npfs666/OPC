@@ -1,7 +1,7 @@
-#include "testInstallation.h"
+#include <Templates/testInstallation.h>
 
-#include "Hardware/SensorBoard.h"
-#include "ProcessControl.h"
+#include <Hardware/SensorBoard.h>
+#include <ProcessControl.h>
 
 #include <Adafruit_GFX.h>
 
@@ -11,39 +11,55 @@
 
 namespace
 {
+    // Entrée 1 : false = PT100 4 fils, true = thermocouple type K.
+    constexpr bool INPUT1_IS_THERMOCOUPLE = false;
+
+    constexpr uint16_t SAMPLES = 16;
+
+    // Écran d'accueil
     constexpr uint16_t COLOR_BLACK = 0x0000;
     constexpr uint16_t COLOR_WHITE = 0xFFFF;
     constexpr uint16_t COLOR_CYAN = 0x07FF;
     constexpr uint16_t COLOR_GREY = 0x8410;
 
-    void printHomeValue(
+    constexpr int16_t LABEL_X = 8;
+    constexpr int16_t VALUE_X = 60;
+    constexpr int16_t ROW_HEIGHT = 20;
+
+    constexpr int16_t T1_Y = 38;
+    constexpr int16_t T2_Y = 70;
+    constexpr int16_t HR_Y = 102;
+
+    void printLabel(
+        Adafruit_GFX& display,
+        int16_t y,
+        const char* label)
+    {
+        display.setCursor(LABEL_X, y);
+        display.print(label);
+    }
+
+    void printValue(
         Adafruit_GFX& display,
         int16_t y,
         const MeasurementSample* sample)
     {
+        // Efface l'ancienne valeur sans toucher à l'étiquette.
         display.fillRect(
-            55,
+            VALUE_X - 5,
             y,
-            display.width() - 55,
-            20,
+            display.width() - (VALUE_X - 5),
+            ROW_HEIGHT,
             COLOR_BLACK);
 
-        display.setCursor(60, y);
-        display.setTextColor(
-            COLOR_WHITE,
-            COLOR_BLACK);
+        display.setCursor(VALUE_X, y);
+        display.setTextColor(COLOR_WHITE, COLOR_BLACK);
 
-        if (sample == nullptr ||
-            !sample->valid)
+        if (sample == nullptr || !sample->valid)
         {
             display.print("--.-");
             return;
         }
-
-        display.print(
-            sample->value,
-            sample->decimals);
-        display.print(' ');
 
         char unit[12] = {};
 
@@ -52,12 +68,10 @@ namespace
             unit,
             sizeof(unit));
 
+        display.print(sample->value, sample->decimals);
+        display.print(' ');
         display.print(unit);
     }
-}
-
-TestInstallation::TestInstallation()
-{
 }
 
 const char* TestInstallation::name() const
@@ -75,6 +89,77 @@ bool TestInstallation::requiresBMP580() const
     return true;
 }
 
+const Temperature& TestInstallation::dryBulbTemperature() const
+{
+    if (INPUT1_IS_THERMOCOUPLE)
+        return tcTemperature;
+
+    return rtd1Temperature;
+}
+
+bool TestInstallation::begin(
+    SensorBoard& board,
+    Adafruit_BMP5xx& bmp580,
+    ProcessControl& process)
+{
+    // ----- Entrées physiques -----
+
+    if (INPUT1_IS_THERMOCOUPLE)
+        input1.begin("input1", "Input 1", Sensor::Type::Tc, Sensor::Wiring::TwoWire, SAMPLES, 0);
+    else
+        input1.begin("input1", "Input 1", Sensor::Type::Pt100, Sensor::Wiring::FourWire, SAMPLES, 0);
+
+    input2.begin("input2", "Input 2", Sensor::Type::Pt100, Sensor::Wiring::FourWire, SAMPLES, 0);
+
+    if (!board.addSensor(input1) || !board.addSensor(input2))
+        return fail("Entrées analogiques indisponibles");
+
+    // ----- Entrée 1 : température sèche -----
+
+    if (INPUT1_IS_THERMOCOUPLE)
+    {
+        tcTemperature.begin("TempTC", input1);
+
+        if (!process.add(tcTemperature))
+            return fail("Mesure thermocouple non enregistrée");
+    }
+    else
+    {
+        rtd1Resistance.begin("RTD1", board, input1);
+        rtd1Temperature.begin("TempRTD1", rtd1Resistance);
+
+        if (!process.add(rtd1Resistance) || !process.add(rtd1Temperature))
+            return fail("Mesures entrée 1 non enregistrées");
+    }
+
+    // ----- Entrée 2 : température humide -----
+
+    rtd2Resistance.begin("RTD2", board, input2);
+    rtd2Temperature.begin("TempRTD2", rtd2Resistance);
+
+    if (!process.add(rtd2Resistance) || !process.add(rtd2Temperature))
+        return fail("Mesures entrée 2 non enregistrées");
+
+    // ----- Pression et humidité -----
+
+    pressure.begin("BMP580", bmp580);
+    psychrometer.begin(dryBulbTemperature(), rtd2Temperature, pressure);
+    humidity.begin("RH psychrom", psychrometer);
+
+    if (!process.add(pressure) || !process.add(humidity))
+        return fail("Mesures pression / humidité non enregistrées");
+
+    // ----- Paramètres du menu -----
+
+    board.registerParameters(parameterList);
+    process.registerParameters(parameterList);
+
+    if (parameterList.hasError())
+        return fail("Paramètres invalides");
+
+    return true;
+}
+
 void TestInstallation::printHomeScreen(
     HomeScreenContext& context)
 {
@@ -82,155 +167,25 @@ void TestInstallation::printHomeScreen(
 
     display.cp437(true);
     display.setTextWrap(false);
+    display.setTextSize(2);
 
     if (context.fullRefresh)
     {
         display.fillScreen(COLOR_BLACK);
 
-        display.setTextSize(2);
-        display.setTextColor(
-            COLOR_CYAN,
-            COLOR_BLACK);
-        display.setCursor(8, 5);
+        display.setTextColor(COLOR_CYAN, COLOR_BLACK);
+        display.setCursor(LABEL_X, 5);
         display.print("OPC - Accueil");
 
-        display.drawFastHLine(
-            0,
-            25,
-            display.width(),
-            COLOR_GREY);
+        display.drawFastHLine(0, 25, display.width(), COLOR_GREY);
 
-        display.setTextColor(
-            COLOR_WHITE,
-            COLOR_BLACK);
-
-        display.setCursor(8, 38);
-        display.print("T1");
-
-        display.setCursor(8, 70);
-        display.print("T2");
-
-        display.setCursor(8, 102);
-        display.print("HR");
+        display.setTextColor(COLOR_WHITE, COLOR_BLACK);
+        printLabel(display, T1_Y, "T1");
+        printLabel(display, T2_Y, "T2");
+        printLabel(display, HR_Y, "HR");
     }
 
-    display.setTextSize(2);
-
-    printHomeValue(
-        display,
-        38,
-        context.snapshot.find(
-            rtd1Temperature));
-
-    printHomeValue(
-        display,
-        70,
-        context.snapshot.find(
-            rtd2Temperature));
-
-    printHomeValue(
-        display,
-        102,
-        context.snapshot.find(
-            psychroHumidity));
-}
-
-
-
-bool TestInstallation::begin(
-    SensorBoard& board,
-    Adafruit_BMP5xx& bmp580,
-    ProcessControl& controller)
-{
-    // ----- Configuration du matériel -----
-    input1.begin("input1", "Input 1", Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0);
-    //input1.begin("input1", "Input 1", Sensor::Type::Tc, Sensor::Wiring::TwoWire, 16, 0);
-
-    if (!board.addSensor(input1))
-        return false;
-
-    input2.begin("input2", "Input 2", Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0);
-
-    if (!board.addSensor(input2))
-        return false;
-
-    // ----- Construction des objets -----
-    pressureBMP580.begin("BMP580", bmp580);
-
-    rtd1Resistance.begin("RTD1", board, input1);
-    rtd1Temperature.begin("TempRTD1", rtd1Resistance);
-    //tcTemp.begin("TempTC", input1);
-
-    rtd2Resistance.begin("RTD2", board, input2);
-    rtd2Temperature.begin("TempRTD2", rtd2Resistance);
-
-    psychrometer.begin(rtd1Temperature, rtd2Temperature, pressureBMP580);
-    psychroHumidity.begin("RH psychrom",psychrometer);
-
-
-    // ----- Enregistrement dans le framework -----
-
-    if (!controller.add(pressureBMP580) ||
-        !controller.add(rtd1Resistance) ||
-        !controller.add(rtd1Temperature) ||
-        !controller.add(rtd2Resistance) ||
-        !controller.add(rtd2Temperature) ||
-        !controller.add(psychroHumidity))
-    {
-        return false;
-    }
-
-    /*thermostat.begin("thermostat", "Thermostats", rtd2Temperature);
-    thermostat.settings.setpoint = 25;
-
-
-    if (!controller.add(thermostat))
-    {
-        return false;
-    }
-
-    heater.begin("heater", thermostat);
-
-    pump.begin("pompe", thermostat, 10000);
-
-    if (!controller.add(heater) ||
-        !controller.add(pump))
-    {
-        return false;
-    }
-
-    relayHeater.begin(
-        "relay_heater",
-        "Relais chauffage",
-        Board::Rp2040::OUTPUT_1,
-        true,
-        false);
-
-    if (!controller.connect(
-            heater,
-            relayHeater))
-    {
-        return false;
-    }*/
-
-    board.registerParameters(parameterList);
-    controller.registerParameters(parameterList);
-
-    /*if (!thermostat.setpointRamp.registerParameters(
-            parameterList,
-            "thermostat.ramp",
-            "Rampe thermostat",
-            "°C/min"))
-    {
-        return false;
-    }*/
-
-    if (parameterList.hasError())
-    {
-        Serial.println(
-            "Parameter registration failed");
-        return false;
-    }
-
-    return true;
+    printValue(display, T1_Y, context.snapshot.find(dryBulbTemperature()));
+    printValue(display, T2_Y, context.snapshot.find(rtd2Temperature));
+    printValue(display, HR_Y, context.snapshot.find(humidity));
 }

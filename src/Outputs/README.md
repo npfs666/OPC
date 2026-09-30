@@ -1,44 +1,187 @@
-# Sorties PWM
+# Sorties et actionneurs
 
-`PWMOutput` est une sortie matérielle, au même titre que `RelayOutput`.
-`ActuatorPWM` transmet directement la commande normalisée (0 à 1) d'un
-régulateur, par exemple un PID. Une commande invalide déclenche `forceSafe()`.
+Le pilotage d'une sortie passe par deux objets :
 
-Exemple à intégrer dans une installation, avec des objets membres dont la
-durée de vie couvre celle de `ProcessControl` :
+```
+Regulator ──► Actuator ──► Output
+(commande     (adapte la    (applique la commande
+ 0 à 1)        commande)     au matériel)
+```
+
+- l'**actionneur** lit la commande du régulateur et la transforme selon le
+  type de pilotage voulu (tout-ou-rien, temporel, proportionnel) ;
+- la **sortie** applique cette commande sur une broche et connaît son
+  **état sûr**.
+
+## Classes disponibles
+
+| Actionneur | Commande envoyée aux sorties |
+| --- | --- |
+| `ActuatorOnOff` | 1 si la commande du régulateur ≥ 0,5, sinon 0. Pour un thermostat ou un régulateur solaire. |
+| `TimeProportionalActuator` | Allume la sortie pendant `commande × période` à chaque période. Pour un PID sur relais. |
+| `ActuatorPWM` | Transmet la commande telle quelle (0 à 1). Pour un PID sur sortie PWM. |
+
+| Sortie | Broches possibles |
+| --- | --- |
+| `RelayOutput` | `OUTPUT_1` (GPIO 21, Relais 1), `OUTPUT_2` (GPIO 20, Relais 2) |
+| `PWMOutput` | `OUTPUT_3` (GPIO 26, PWM 1), `OUTPUT_4` (GPIO 27, PWM 2) |
+
+Les constantes sont dans `<Hardware/pinout.h>` (`Board::Rp2040::OUTPUT_x`).
+Un actionneur peut piloter jusqu'à 4 sorties (`MAX_OUTPUTS`), et le processus
+jusqu'à 16 sorties au total (`MAX_REGISTERED_OUTPUTS`).
+
+## Ajouter une sortie à une installation
+
+Déclarer l'actionneur et la sortie comme **membres** de l'installation (le
+framework conserve leurs adresses) :
 
 ```cpp
-ActuatorPWM actuator;
-PWMOutput output;
+#include <Outputs/ActuatorOnOff.h>
+#include <Outputs/RelayOutput.h>
 
-// Après l'initialisation et l'enregistrement du régulateur :
-actuator.begin("pwm_actuator", "Actionneur PWM", pid);
-output.begin("pwm_output", "Sortie PWM", Board::Rp2040::OUTPUT_3);
+class MonInstallation final : public Installation
+{
+    // ...
+private:
+    Thermostat thermostat;
+    ActuatorOnOff commande;
+    RelayOutput relais;
+};
+```
 
-if (!process.add(actuator) || !process.connect(actuator, output))
-    return false;
+Puis, dans `begin()`, après avoir initialisé et enregistré le régulateur :
 
+```cpp
+commande.begin("commande", "Commande", thermostat);
+
+relais.begin(
+    "relais",                   // clé de configuration (stable)
+    "Relais chauffage",         // nom affiché
+    Board::Rp2040::OUTPUT_1,
+    true,                       // actif à HIGH
+    false);                     // état sûr : OFF
+
+if (!process.add(commande) || !process.connect(commande, relais))
+    return fail("Relais non relié");
+
+// Une seule fois, après avoir enregistré tous les composants :
 process.registerParameters(parameterList);
 ```
 
-Inclure `Outputs/ActuatorPWM.h` et `Outputs/PWMOutput.h`. Le framework
-initialise les sorties, applique leurs réglages et gère leur repli.
-Aucune installation n'instancie ces nouvelles classes par défaut.
+`process.connect()` enregistre la sortie et la relie à l'actionneur en une
+seule opération. Il refuse un actionneur non enregistré et une sortie déjà
+reliée.
 
-Le menu **Sorties** expose pour chaque instance :
+Le framework initialise ensuite les sorties au démarrage, les place en état sûr
+et les pilote à chaque tour de la boucle de contrôle. Aucun autre appel n'est
+nécessaire.
 
-- **Broche** : PWM 1 (`OUTPUT_3`, GPIO 26) ou PWM 2 (`OUTPUT_4`, GPIO 27) ;
-- **Actif à HIGH** : polarité de la commande ;
-- **Commande de sécurité** : rapport cyclique logique de repli, de 0 à 1
-  (0 par défaut).
+### Autres combinaisons
 
-La rubrique **PWM commun** expose une seule **Fréquence**, commune aux deux
-canaux du même compteur matériel. Elle est réglable de 1 à 100 kHz, avec
-1 kHz par défaut, via `PWMOutput::sharedSettings.frequency` ou le menu.
-La fréquence réelle est quantifiée par le diviseur matériel (pas de 1/16).
-La résolution du rapport cyclique est de 0,1 %. Les commandes 0 et 1
-produisent des niveaux constants ; la polarité s'applique aussi au repli.
+PID sur relais, avec une période de 10 s :
 
-Les paramètres sont persistants par le mécanisme habituel. La validation
-interdit d'affecter la même broche à deux sorties dans le menu. Lors d'une
-construction entièrement en code, utiliser une broche distincte par sortie.
+```cpp
+actionneur.begin("pid_actuator", "Commande PID", pid, 10000);   // TimeProportionalActuator
+relais.begin("pid_relay", "Relais PID", Board::Rp2040::OUTPUT_1, true, false);
+```
+
+PID sur sortie PWM :
+
+```cpp
+actionneur.begin("pwm_actuator", "Actionneur PWM", pid);         // ActuatorPWM
+sortie.begin("pwm_output", "Sortie PWM", Board::Rp2040::OUTPUT_3,
+             true,     // actif à HIGH
+             0.0);     // commande de sécurité : 0 %
+```
+
+L'enregistrement est identique : `process.add(actionneur)` puis
+`process.connect(actionneur, sortie)`.
+
+## Réglages
+
+Tous les réglages apparaissent dans le menu et sont sauvegardés avec la
+configuration. Les valeurs passées à `begin()` sont les valeurs par défaut ; une
+configuration sauvegardée les remplace.
+
+**Menu `Sorties > <nom du relais>`** (`RelayOutput`)
+
+| Paramètre | Champ | Rôle |
+| --- | --- | --- |
+| Broche | `settings.pin` | Relais 1 ou Relais 2 |
+| Actif à HIGH | `settings.activeHigh` | `true` : HIGH = relais activé |
+| État de sécurité | `settings.safeState` | État logique appliqué en cas de repli |
+
+**Menu `Sorties > <nom de la sortie PWM>`** (`PWMOutput`)
+
+| Paramètre | Champ | Rôle |
+| --- | --- | --- |
+| Broche | `settings.pin` | PWM 1 ou PWM 2 |
+| Actif à HIGH | `settings.activeHigh` | `false` inverse le rapport cyclique |
+| Commande de sécurité | `settings.safeCommand` | Rapport cyclique de repli, de 0 à 1 |
+
+**Menu `Sorties > PWM commun`**
+
+| Paramètre | Champ | Rôle |
+| --- | --- | --- |
+| Fréquence | `PWMOutput::sharedSettings.frequency` | 1 à 100 kHz (1 kHz par défaut), commune aux deux sorties PWM |
+
+Les deux sorties PWM partagent le même compteur matériel, d'où une fréquence
+unique. La résolution du rapport cyclique est de 0,1 %. Les commandes 0 et 1
+donnent un niveau constant, sans impulsions.
+
+**Menu `Actionneurs > <nom de l'actionneur>`** (`TimeProportionalActuator`)
+
+| Paramètre | Champ | Rôle |
+| --- | --- | --- |
+| Période | `settings.period` | 1 s à 1 h, par pas de 1 s |
+
+Le menu refuse d'affecter la même broche à deux sorties. En code, utiliser une
+broche distincte par sortie.
+
+## État sûr
+
+Chaque sortie a un état de repli : `safeState` pour un relais, `safeCommand`
+pour une sortie PWM. Il est appliqué automatiquement :
+
+- au démarrage, avant la première régulation ;
+- quand le régulateur n'a pas de commande valide (mesure invalide, régulation
+  désactivée, etc.) ;
+- quand aucune nouvelle mesure n'arrive avant le timeout
+  (`Input > Timeout mesures`) ;
+- pendant l'application de réglages modifiés dans le menu ;
+- si une sortie n'est pas correctement initialisée (`isHealthy()`).
+
+L'état sûr est **logique** : avec `Actif à HIGH` mal réglé, un relais « OFF »
+peut être physiquement fermé. Vérifier le câblage réel avant toute mise en
+service.
+
+Pour interdire qu'un relais soit configuré avec un état sûr `ON` (chauffage,
+par exemple), verrouiller cet état dans `begin()` :
+
+```cpp
+relais.lockSafeState(false);   // état sûr forcé à OFF, non modifiable dans le menu
+```
+
+## Afficher l'état (écran d'accueil)
+
+Dans `printHomeScreen()`, lire la sortie via le snapshot, jamais directement
+l'objet :
+
+```cpp
+const OutputSample* s = context.snapshot.find(relais);
+
+const bool relaisActif =
+    s != nullptr && s->healthy && s->appliedCommand >= 0.5;
+```
+
+`OutputSample` contient `appliedCommand` (0 à 1, réellement appliquée) et
+`healthy`.
+
+## Limites
+
+- `TimeProportionalActuator` n'impose aucun temps minimal de marche ou d'arrêt :
+  il ne convient pas à un compresseur ou à tout appareil sensible aux cycles
+  courts.
+- Une sortie PWM ne peut utiliser que `OUTPUT_3` ou `OUTPUT_4`. Une autre broche
+  fait échouer l'initialisation et le démarrage.
+- Les sorties Modbus ne sont pas encore implémentées.

@@ -160,7 +160,7 @@ bool SolarInstallation::begin(
         !board.addSensor(tankTopInput) ||
         !board.addSensor(tankBottomInput))
     {
-        return false;
+        return fail("Sondes solaires : entrées analogiques indisponibles");
     }
 
     collectorResistance.begin(
@@ -197,7 +197,7 @@ bool SolarInstallation::begin(
         !process.add(tankBottomResistance) ||
         !process.add(tankBottomTemperature))
     {
-        return false;
+        return fail("Mesures solaires non enregistrées");
     }
 
     solarRegulator.begin(
@@ -208,7 +208,7 @@ bool SolarInstallation::begin(
         tankBottomTemperature);
 
     if (!process.add(solarRegulator))
-        return false;
+        return fail("Régulateur solaire non enregistré");
 
     pump.begin(
         "solar_pump",
@@ -216,7 +216,7 @@ bool SolarInstallation::begin(
         solarRegulator);
 
     if (!process.add(pump))
-        return false;
+        return fail("Pompe solaire non enregistrée");
 
     pumpRelay.begin(
         "solar_pump_relay",
@@ -229,18 +229,14 @@ bool SolarInstallation::begin(
             pump,
             pumpRelay))
     {
-        return false;
+        return fail("Relais pompe non relié à la pompe");
     }
 
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
     if (parameterList.hasError())
-    {
-        Serial.println(
-            "Solar installation parameter registration failed");
-        return false;
-    }
+        return fail("Paramètres solaires invalides");
 
     return true;
 }

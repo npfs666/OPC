@@ -1,41 +1,33 @@
 #ifndef TESTINSTALLATION_H
 #define TESTINSTALLATION_H
 
-#include "Installation.h"
+#include <Installation.h>
 
 #include <Hardware/Sensor.h>
 
-#include "Measurements/Temperature/TemperatureBME.h"
-#include "Measurements/Temperature/TemperatureTC.h"
-#include "Measurements/Humidity/HumidityBME.h"
-#include "Measurements/Pressure/PressureBMP580.h"
+#include <Measurements/Resistance.h>
+#include <Measurements/Temperature/TemperatureRTD.h>
+#include <Measurements/Temperature/TemperatureTC.h>
+#include <Measurements/Pressure/PressureBMP580.h>
+#include <Measurements/Psychrometer.h>
+#include <Measurements/Humidity/HumidityPsychrometer.h>
 
-#include "Measurements/Resistance.h"
-#include "Measurements/Temperature/TemperatureRTD.h"
-
-#include "Measurements/Psychrometer.h"
-#include "Measurements/Humidity/HumidityPsychrometer.h"
-
-#include <Regulator/Thermostat.h>
-#include <Regulator/PID.h>
-#include "Regulator/SolarRegulator.h"
-
-#include <Outputs/ActuatorOnOff.h>
-#include "Outputs/TimeProportionalActuator.h"
-#include <Outputs/RelayOutput.h>
-
-class SensorBoard;
 class Adafruit_BMP5xx;
 class ProcessControl;
+class SensorBoard;
 
-class TestInstallation : public Installation
+/**
+ * Installation de développement : psychromètre.
+ *
+ * - Entrée 1 : température sèche (PT100 4 fils ou thermocouple K) ;
+ * - Entrée 2 : température humide (PT100 4 fils) ;
+ * - BMP580   : pression atmosphérique.
+ *
+ * Aucune régulation ni sortie n'est pilotée.
+ */
+class TestInstallation final : public Installation
 {
 public:
-
-    //static constexpr size_t MAX_PARAMETERS = 32;
-
-    TestInstallation();
-
     const char* name() const override;
     const char* configurationKey() const override;
 
@@ -50,43 +42,26 @@ public:
         HomeScreenContext& context) override;
 
 private:
+    // Température réellement mesurée sur l'entrée 1 (PT100 ou thermocouple).
+    const Temperature& dryBulbTemperature() const;
 
-    // Entrées
+    // Entrées physiques
+    Sensor input1;
+    Sensor input2;
 
-    Sensor input1, input2;
-
-    // ---------- Mesures ----------
-
-    PressureBMP580 pressureBMP580;
-
-    TemperatureTC tcTemp;
-
+    // Entrée 1 : température sèche
     Resistance rtd1Resistance;
     TemperatureRTD rtd1Temperature;
+    TemperatureTC tcTemperature;
 
+    // Entrée 2 : température humide
     Resistance rtd2Resistance;
     TemperatureRTD rtd2Temperature;
 
+    // Pression et humidité
+    PressureBMP580 pressure;
     Psychrometer psychrometer;
-    HumidityPsychrometer psychroHumidity;
-
-    // ---------- Régulateurs ----------
-
-    Thermostat thermostat;
-
-    PID pid;
-
-    SolarRegulator solar;
-
-    // ---------- Actionneurs ----------
-
-    ActuatorOnOff heater;
-
-    TimeProportionalActuator pump;
-
-    // ---------- Sorties ----------
-
-    RelayOutput relayHeater;
+    HumidityPsychrometer humidity;
 };
 
 #endif

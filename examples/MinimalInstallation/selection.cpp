@@ -1,6 +1,6 @@
 /*
- * Extrait à reporter dans src/main.cpp.
- * Les fonctions setup/loop et leurs ISR restent celles du firmware principal.
+ * Extrait à reporter dans src/Templates/main.cpp.
+ * Le watchdog, setup/loop et les ISR restent ceux du firmware principal.
  */
 
 #include <OPC.h>

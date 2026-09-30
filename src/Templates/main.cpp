@@ -92,10 +92,14 @@ void setup()
     const bool measurementsReady =
         opc.initMeasurements();
 
-    if (measurementsReady)
-        rp2040.fifo.push(
-            interCoreMessageValue(
-                InterCoreMessage::ParametersReady));
+    // La cause d'un échec doit être visible par le cœur UI avant le message.
+    __dmb();
+
+    rp2040.fifo.push(
+        interCoreMessageValue(
+            measurementsReady
+                ? InterCoreMessage::ParametersReady
+                : InterCoreMessage::StartupFailed));
 }
 
 

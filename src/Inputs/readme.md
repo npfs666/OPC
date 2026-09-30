@@ -1,184 +1,138 @@
 # Entrées numériques
 
-`DigitalInput` représente une entrée logique, notamment une voie de l'ISO1212.
-Chaque objet lit un GPIO configuré en `INPUT`, applique la polarité choisie et
-filtre éventuellement les changements d'état sans bloquer le programme.
-Il est indépendant des mesures analogiques et de `SensorBoard`.
+`DigitalInput` lit une entrée logique, typiquement une des deux voies isolées
+ISO1212 de la carte. Elle gère la polarité et un filtrage anti-rebond, sans
+bloquer le programme.
 
-## Brochage OPC v0.2
-
-Les constantes sont accessibles avec `#include <Hardware/pinout.h>` :
-
-| Constante | GPIO | Fonction |
+| Constante | GPIO | Voie |
 | --- | --- | --- |
-| `Board::Rp2040::DIGITAL_INPUT_1` | 8 | Première voie ISO1212 |
-| `Board::Rp2040::DIGITAL_INPUT_2` | 9 | Deuxième voie ISO1212 |
+| `Board::Rp2040::DIGITAL_INPUT_1` | 8 | ISO1212 voie 1 |
+| `Board::Rp2040::DIGITAL_INPUT_2` | 9 | ISO1212 voie 2 |
 
-Elles remplacent les anciens noms `OUTPUT_5` et `OUTPUT_6`.
-Les broches restent définies dans le code ; elles ne sont pas éditables dans
-le menu. Ne pas affecter le même GPIO à plusieurs composants.
+Les constantes sont dans `<Hardware/pinout.h>`. Au plus `MAX_DIGITAL_INPUTS`
+entrées (2 par défaut) peuvent être enregistrées.
 
-## Déclarer les entrées dans une installation
+## Ajouter une entrée à une installation
 
-Inclure la classe dans le `.h` de l'installation et ajouter des membres :
+Déclarer l'entrée comme **membre** de l'installation (le framework conserve
+son adresse) :
 
 ```cpp
 #include <Inputs/DigitalInput.h>
 
-// Membres de la classe dérivée d'Installation :
-DigitalInput autorisation;
-DigitalInput niveau;
+class MonInstallation final : public Installation
+{
+    // ...
+private:
+    DigitalInput autorisation;
+};
 ```
 
-Ces objets doivent vivre aussi longtemps que l'installation : `ProcessControl`
-conserve leurs adresses. Ne pas les déclarer comme variables locales de `begin()`.
-
-Dans le `.cpp`, inclure `<ProcessControl.h>`, puis compléter la méthode
-`Installation::begin(...)` :
+Puis l'initialiser et l'enregistrer dans `begin()` :
 
 ```cpp
 autorisation.begin(
-    "autorisation", "Autorisation",
-    Board::Rp2040::DIGITAL_INPUT_1);
+    "autorisation",                  // clé de configuration (stable)
+    "Autorisation",                  // nom affiché
+    Board::Rp2040::DIGITAL_INPUT_1,
+    true,                            // actif quand le GPIO est HIGH
+    20);                             // filtrage : 20 ms
 
-niveau.begin(
-    "niveau", "Niveau",
-    Board::Rp2040::DIGITAL_INPUT_2,
-    true,   // Actif quand le GPIO est HIGH
-    20);    // État stable pendant 20 ms avant validation
+if (!process.add(autorisation))
+    return fail("Entrée autorisation non enregistrée");
 
-if (!process.add(autorisation) || !process.add(niveau))
-    return false;
-
-// Après l'enregistrement de tous les composants, une seule fois :
+// Une seule fois, après avoir enregistré tous les composants :
 process.registerParameters(parameterList);
 ```
 
-Le premier texte est une clé de configuration stable et unique dans
-l'installation ; le second est le nom affiché. La surcharge
-`begin("Niveau", pin)` utilise le même texte pour ces deux rôles.
+Les deux derniers arguments sont optionnels (par défaut : actif à HIGH, sans
+filtrage). La surcharge `begin("Nom", pin)` utilise le même texte comme clé et
+comme nom.
 
-`process.add()` renvoie `false` si l'objet est déjà enregistré ou si la liste
-est pleine. Sa capacité est `MAX_DIGITAL_INPUTS` (2 par défaut).
-L'enregistrement seul ne remplace pas l'appel à `begin()`.
+Une fois enregistrée, l'entrée est lue automatiquement à chaque tour de la
+boucle de contrôle, même quand les sorties sont arrêtées. Aucun appel
+supplémentaire n'est nécessaire.
 
-## Lire l'état dans le contrôle
+## Réglages
 
-Sur le cœur de contrôle, par exemple dans `update()` d'un régulateur personnalisé :
+Deux paramètres apparaissent dans le menu `Input > <nom de l'entrée>` et sont
+sauvegardés avec le reste de la configuration :
+
+| Paramètre | Champ | Rôle |
+| --- | --- | --- |
+| Actif à HIGH | `settings.activeHigh` | `true` : HIGH = actif ; `false` : LOW = actif |
+| Filtrage | `settings.debounceMs` | 0 à 10 000 ms. Durée pendant laquelle un nouvel état doit rester stable avant d'être validé (0 = immédiat) |
+
+Les valeurs passées à `begin()` sont les valeurs par défaut ; une configuration
+sauvegardée les remplace.
+
+## Lire l'état (cœur de contrôle)
 
 ```cpp
-if (!autorisation.isValid() || !autorisation.isActive())
+if (autorisation.isActive())
 {
-    invalidateCommand(); // Méthode protégée de Regulator
+    // ...
+}
+```
+
+- `isActive()` : état filtré, `false` tant que l'entrée n'est pas valide ;
+- `isValid()` : `false` au démarrage tant que le premier état n'est pas stable,
+  et juste après un changement de réglage ;
+- `sampledAt()` : date de la dernière lecture (`millis()`).
+
+`isValid()` indique seulement que la lecture est établie. Ce n'est pas un
+diagnostic de câblage : un fil coupé est lu comme un état normal.
+
+### Exemple : bloquer un régulateur
+
+Dans l'`update()` d'un régulateur personnalisé qui reçoit une référence vers
+l'entrée :
+
+```cpp
+if (!autorisation.isActive())
+{
+    invalidateCommand();   // les sorties passent en état sûr
     return;
 }
 
-// Calcul habituel de la commande du régulateur...
+// calcul habituel de la commande...
 ```
 
-Le régulateur doit recevoir une référence à l'entrée de l'installation.
-`isActive()` renvoie l'état logique filtré et vaut `false` lorsque l'état est
-invalide. `isValid()` permet de distinguer « inactif » de « pas encore acquis ».
-Cette validité décrit l'acquisition logicielle, pas un diagnostic de câblage.
+Une entrée seule ne coupe **aucune** sortie : c'est au régulateur ou à
+l'actionneur d'utiliser son état.
 
-`OPC::controlPoll()` acquiert les entrées à chaque passage, même lorsque les
-sorties sont désactivées ou que l'acquisition analogique est suspendue.
-`ProcessControl::updateMeasurementsAndRegulators()` les actualise également
-avant de calculer les régulateurs. Aucun appel supplémentaire n'est requis
-dans une installation utilisant la boucle OPC habituelle.
+Un régulateur n'est mis à jour qu'à l'arrivée d'une nouvelle mesure ADC : sa
+réaction à l'entrée suit donc ce rythme. Pour réagir plus vite, placer la
+logique dans l'`update(now)` d'un actionneur personnalisé, exécuté à chaque
+tour de boucle. La condition doit alors être réappliquée à chaque tour : une
+écriture ponctuelle sur un relais serait écrasée par l'actionneur.
 
-Les régulateurs existants gardent leur cadence liée aux nouvelles mesures ADC.
-Une condition placée dans leur `update()` est donc évaluée à cette cadence.
-Pour réagir indépendamment de l'ADC, la logique doit être exécutée dans le cycle
-rapide avant le pilotage des sorties, par exemple dans `update(now)` d'un
-actionneur personnalisé. Il faut maintenir cette condition à chaque cycle ;
-une écriture ponctuelle sur un relais serait remplacée par l'actionneur.
-L'entrée seule ne désactive automatiquement aucune sortie.
+## Afficher l'état (écran d'accueil)
 
-En utilisation sans `OPC`, appeler `process.pollInputs(now)` avant la logique
-de contrôle à chaque tour de boucle, ou `entree.poll(now)` pour un objet isolé.
-`process.poll(now)` seul pilote les actionneurs et les sorties.
-
-## Polarité et filtrage
-
-Les réglages peuvent être définis après `begin()`, avant la fin de
-l'initialisation :
+L'écran tourne sur l'autre cœur : dans `printHomeScreen()`, lire l'entrée via
+le snapshot, jamais directement l'objet `DigitalInput`.
 
 ```cpp
-niveau.settings.activeHigh = false;
-niveau.settings.debounceMs = 50;
-```
+const DigitalInputSample* s = context.snapshot.find(autorisation);
 
-- `activeHigh = true` : HIGH signifie actif ; `false` : LOW signifie actif.
-- `debounceMs = 0` : lecture immédiatement validée à chaque passage.
-- `debounceMs > 0` : un nouvel état doit être observé sans changement pendant
-  cette durée. Le filtre s'applique aux deux transitions.
-
-Au démarrage, l'entrée reste invalide jusqu'à la première observation stable
-pendant la durée configurée. Une fois valide, elle conserve son dernier état
-validé pendant les rebonds. Une modification effective de polarité ou de durée
-invalide l'état ; le filtre redémarre à la prochaine lecture. Une consultation
-du menu ou l'application de réglages identiques ne le redémarre pas.
-
-Les deux paramètres apparaissent dans `Input > <nom de l'entrée>` après
-`process.registerParameters(parameterList)` : `Actif à HIGH` et `Filtrage`
-(0 à 10 000 ms). Ils utilisent la sauvegarde/restauration habituelle de
-l'installation. Les réglages sauvegardés remplacent les valeurs par défaut du
-code, et sont pris en compte au prochain `poll()`.
-
-Le filtrage repose sur les observations de la boucle : il ne compte pas les
-impulsions et ne détecte pas un changement survenu entièrement entre deux
-lectures. La latence dépend de la boucle et augmente lors d'une opération
-bloquante, notamment une sauvegarde. Aucun `delay()` ni interruption GPIO
-n'est ajouté.
-
-## Afficher l'état sur le second cœur
-
-Dans `printHomeScreen()`, utiliser exclusivement le snapshot fourni, sans lire
-directement l'objet `DigitalInput` :
-
-```cpp
-#include <Adafruit_GFX.h>
-#include <ProcessSnapshot.h>
-#include <hmi/HomeScreen.h>
-
-// Dans printHomeScreen(HomeScreenContext& context), après placement du curseur :
-const DigitalInputSample* sample = context.snapshot.find(niveau);
-
-if (sample == nullptr || !sample->valid)
+if (s == nullptr || !s->valid)
     context.display.print("--");
 else
-    context.display.print(sample->active ? "Actif" : "Inactif");
+    context.display.print(s->active ? "Actif" : "Inactif");
 ```
 
-`inputCount()` et `inputAt(index)` permettent aussi de parcourir les entrées.
-`find()` renvoie `nullptr` pour un objet absent du snapshot ; `inputAt()` fait
-de même pour un index hors limites.
+`DigitalInputSample` contient `active`, `valid` et `sampledAt`. Pour parcourir
+toutes les entrées : `inputCount()` et `inputAt(index)`.
 
-Chaque `DigitalInputSample` contient `active`, `valid` et `sampledAt`, la date
-de dernière lecture en millisecondes. Les entrées sont copiées sous le mutex
-du processus et actualisées indépendamment des mesures analogiques.
-`ProcessSnapshot::capturedAt()` conserve la date de capture de l'ensemble
-mesures/sorties ; utiliser `sampledAt` pour dater une entrée numérique.
+L'écran d'accueil n'est redessiné qu'à l'arrivée d'une nouvelle mesure ADC ou au
+retour du menu. Un changement d'entrée seul ne provoque pas de rafraîchissement
+immédiat.
 
-Le rafraîchissement de l'écran d'accueil conserve son déclenchement actuel
-sur les nouvelles mesures ADC et les retours du menu. L'acquisition numérique
-et son snapshot continuent entre ces rafraîchissements, mais un changement
-numérique seul ne déclenche pas un nouvel affichage.
+## Limites
 
-Pour les diagnostics série, `ProcessControl::print()` inclut les entrées :
-`0` ou `1` lorsqu'elles sont valides, une valeur non numérique sinon.
-
-## Vérification
-
-Depuis la racine du projet :
-
-```sh
-bash test/host/run_tests.sh
-pio run -e opc_v02
-```
-
-Les tests hôte couvrent l'initialisation, les deux polarités, les rebonds dans
-les deux sens, le débordement de `millis()`, les changements de paramètres,
-l'enregistrement et les snapshots. La lecture réelle des deux voies reste à
-vérifier sur la carte.
+- Le filtrage repose sur les lectures successives de la boucle : une impulsion
+  plus courte qu'un tour de boucle peut être manquée, et les impulsions ne sont
+  pas comptées.
+- La latence augmente pendant les opérations bloquantes (sauvegarde de la
+  configuration, par exemple).
+- Ne pas affecter le même GPIO à plusieurs composants.

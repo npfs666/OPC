@@ -7,7 +7,7 @@
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
 
-class Adafruit_BME280;
+class Adafruit_BMP5xx;
 class ProcessControl;
 class SensorBoard;
 
@@ -19,7 +19,7 @@ public:
 
     bool begin(
         SensorBoard& board,
-        Adafruit_BME280& bme,
+        Adafruit_BMP5xx& bmp580,
         ProcessControl& process) override;
 
     void printHomeScreen(

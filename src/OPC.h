@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include <InterCoreMessages.h>
+#include <StartupStatus.h>
 #include "Hardware/SensorBoard.h"
 #include <Hardware/RTC.h>
 #include <ProcessControl.h>
@@ -81,9 +82,14 @@ private:
     static constexpr size_t SERIAL_PRINT_BUFFER_SIZE =
         1024;
 
+    // Période de rappel de l'erreur de démarrage sur le port série.
+    static constexpr uint32_t STARTUP_ERROR_REPEAT_MS =
+        5000;
+
     enum class UIState : uint8_t
     {
         Starting,
+        StartupFailed,
         Home,
         CaptureRequested,
         ClockCaptureRequested,
@@ -111,6 +117,10 @@ private:
     bool configurationSavePending = false;
     uint32_t lastMeasurementTime = 0;
 
+    // Écrit par le cœur contrôle avant StartupFailed, lu ensuite par le cœur UI.
+    StartupError startupError = StartupError::None;
+    uint32_t lastStartupErrorPrint = 0;
+
     MenuBuilder::ActionId pendingMenuAction =
         MenuBuilder::NO_ACTION;
 
@@ -122,6 +132,11 @@ private:
     uint32_t lastClockRefresh = 0;
     uint8_t serialPrintBuffer[
         SERIAL_PRINT_BUFFER_SIZE] = {};
+
+    bool failStartup(StartupError error);
+    const char* startupErrorDetail() const;
+    void printStartupError(Print& output) const;
+    void showStartupError();
 
     void copyProcessSnapshot();
 

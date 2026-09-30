@@ -6,10 +6,72 @@
 #include <Hardware/pinout.h>
 #include <hardware/sync.h>
 
+#include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
+
+#include <cstring>
 
 namespace
 {
+    constexpr int16_t STARTUP_ERROR_MARGIN = 8;
+    constexpr int16_t STARTUP_ERROR_LINE_HEIGHT = 20;
+    // Taille de texte 2 : 12 px par caractère sur 240 px de large.
+    constexpr size_t STARTUP_ERROR_LINE_LENGTH = 18;
+
+    /**
+     * Affiche un texte UTF-8 sur plusieurs lignes, en coupant de préférence
+     * aux espaces. Retourne l'ordonnée de la ligne suivante.
+     */
+    int16_t printWrapped(
+        Adafruit_GFX& display,
+        const char* text,
+        int16_t y,
+        uint8_t maximumLines)
+    {
+        char encoded[96] = {};
+
+        DisplayTextCodec::utf8ToCp437(
+            text != nullptr ? text : "",
+            encoded,
+            sizeof(encoded));
+
+        const char* cursor = encoded;
+
+        for (uint8_t line = 0;
+             line < maximumLines && *cursor != '\0';
+             line++)
+        {
+            while (*cursor == ' ')
+                cursor++;
+
+            size_t length = std::strlen(cursor);
+
+            if (length > STARTUP_ERROR_LINE_LENGTH)
+            {
+                length = STARTUP_ERROR_LINE_LENGTH;
+
+                for (size_t i = STARTUP_ERROR_LINE_LENGTH; i > 0; i--)
+                {
+                    if (cursor[i] == ' ')
+                    {
+                        length = i;
+                        break;
+                    }
+                }
+            }
+
+            display.setCursor(STARTUP_ERROR_MARGIN, y);
+
+            for (size_t i = 0; i < length; i++)
+                display.write(cursor[i]);
+
+            cursor += length;
+            y += STARTUP_ERROR_LINE_HEIGHT;
+        }
+
+        return y;
+    }
+
     class FixedBufferPrint final : public Stream
     {
     public:
@@ -283,35 +345,23 @@ bool OPC::initMeasurements()
 {
     // Sans le MCP23017, le routage analogique est inconnu : mesures fausses.
     if (!sensorBoardInitialized)
-    {
-        Serial.println(
-            "Sensor board (MCP23017) unavailable");
-        return false;
-    }
+        return failStartup(StartupError::SensorBoard);
 
     if (userInstall.requiresBMP580() &&
         !bmp580Initialized)
     {
-        Serial.println(
-            "BMP580 required by installation but unavailable");
-        return false;
+        return failStartup(StartupError::BMP580);
     }
 
     if (!userInstall.prepareParameterRegistration())
-    {
-        Serial.println(
-            "Parameter storage initialization failed");
-        return false;
-    }
+        return failStartup(StartupError::ParameterStorage);
 
     if (!userInstall.begin(
             input,
             bmp580,
             controller))
     {
-        Serial.println(
-            "Installation initialization failed");
-        return false;
+        return failStartup(StartupError::Installation);
     }
 
     clock.registerParameters(userInstall.getParameters());
@@ -319,9 +369,7 @@ bool OPC::initMeasurements()
     if (!userInstall.completeParameterRegistration() ||
         userInstall.getParameters().hasError())
     {
-        Serial.println(
-            "Framework parameter registration failed");
-        return false;
+        return failStartup(StartupError::ParameterRegistration);
     }
 
     const bool storageReady =
@@ -360,11 +408,7 @@ bool OPC::initMeasurements()
     }
 
     if (!controller.beginOutputs())
-    {
-        Serial.println(
-            "Output initialization failed");
-        return false;
-    }
+        return failStartup(StartupError::Outputs);
 
     controlOutputsEnabled = false;
     lastMeasurementTime = millis();
@@ -372,6 +416,62 @@ bool OPC::initMeasurements()
     input.startContinuous();
 
     return true;
+}
+
+bool OPC::failStartup(StartupError error)
+{
+    startupError = error;
+    printStartupError(Serial);
+    return false;
+}
+
+const char* OPC::startupErrorDetail() const
+{
+    // Une installation peut préciser sa cause avec Installation::fail().
+    if (startupError == StartupError::Installation &&
+        userInstall.failureReason() != nullptr)
+    {
+        return userInstall.failureReason();
+    }
+
+    return startupErrorText(startupError).detail;
+}
+
+void OPC::printStartupError(Print& output) const
+{
+    output.print("Erreur de demarrage : ");
+    output.print(startupErrorText(startupError).title);
+    output.print(" - ");
+    output.println(startupErrorDetail());
+}
+
+void OPC::showStartupError()
+{
+    constexpr uint16_t COLOR_GREY = 0x8410;
+
+    tft.cp437(true);
+    tft.setTextWrap(false);
+    tft.setTextSize(2);
+    tft.fillScreen(ST77XX_BLACK);
+
+    tft.fillRect(0, 0, tft.width(), 32, ST77XX_RED);
+    tft.setTextColor(ST77XX_WHITE, ST77XX_RED);
+    tft.setCursor(STARTUP_ERROR_MARGIN, 9);
+    tft.print("ERREUR DEMARRAGE");
+
+    int16_t y = 50;
+
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    y = printWrapped(tft, startupErrorText(startupError).title, y, 2);
+
+    y += 6;
+
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    printWrapped(tft, startupErrorDetail(), y, 4);
+
+    tft.setTextColor(COLOR_GREY, ST77XX_BLACK);
+    printWrapped(tft, "Sorties inactives", 190, 1);
+    printWrapped(tft, "Détails : série", 212, 1);
 }
 
 void OPC::initMenu()
@@ -494,6 +594,18 @@ void OPC::uiPoll()
 
     const bool clicked =
         encoder.takeClick();
+
+    if (uiState == UIState::StartupFailed)
+    {
+        // Rappel périodique : le moniteur série peut être ouvert après le boot.
+        if (millis() - lastStartupErrorPrint >= STARTUP_ERROR_REPEAT_MS)
+        {
+            lastStartupErrorPrint = millis();
+            printStartupError(Serial);
+        }
+
+        return;
+    }
 
     if (uiState == UIState::Home)
     {
@@ -838,6 +950,18 @@ void OPC::handleUIMessage(
         uiState = UIState::Menu;
         break;
     }
+
+    case InterCoreMessage::StartupFailed:
+        if (uiState != UIState::Starting)
+            break;
+
+        // startupError a été écrit par le cœur contrôle avant l'envoi.
+        __dmb();
+
+        uiState = UIState::StartupFailed;
+        showStartupError();
+        lastStartupErrorPrint = millis();
+        break;
 
     case InterCoreMessage::ParametersReady:
         initMenu();

@@ -53,7 +53,7 @@ public:
     struct Settings
     {
         CalibrationProfile pt100 = {
-            1650.541,
+            1650.667,
             7.5,
             100.061,
             26.0
@@ -154,6 +154,9 @@ private:
     void stopCalibrationHardware(
         uint8_t channel);
 
+    // Lance la conversion de la température interne de l'ADC sans l'attendre.
+    void startAdcTemperature();
+
     static uint8_t thermocoupleGain(Physics::Thermocouple::Type type);
 
     static double_t nominalReferenceResistance(
@@ -161,10 +164,15 @@ private:
     static double_t measurementGain(
         Sensor::Wiring wiring);
 
+    // Nombre de conversions à ignorer après un changement de configuration.
+    uint16_t conversionsToDiscard() const;
+
     uint8_t curSensor;   // cur sensor index
     uint8_t numSensors;  // number of RTD sensors in rtd array[]
     volatile bool pauseInterrupts = true;
-    volatile bool discardNextConversion = false;
+    volatile uint16_t discardConversions = 0;
+    // Dernière étape du cycle : la prochaine IRQ DRDY lit la température ADC.
+    volatile bool measuringAdcTemperature = false;
     double_t adcTemperature;
     Settings calibrationBackup;
     bool calibrationBackupValid = false;

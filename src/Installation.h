@@ -127,7 +127,24 @@ public:
             1000UL;
     }
 
+    /** Cause fournie par fail() lors d'un begin() refusé, sinon nullptr. */
+    const char* failureReason() const
+    {
+        return startupFailureReason;
+    }
+
 protected:
+
+    /**
+     * Mémorise la cause d'un échec de begin() puis retourne false.
+     * Usage : return fail("Relais PID non relié");
+     * Le texte doit rester valide (littéral) : il est affiché à l'écran.
+     */
+    bool fail(const char* reason)
+    {
+        startupFailureReason = reason;
+        return false;
+    }
 
     Parameter parameterStorage[MAX_PARAMETERS];
     ParameterList parameterList;
@@ -137,6 +154,8 @@ private:
 
     bool prepareParameterRegistration();
     bool completeParameterRegistration();
+
+    const char* startupFailureReason = nullptr;
 };
 
 #endif

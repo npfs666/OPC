@@ -117,6 +117,8 @@ class ADS1120 {
     byte * readADC_SingleArray(void);
     double readInternalTemp(void);
     bool readInternalTemp(double& value, uint32_t timeoutMs);
+    // Conversion d'une mesure brute du capteur interne en °C.
+    static double rawToTemperature(int32_t rawValue);
     void sendCommand(uint8_t command);
     void reset(void);
     void startSync(void);

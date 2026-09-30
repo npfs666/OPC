@@ -112,7 +112,7 @@ bool PIDInstallation::begin(
         0.0f);
 
     if (!board.addSensor(temperatureInput))
-        return false;
+        return fail("Sonde PID : entrée analogique indisponible");
 
     temperatureResistance.begin(
         "Resistance PID",
@@ -127,7 +127,7 @@ bool PIDInstallation::begin(
             temperatureResistance) ||
         !process.add(temperature))
     {
-        return false;
+        return fail("Mesures PID non enregistrées");
     }
 
     pid.begin(
@@ -152,7 +152,7 @@ bool PIDInstallation::begin(
     pid.stop();
 
     if (!process.add(pid))
-        return false;
+        return fail("Régulateur PID non enregistré");
 
     actuator.begin(
         /* Clé historique : ne pas la renommer sans migration. */
@@ -162,7 +162,7 @@ bool PIDInstallation::begin(
         10000);
 
     if (!process.add(actuator))
-        return false;
+        return fail("Actionneur PID non enregistré");
 
     controlRelay.begin(
         "pid_tune_relay",
@@ -178,7 +178,7 @@ bool PIDInstallation::begin(
             actuator,
             controlRelay))
     {
-        return false;
+        return fail("Relais PID non relié à l'actionneur");
     }
 
     board.registerParameters(parameterList);
@@ -194,15 +194,11 @@ bool PIDInstallation::begin(
             AUTOTUNE_OWNER_KEY,
             AUTOTUNE_OWNER_NAME))
     {
-        return false;
+        return fail("Paramètres rampe ou autotune PID");
     }
 
     if (parameterList.hasError())
-    {
-        Serial.println(
-            "PID installation parameter registration failed");
-        return false;
-    }
+        return fail("Paramètres PID invalides");
 
     return true;
 }

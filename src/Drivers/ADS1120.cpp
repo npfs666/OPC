@@ -181,8 +181,14 @@ bool ADS1120::readInternalTemp(
   if (!success)
     return false;
 
-  value = static_cast<double>(rawValue) * 0.03125 / 4.0;
+  value = rawToTemperature(rawValue);
   return true;
+}
+
+double ADS1120::rawToTemperature(int32_t rawValue)
+{
+  // Résultat 14 bits justifié à gauche, 0,03125 °C par LSB.
+  return static_cast<double>(rawValue) * 0.03125 / 4.0;
 }
 
 void ADS1120::sendCommand(uint8_t command)

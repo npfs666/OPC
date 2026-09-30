@@ -14,8 +14,9 @@ namespace
         "Calibration menu actions assume three RTD inputs");
 
     constexpr uint8_t CALIBRATION_CHANNEL = 0;
-    constexpr uint8_t CALIBRATION_DISCARDED_SAMPLES = 4;
-    constexpr uint8_t CALIBRATION_SAMPLES = 64;
+    // Même débit et même suréchantillonnage que les mesures (voir Sensor.h)
+    constexpr uint16_t CALIBRATION_DISCARDED_SAMPLES = RTD_DISCARDED_CONVERSIONS;
+    constexpr uint16_t CALIBRATION_SAMPLES = 64 * RTD_OVERSAMPLING;
     constexpr uint32_t CALIBRATION_SAMPLE_TIMEOUT_MS = 250;
     constexpr int32_t ADC_CALIBRATION_LIMIT = 32000;
     constexpr int32_t MAX_ZERO_OFFSET_COUNTS = 2048;
@@ -87,8 +88,8 @@ void SensorBoard::setStandardRTD() {
     adc.setVoltageRef(VREF_EXTERNAL_REFP0_REFN0);
     adc.setIDAC1routing(IDAC_AIN3_REFN1);
     adc.setIDAC2routing(IDAC_DISABLED);
-    adc.setFIR(FIR_50HZ); 
-    adc.setDataRate(DATARATE_20_SPS);   // No 50/60Hz filtering above 20 SPS
+    adc.setFIR(FIR_NONE);
+    adc.setDataRate(DATARATE_1000_SPS); // Dithering, voir RTD_OVERSAMPLING (Sensor.h)
 }
 
 void SensorBoard::setStandardTC() {
@@ -219,7 +220,7 @@ void SensorBoard::startContinuous()
     setWiringRoute(rtd[curSensor]->settings);
 
     adc.setConversionMode(CONVERSION_CONTINUOUS);
-    discardNextConversion = true;
+    discardConversions = conversionsToDiscard();
     adc.startSync();
 
     gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
@@ -241,7 +242,7 @@ void SensorBoard::pause() {
 void SensorBoard::restart() {
 
     adc.setConversionMode(CONVERSION_CONTINUOUS);
-    discardNextConversion = true;
+    discardConversions = conversionsToDiscard();
 
     /**
      * Une conversion synchrone, notamment la température interne de l'ADC,
@@ -261,16 +262,34 @@ void SensorBoard::adcInterrupt() {
 
     if( pauseInterrupts ) return;
 
-    //#define PRINT_CONVERSION_TIME 
+    //#define PRINT_CONVERSION_TIME
     #ifdef PRINT_CONVERSION_TIME
-        uint32_t time = millis();//micros();
+        uint32_t time = micros();
     #endif
 
     int32_t value = adc.readADC();
 
-    if (discardNextConversion)
+    // Fin de cycle : conversion single-shot de la température interne terminée.
+    if (measuringAdcTemperature)
     {
-        discardNextConversion = false;
+        adc.setTemperatureMode(TEMP_OFF);
+        adcTemperature = ADS1120::rawToTemperature(value);
+        measuringAdcTemperature = false;
+        newMeasurement = true;
+
+        // curSensor vaut déjà 0 : départ du cycle suivant.
+        setWiringRoute(rtd[curSensor]->settings);
+        restart();
+
+        #ifdef PRINT_CONVERSION_TIME
+            Serial.println((micros()-time));
+        #endif
+        return;
+    }
+
+    if (discardConversions > 0)
+    {
+        discardConversions--;
         return;
     }
 	
@@ -299,23 +318,37 @@ void SensorBoard::adcInterrupt() {
 		curSensor++;
         //Serial.print(curSensor);Serial.print("  |  ");Serial.print(numSensors);
         // If all inputs RTDs are finished, we flag newMeasurement available
+        // Toutes les entrées sont mesurées : la température ADC est lue à
+        // l'IRQ suivante, qui signalera newMeasurement et relancera le cycle.
         if( curSensor == numSensors ) {
             curSensor = 0;
-
-            if (!adc.readInternalTemp(adcTemperature, 250))
-                adcTemperature = NAN;
-            newMeasurement = true;
+            startAdcTemperature();
         }
+        else {
+            setWiringRoute(rtd[curSensor]->settings);
 
-        setWiringRoute(rtd[curSensor]->settings);
-
-        // relance de la conversion continue
-		restart();
+            // relance de la conversion continue
+            restart();
+        }
     }
 
     #ifdef PRINT_CONVERSION_TIME
-        Serial.println((millis()-time));
+        Serial.println((micros()-time));
     #endif
+}
+
+void SensorBoard::startAdcTemperature()
+{
+    // pause() a déjà repassé l'ADC en single-shot.
+    adc.setTemperatureMode(TEMP_ON);
+    measuringAdcTemperature = true;
+    discardConversions = 0;
+
+    adc.startSync();
+
+    gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
+
+    pauseInterrupts = false;
 }
 
 
@@ -335,8 +368,12 @@ double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
     
     const uint8_t channel = channelFor(rtdSensor);
 
-    if (channel >= MAX_RTD)
+    // Une entrée thermocouple n'a pas de résistance exploitable.
+    if (channel >= MAX_RTD ||
+        rtdSensor.settings.type == Sensor::Type::Tc)
+    {
         return NAN;
+    }
 
     const CalibrationProfile& calibration = calibrationFor(rtdSensor.settings.type);
 
@@ -352,7 +389,8 @@ double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
 
     //Rrtd = Rrtd * (1 + ppm/1000000.0);
 
-    return Rrtd;
+    // Une résistance nulle ou négative signale un court-circuit ou un câblage inversé.
+    return Rrtd > 0.0 ? Rrtd : NAN;
 }
 
 uint8_t SensorBoard::thermocoupleGain(Physics::Thermocouple::Type type)
@@ -824,7 +862,7 @@ bool SensorBoard::readCalibrationSamples(
 
     int32_t value = 0;
 
-    for (uint8_t i = 0;
+    for (uint16_t i = 0;
          i < CALIBRATION_DISCARDED_SAMPLES;
          i++)
     {
@@ -845,7 +883,7 @@ bool SensorBoard::readCalibrationSamples(
     int32_t maximum =
         std::numeric_limits<int32_t>::lowest();
 
-    for (uint8_t i = 0;
+    for (uint16_t i = 0;
          i < CALIBRATION_SAMPLES;
          i++)
     {
@@ -905,6 +943,15 @@ double_t SensorBoard::nominalReferenceResistance(
             : 1650.0;
 }
 
+uint16_t SensorBoard::conversionsToDiscard() const
+{
+    const Sensor* sensor = rtd[curSensor];
+    if (sensor != nullptr && sensor->settings.type != Sensor::Type::Tc)
+        return RTD_DISCARDED_CONVERSIONS;
+
+    return 1;
+}
+
 double_t SensorBoard::measurementGain(
     Sensor::Wiring wiring)
 {
@@ -924,7 +971,12 @@ void SensorBoard::resetAcquisition()
 {
     pauseInterrupts = true;
     newMeasurement = false;
-    discardNextConversion = false;
+    discardConversions = 0;
+
+    // Une mesure de température ADC interrompue ne doit pas laisser l'ADC
+    // en mode capteur interne pour le cycle suivant.
+    measuringAdcTemperature = false;
+    adc.setTemperatureMode(TEMP_OFF);
 
     for (uint8_t i = 0; i < MAX_RTD; i++)
         mux.disableChannel(i);
