@@ -37,6 +37,9 @@ private:
 
     SensorBoard* board = nullptr;
     Sensor*   sensor = nullptr;
+
+    // État d'une résistance finie selon le type de sonde.
+    MeasurementStatus classify(double_t ohms) const;
 };
 
 #endif

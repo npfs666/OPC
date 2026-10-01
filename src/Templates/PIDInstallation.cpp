@@ -10,6 +10,7 @@
 #include <ProcessSnapshot.h>
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
+#include <hmi/MeasurementDisplay.h>
 
 #include <cmath>
 
@@ -426,23 +427,13 @@ void PIDInstallation::printHomeScreen(
         TEMPERATURE_Y,
         COLOR_ORANGE);
 
-    if (temperatureSample == nullptr ||
-        !temperatureSample->valid ||
-        !std::isfinite(
-            temperatureSample->value))
-    {
-        display.print("--.-");
-        printUnit(display, "°C");
-    }
-    else
-    {
-        display.print(
-            temperatureSample->value,
-            temperatureSample->decimals);
-        printUnit(
-            display,
-            temperatureSample->unit);
-    }
+    // Taille 3 sur VALUE_WIDTH : 8 caractères.
+    MeasurementDisplay::print(
+        display,
+        temperatureSample,
+        COLOR_ORANGE,
+        COLOR_BLACK,
+        8);
 
     prepareValue(
         display,

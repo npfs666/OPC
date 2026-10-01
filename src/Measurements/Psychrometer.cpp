@@ -21,19 +21,26 @@ void Psychrometer::begin(const Temperature& dryBulb,
 
 bool Psychrometer::isValid() const
 {
+    return status() == MeasurementStatus::Ok;
+}
+
+MeasurementStatus Psychrometer::status() const
+{
     if (dryBulb == nullptr ||
         wetBulb == nullptr ||
         pressure == nullptr)
     {
-        return false;
+        return MeasurementStatus::Invalid;
     }
 
-    if (!dryBulb->isValid() ||
-        !wetBulb->isValid() ||
-        !pressure->isValid())
-    {
-        return false;
-    }
+    if (!dryBulb->isValid())
+        return dryBulb->getStatus();
+
+    if (!wetBulb->isValid())
+        return wetBulb->getStatus();
+
+    if (!pressure->isValid())
+        return pressure->getStatus();
 
     const double_t dryTemperature =
         dryBulb->getValue();
@@ -48,7 +55,9 @@ bool Psychrometer::isValid() const
         std::isfinite(dryTemperature) &&
         std::isfinite(wetTemperature) &&
         std::isfinite(atmosphericPressure) &&
-        atmosphericPressure > 0.0;
+        atmosphericPressure > 0.0
+            ? MeasurementStatus::Ok
+            : MeasurementStatus::Invalid;
 }
 
 /**

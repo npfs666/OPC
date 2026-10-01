@@ -162,8 +162,13 @@ private:
 
     static double_t nominalReferenceResistance(
         Sensor::Type type);
-    static double_t measurementGain(
-        Sensor::Wiring wiring);
+
+    // Termine l'acquisition de la voie courante et passe à la suivante.
+    void finishSensor();
+
+    // Conversion au gain de l'étendue large après une saturation en
+    // étendue précise (voir Sensor::needsRangeDiagnostic()).
+    void startRangeDiagnostic();
 
     // Nombre de conversions à ignorer après un changement de configuration.
     uint16_t conversionsToDiscard() const;
@@ -174,6 +179,8 @@ private:
     volatile uint16_t discardConversions = 0;
     // Dernière étape du cycle : la prochaine IRQ DRDY lit la température ADC.
     volatile bool measuringAdcTemperature = false;
+    // La prochaine conversion utile est la conversion de diagnostic.
+    volatile bool diagnosingRange = false;
     double_t adcTemperature;
     Settings calibrationBackup;
     bool calibrationBackupValid = false;

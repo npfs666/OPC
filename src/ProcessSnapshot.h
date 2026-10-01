@@ -3,6 +3,7 @@
 
 #include <Hardware/pinout.h>
 #include <Hardware/RTC.h>
+#include <Measurements/MeasurementStatus.h>
 
 #include <cmath>
 #include <cstddef>
@@ -32,7 +33,9 @@ struct MeasurementSample
     double_t value = 0.0;
     const char* unit = "";
     uint8_t decimals = 3;
+    // valid vaut status == MeasurementStatus::Ok.
     bool valid = false;
+    MeasurementStatus status = MeasurementStatus::NotReady;
 
 private:
     friend class ProcessSnapshot;

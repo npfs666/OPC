@@ -9,6 +9,7 @@
 
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
+#include <hmi/MeasurementDisplay.h>
 #include <ProcessSnapshot.h>
 
 #include <cmath>
@@ -141,19 +142,23 @@ namespace
             36,
             COLOR_BLACK);
 
-        printCenteredTemperature(
+        // Taille 4 : 9 caractères tiennent dans la largeur de l'écran.
+        char text[24];
+
+        MeasurementDisplay::format(
+            sample,
+            text,
+            sizeof(text),
+            9);
+
+        printCenteredText(
             display,
             ACTUAL_TEMPERATURE_Y,
             4,
-            COLOR_RED,
-            sample != nullptr
-                ? sample->value
-                : 0.0,
-            sample != nullptr
-                ? sample->decimals
-                : 1,
-            sample != nullptr &&
-                sample->valid);
+            MeasurementDisplay::color(
+                sample,
+                COLOR_RED),
+            text);
     }
 
     void printSetpoint(

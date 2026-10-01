@@ -18,10 +18,18 @@ void HumidityPsychrometer::begin(
 
 void HumidityPsychrometer::update()
 {
-    if (psychrometer == nullptr ||
-        !psychrometer->isValid())
+    if (psychrometer == nullptr)
     {
         setValid(false);
+        return;
+    }
+
+    const MeasurementStatus inputStatus =
+        psychrometer->status();
+
+    if (inputStatus != MeasurementStatus::Ok)
+    {
+        setStatus(inputStatus);
         return;
     }
 

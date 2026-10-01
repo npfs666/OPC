@@ -1,5 +1,7 @@
 #include "Measurements/Measurement.h"
 
+#include <cstring>
+
 Measurement::Measurement()
 {
 }
@@ -31,7 +33,12 @@ const char* Measurement::getUnit() const
 
 bool Measurement::isValid() const
 {
-    return valid;
+    return status == MeasurementStatus::Ok;
+}
+
+MeasurementStatus Measurement::getStatus() const
+{
+    return status;
 }
 
 void Measurement::setValue(double_t value)
@@ -41,7 +48,34 @@ void Measurement::setValue(double_t value)
 
 void Measurement::setValid(bool valid)
 {
-    this->valid = valid;
+    setStatus(valid ? MeasurementStatus::Ok : MeasurementStatus::Invalid);
+}
+
+void Measurement::setStatus(MeasurementStatus status)
+{
+    this->status = status;
+}
+
+void Measurement::print(Stream& stream) const
+{
+    if (status == MeasurementStatus::Ok)
+    {
+        Displayable::print(stream);
+        return;
+    }
+
+    if (!display)
+        return;
+
+    // Même mise en colonnes que Displayable::print().
+    stream.print(getName());
+
+    size_t len = std::strlen(getName());
+    while (len++ < 16)
+        stream.print(' ');
+
+    stream.print(": ");
+    stream.println(measurementStatusLabel(status));
 }
 
 double_t Measurement::printValue() const {

@@ -5,6 +5,7 @@
 
 #include <Hardware/pinout.h>
 #include <Hardware/RTC.h>
+#include <Measurements/MeasurementStatus.h>
 
 class Actuator;
 class DigitalInput;
@@ -71,6 +72,13 @@ public:
 
     void printCSVPsychro(Stream& stream) const;
 
+    /**
+     * Écrit une ligne par changement d'état de mesure survenu depuis le
+     * dernier appel, puis les oublie. Le passage NotReady -> Ok du démarrage
+     * n'est pas journalisé.
+     */
+    void printStatusEvents(Stream& stream);
+
     void registerParameters(ParameterList& list);
 
     bool validateParameters(
@@ -78,7 +86,26 @@ public:
 
 private:
 
+    struct StatusEvent
+    {
+        uint32_t time;
+        uint8_t measurement;
+        MeasurementStatus from;
+        MeasurementStatus to;
+    };
+
+    // Au-delà, les changements suivants sont seulement comptés : les premiers
+    // désignent en général la cause.
+    static constexpr uint8_t MAX_STATUS_EVENTS = 8;
+
+    void recordStatusChanges(uint32_t now);
+
     ClockSample clockSample;
+
+    MeasurementStatus loggedStatus[MAX_MEASUREMENTS] = {};
+    StatusEvent statusEvents[MAX_STATUS_EVENTS] = {};
+    uint8_t statusEventCount = 0;
+    uint16_t lostStatusEvents = 0;
 
     DigitalInput* digitalInputs[MAX_DIGITAL_INPUTS] = {};
     uint8_t digitalInputCount = 0;

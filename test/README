@@ -26,6 +26,11 @@ Ils couvrent actuellement :
 - le thermostat et le PID programmés (consigne réduite, arrêt, autotune
   prioritaire) et la décharge nocturne solaire en mode vacances ;
 - la détection de l'alerte horloge dans le snapshot.
+- les plages RTD : gains ADC selon le câblage et la plage, diagnostic de
+  saturation (rupture ou dépassement) ;
+- les états de mesure : acquisition (saturations), classement des
+  résistances RTD, thermocouple ouvert ou hors domaine, propagation,
+  affichage (libellés, couleurs), journal des changements et snapshot.
 
 Les tests qui dépendent réellement de l'ADS1120, des multiplexeurs, de
 LittleFS ou de l'USB devront être ajoutés comme tests d'intégration sur Pico.

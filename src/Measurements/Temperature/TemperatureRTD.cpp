@@ -22,7 +22,7 @@ void TemperatureRTD::update()
 {
     if(!resistance->isValid())
     {
-        setValid(false);
+        setStatus(resistance->getStatus());
         return;
     }
 

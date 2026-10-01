@@ -1070,6 +1070,7 @@ void OPC::handleUIMessage(
         mutex_enter_blocking(
             &processDataMutex);
 
+        controller.printStatusEvents(bufferedOutput);
         controller.print(bufferedOutput);
         // Vieille méthode de print pour un CSV
         //controller.printCSVPsychro(bufferedOutput);

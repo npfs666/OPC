@@ -1,8 +1,19 @@
 #include <Measurements/Resistance.h>
 
 #include <Hardware/SensorBoard.h>
+#include <Physics/PT100.h>
 
 #include <cmath>
+
+namespace
+{
+    /*
+     * Seuil de court-circuit d'une PT100 (×10 en PT1000) : bien sous
+     * R(-200 °C) = 18,52 Ω et au-dessus de la résistance des lignes d'un
+     * montage 2 fils.
+     */
+    constexpr double_t PT100_SHORT_CIRCUIT_OHMS = 10.0;
+}
 
 Resistance::Resistance()
 {
@@ -31,8 +42,53 @@ void Resistance::update()
 
     setValue(resistance);
 
-    // NaN : saturation, entrée non reliée à la carte ou valeur non physique.
-    setValid(std::isfinite(resistance));
+    if (!std::isfinite(resistance))
+    {
+        // Acquisition non aboutie : le capteur en donne la cause. Une
+        // acquisition lisible sans résistance (voie thermocouple, entrée non
+        // reliée à la carte) est invalide.
+        const MeasurementStatus acquisition =
+            sensor->acquisitionStatus();
+
+        setStatus(
+            acquisition == MeasurementStatus::Ok
+                ? MeasurementStatus::Invalid
+                : acquisition);
+        return;
+    }
+
+    setStatus(classify(resistance));
+}
+
+MeasurementStatus Resistance::classify(double_t ohms) const
+{
+    double_t scale = 1.0;
+
+    switch (sensor->settings.type)
+    {
+    case Sensor::Type::Pt100:
+        break;
+
+    case Sensor::Type::Pt1000:
+        scale = 10.0;
+        break;
+
+    default:
+        return MeasurementStatus::Invalid;
+    }
+
+    if (ohms < PT100_SHORT_CIRCUIT_OHMS * scale)
+        return MeasurementStatus::Short;
+
+    if (ohms < PT100::getTemperatureToResistance(
+                   PT100::MINIMUM_TEMPERATURE) * scale)
+        return MeasurementStatus::UnderRange;
+
+    if (ohms > PT100::getTemperatureToResistance(
+                   PT100::MAXIMUM_TEMPERATURE) * scale)
+        return MeasurementStatus::OverRange;
+
+    return MeasurementStatus::Ok;
 }
 
 Sensor& Resistance::getSensor()

@@ -11,6 +11,23 @@ const float PT100::interpolationTable[interpolationSize] =
      266.419};
 
 
+double_t PT100::getTemperatureToResistance(double_t temperature)
+{
+    double_t ratio =
+        1.0 +
+        A * temperature +
+        B * temperature * temperature;
+
+    if (temperature < 0.0)
+    {
+        ratio += C * (temperature - 100.0) *
+                 temperature * temperature * temperature;
+    }
+
+    return R0 * ratio;
+}
+
+
 /**
  * @brief Conversion d'une resistance en température via le calcul par interpolation (plus précis qu'une fonction pour une approche réelle)
  * 
@@ -109,26 +126,8 @@ double_t PT100::getResistanceToTemperature(
  */
 double_t PT100::getResistanceToTemperatureNewton(double_t resistance)
 {
-    constexpr double_t minimumTemperature = -200.0;
-    constexpr double_t maximumTemperature = 850.0;
     constexpr double_t tolerance = 1e-6;
     constexpr uint8_t maximumIterations = 20;
-
-    auto resistanceAt = [](double_t temperature) -> double_t
-    {
-        double_t ratio =
-            1.0 +
-            A * temperature +
-            B * temperature * temperature;
-
-        if (temperature < 0.0)
-        {
-            ratio += C * (temperature - 100.0) *
-                     temperature * temperature * temperature;
-        }
-
-        return R0 * ratio;
-    };
 
     auto derivativeAt = [](double_t temperature) -> double_t
     {
@@ -146,8 +145,8 @@ double_t PT100::getResistanceToTemperatureNewton(double_t resistance)
     };
 
     if (!std::isfinite(resistance) ||
-        resistance < resistanceAt(minimumTemperature) ||
-        resistance > resistanceAt(maximumTemperature))
+        resistance < getTemperatureToResistance(MINIMUM_TEMPERATURE) ||
+        resistance > getTemperatureToResistance(MAXIMUM_TEMPERATURE))
     {
         return NAN;
     }
@@ -162,7 +161,7 @@ double_t PT100::getResistanceToTemperatureNewton(double_t resistance)
     for (uint8_t i = 0; i < maximumIterations; i++)
     {
         const double_t step =
-            (resistanceAt(temperature) - resistance) /
+            (getTemperatureToResistance(temperature) - resistance) /
             derivativeAt(temperature);
 
         temperature -= step;

@@ -6,8 +6,8 @@
 
 #include <Adafruit_GFX.h>
 
-#include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
+#include <hmi/MeasurementDisplay.h>
 #include <ProcessSnapshot.h>
 
 #include <cstring>
@@ -49,34 +49,14 @@ namespace
 
         display.setTextSize(3);
         display.setCursor(VALUE_X, y);
-        display.setTextColor(
+
+        // Taille 3 depuis VALUE_X : 7 caractères avant le bord.
+        MeasurementDisplay::print(
+            display,
+            sample,
             COLOR_ORANGE,
-            COLOR_BLACK);
-
-        if (sample == nullptr ||
-            !sample->valid)
-        {
-            display.print("--.-");
-        }
-        else
-        {
-            display.print(
-                sample->value,
-                sample->decimals);
-        }
-
-        display.print(' ');
-
-        char unit[8] = {};
-
-        DisplayTextCodec::utf8ToCp437(
-            sample != nullptr
-                ? sample->unit
-                : "°C",
-            unit,
-            sizeof(unit));
-
-        display.print(unit);
+            COLOR_BLACK,
+            7);
     }
 
     void printState(

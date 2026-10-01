@@ -3,32 +3,98 @@
 
 #include <cmath>
 
+namespace
+{
+    namespace Tc = Physics::Thermocouple;
+
+    /**
+     * Cause d'une conversion impossible avec une tension et une jonction
+     * froide finies : f.é.m. totale (référencée à 0 °C) hors du domaine de
+     * mesure du type, ou jonction froide hors de son propre domaine.
+     */
+    MeasurementStatus rangeStatus(
+        Tc::Type type,
+        double voltageMv,
+        double coldJunctionC)
+    {
+        const double coldJunctionMv =
+            Tc::temperatureToMillivolts(type, coldJunctionC);
+
+        const Tc::Range range = Tc::measurementRange(type);
+
+        const double minimumMv =
+            Tc::temperatureToMillivolts(type, range.minimum);
+        const double maximumMv =
+            Tc::temperatureToMillivolts(type, range.maximum);
+
+        if (!std::isfinite(coldJunctionMv) ||
+            !std::isfinite(minimumMv) ||
+            !std::isfinite(maximumMv))
+            return MeasurementStatus::Invalid;
+
+        const double totalMv = voltageMv + coldJunctionMv;
+
+        if (totalMv > maximumMv)
+            return MeasurementStatus::OverRange;
+
+        if (totalMv < minimumMv)
+            return MeasurementStatus::UnderRange;
+
+        return MeasurementStatus::Invalid;
+    }
+}
+
 void TemperatureTC::begin(const char* name, Sensor& sensor)
 {
     Temperature::begin(name);
     this->sensor = &sensor;
     setValue(NAN);
-    setValid(false);
+    setStatus(MeasurementStatus::NotReady);
 }
 
 void TemperatureTC::update()
 {
-    setValid(false);
     setValue(NAN);
 
     if (sensor == nullptr || sensor->getBoard() == nullptr ||
         sensor->settings.type != Sensor::Type::Tc)
+    {
+        setStatus(MeasurementStatus::Invalid);
         return;
+    }
 
     const auto& board = *sensor->getBoard();
-    const double temperature = Physics::Thermocouple::compensatedTemperature(
+    const double voltage = board.computeVoltage(*sensor);
+
+    if (!std::isfinite(voltage))
+    {
+        // Thermocouple ouvert : la polarisation 1 MΩ sature l'entrée (Open).
+        const MeasurementStatus acquisition =
+            sensor->acquisitionStatus();
+
+        setStatus(
+            acquisition == MeasurementStatus::Ok
+                ? MeasurementStatus::Invalid
+                : acquisition);
+        return;
+    }
+
+    const double coldJunction = board.getColdJunctionTemperature();
+
+    const double temperature = Tc::compensatedTemperature(
         sensor->settings.thermocoupleType,
-        board.computeVoltage(*sensor),
-        board.getColdJunctionTemperature()) + sensor->settings.offset;
+        voltage,
+        coldJunction) + sensor->settings.offset;
 
     if (!std::isfinite(temperature))
+    {
+        setStatus(rangeStatus(
+            sensor->settings.thermocoupleType,
+            voltage,
+            coldJunction));
         return;
+    }
 
     setValue(temperature);
-    setValid(true);
+    setStatus(MeasurementStatus::Ok);
 }

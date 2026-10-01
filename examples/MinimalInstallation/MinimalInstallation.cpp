@@ -6,8 +6,8 @@
 #include <Adafruit_GFX.h>
 
 #include <ProcessSnapshot.h>
-#include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
+#include <hmi/MeasurementDisplay.h>
 
 namespace
 {
@@ -97,31 +97,11 @@ void MinimalInstallation::printHomeScreen(
 
     display.setCursor(8, 48);
     display.setTextSize(3);
-    display.setTextColor(
+
+    // Valeur et unité, ou état de la mesure ("RUPTURE"...) en couleur.
+    MeasurementDisplay::print(
+        display,
+        context.snapshot.find(temperature),
         COLOR_WHITE,
         COLOR_BLACK);
-
-    const MeasurementSample* sample =
-        context.snapshot.find(temperature);
-
-    if (sample == nullptr ||
-        !sample->valid)
-    {
-        display.print("--.-");
-        return;
-    }
-
-    display.print(
-        sample->value,
-        sample->decimals);
-    display.print(' ');
-
-    char unit[8] = {};
-
-    DisplayTextCodec::utf8ToCp437(
-        sample->unit,
-        unit,
-        sizeof(unit));
-
-    display.print(unit);
 }

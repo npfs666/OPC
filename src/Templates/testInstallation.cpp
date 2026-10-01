@@ -5,8 +5,8 @@
 
 #include <Adafruit_GFX.h>
 
-#include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
+#include <hmi/MeasurementDisplay.h>
 #include <ProcessSnapshot.h>
 
 namespace
@@ -53,24 +53,12 @@ namespace
             COLOR_BLACK);
 
         display.setCursor(VALUE_X, y);
-        display.setTextColor(COLOR_WHITE, COLOR_BLACK);
 
-        if (sample == nullptr || !sample->valid)
-        {
-            display.print("--.-");
-            return;
-        }
-
-        char unit[12] = {};
-
-        DisplayTextCodec::utf8ToCp437(
-            sample->unit,
-            unit,
-            sizeof(unit));
-
-        display.print(sample->value, sample->decimals);
-        display.print(' ');
-        display.print(unit);
+        MeasurementDisplay::print(
+            display,
+            sample,
+            COLOR_WHITE,
+            COLOR_BLACK);
     }
 }
 

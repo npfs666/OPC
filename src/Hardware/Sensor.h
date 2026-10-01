@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <Configurable.h>
+#include <Measurements/MeasurementStatus.h>
 #include <Physics/Thermocouple.h>
 
 class SensorBoard;
@@ -24,6 +25,16 @@ constexpr uint16_t RTD_OVERSAMPLING = 50;
 // (τ ≈ 0.57 ms, ~7.5 ms pour 16 bits), avec marge.
 constexpr uint16_t RTD_DISCARDED_CONVERSIONS = 15;
 
+/**
+ * Gain de mesure RTD (pleine échelle = Rref / gain) :
+ *  - étendue précise, gain 8 : 206 Ω en PT100, soit environ +280 °C ;
+ *  - étendue large, gain 4 : 412 Ω, toute la norme (-200 à +850 °C), avec un
+ *    pas de quantification deux fois plus grand.
+ * Les calibrations (N0, Rref) sont faites en étendue précise.
+ */
+constexpr uint8_t RTD_PRECISE_GAIN = 8;
+constexpr uint8_t RTD_EXTENDED_GAIN = 4;
+
 class Sensor : public Configurable
 {
 
@@ -43,6 +54,13 @@ public:
         FourWire
     };
 
+    // Étendue de mesure RTD (voir RTD_PRECISE_GAIN)
+    enum class Range : uint8_t
+    {
+        Precise,
+        Extended
+    };
+
     // Settings that can be configured in the menu and needs to be public
     struct Settings
     {
@@ -51,6 +69,7 @@ public:
         double_t offset;
         int32_t samples;
         Physics::Thermocouple::Type thermocoupleType = Physics::Thermocouple::Type::K;
+        Range range = Range::Precise;
     };
 
     Settings settings = {};
@@ -77,6 +96,44 @@ public:
     bool isAccumulationDone();
     double_t readValue() const;
 
+    /**
+     * État de la dernière acquisition, sans interprétation de la valeur :
+     *  - NotReady : aucune acquisition terminée depuis le dernier reset() ;
+     *  - Open     : saturation haute de l'ADC. Thermocouple : la polarisation
+     *               1 MΩ tire l'entrée ouverte vers la saturation. RTD : la
+     *               source de courant sature sur une ligne ouverte ;
+     *  - OverRange: RTD en étendue précise, saturée mais lisible au gain de
+     *               l'étendue large (voir setRangeDiagnostic()) ;
+     *  - Invalid  : saturation basse (câblage inversé) ;
+     *  - Ok       : valeur lisible.
+     */
+    MeasurementStatus acquisitionStatus() const;
+
+    /**
+     * RTD : gain de mesure de l'étendue choisie (RTD_PRECISE_GAIN ou
+     * RTD_EXTENDED_GAIN), qui relie le code ADC à la résistance.
+     */
+    static uint8_t measurementGain(const Settings& settings);
+
+    /**
+     * RTD : gain programmé dans l'ADC. En 3 fils, Rref voit les deux sources
+     * de courant et la sonde une seule : le gain ADC est doublé.
+     */
+    static uint8_t adcGain(const Settings& settings);
+
+    /**
+     * Vrai si l'acquisition en cours a saturé vers le haut en étendue
+     * précise : une conversion au gain de l'étendue large dira si l'entrée
+     * est ouverte ou seulement au-delà de l'étendue.
+     */
+    bool needsRangeDiagnostic() const;
+
+    /**
+     * Résultat de cette conversion, à donner avant compute() : une entrée
+     * lisible au gain large est hors étendue (OverRange), sinon ouverte.
+     */
+    void setRangeDiagnostic(bool readableAtExtendedGain);
+
     const SensorBoard* getBoard() const { return board; }
 
     void registerParameters(ParameterList& list) override;
@@ -85,7 +142,9 @@ private:
 
     friend class SensorBoard;
     SensorBoard* board = nullptr;
-    bool saturated = false;
+    bool saturatedHigh = false;
+    bool saturatedLow = false;
+    bool readableAtExtendedGain = false;
 
     int32_t accumulationTarget() const;
 
@@ -95,6 +154,9 @@ private:
     //double_t resistance;
     uint16_t sampleCount;
     double_t avgValue = NAN;
+    MeasurementStatus lastAcquisition = MeasurementStatus::NotReady;
+
+    void trackSaturation(int32_t value);
 };
 
 #endif

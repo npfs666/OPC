@@ -3031,6 +3031,7 @@ void runThermocoupleTests();
 void runPWMTests();
 void runDigitalInputTests();
 void runScheduleTests();
+void runMeasurementStatusTests();
 
 int main()
 {
@@ -3213,6 +3214,7 @@ int main()
     runPWMTests();
     runDigitalInputTests();
     runScheduleTests();
+    runMeasurementStatusTests();
 
     return TestHarness::finish();
 }

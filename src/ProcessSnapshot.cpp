@@ -138,6 +138,7 @@ bool ProcessSnapshot::add(
     sample.decimals =
         measurement.printDecimals();
     sample.valid = measurement.isValid();
+    sample.status = measurement.getStatus();
 
     return true;
 }

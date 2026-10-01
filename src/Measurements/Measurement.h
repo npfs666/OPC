@@ -3,6 +3,7 @@
 
 #include <hmi/Displayable.h>
 #include <Configurable.h>
+#include <Measurements/MeasurementStatus.h>
 
 /**
  * @brief Classe de base de toutes les grandeurs physiques.
@@ -54,6 +55,16 @@ public:
     bool isValid() const;
 
     /**
+     * @return État de la mesure : Ok, ou la cause de l'invalidité.
+     */
+    MeasurementStatus getStatus() const;
+
+    /**
+     * @brief Affiche la valeur, ou le libellé de l'état si elle est invalide.
+     */
+    void print(Stream& stream) const override;
+
+    /**
      * @return Valeur destinée à l'affichage (double_t).
      */
     double_t printValue() const override;
@@ -96,9 +107,14 @@ protected:
     void setValue(double_t value);
 
     /**
-     * @param[in] valid Nouvel état de validité (bool).
+     * @param[in] valid true : Ok ; false : Invalid (cause non précisée).
      */
     void setValid(bool valid = true);
+
+    /**
+     * @param[in] status Nouvel état de la mesure (MeasurementStatus).
+     */
+    void setStatus(MeasurementStatus status);
 
 private:
     // Unité associée à la valeur (const char*).
@@ -107,8 +123,8 @@ private:
     // Dernière valeur mesurée (double_t).
     double_t value = 0.0;
 
-    // État de validité de la valeur (bool).
-    bool valid = false;
+    // État de la valeur ; seul Ok la rend exploitable.
+    MeasurementStatus status = MeasurementStatus::NotReady;
 };
 
 #endif

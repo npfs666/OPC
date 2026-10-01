@@ -23,6 +23,7 @@ namespace
     constexpr int32_t MAX_SAMPLE_SPREAD_COUNTS = 256;
     constexpr double_t REFERENCE_TOLERANCE = 0.05;
     constexpr double_t ADC_FULL_SCALE = 32768.0;
+    constexpr int32_t ADC_POSITIVE_SATURATION = 32767;
 }
 
 
@@ -123,14 +124,14 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
         {
 
         case Sensor::Type::Pt100:
-            adc.setGain(8);
+            adc.setGain(Sensor::adcGain(settings));
             setStandardRTD();
             adc.setIDACcurrent(CURRENT_1000_UA);
             mux.setPT100();
             break;
 
         case Sensor::Type::Pt1000:
-            adc.setGain(8);
+            adc.setGain(Sensor::adcGain(settings));
             setStandardRTD();
             adc.setIDACcurrent(CURRENT_100_UA);
             mux.setPT1000();
@@ -148,7 +149,7 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
         setStandardRTD();
         mux.set3Wire();
         adc.setIDAC2routing(IDAC_AIN2);
-        adc.setGain(16);
+        adc.setGain(Sensor::adcGain(settings));
 
         switch (settings.type)
         {
@@ -169,7 +170,7 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
 
         setStandardRTD();
         mux.set4Wire();
-        adc.setGain(8);
+        adc.setGain(Sensor::adcGain(settings));
 
         switch (settings.type)
         {
@@ -292,6 +293,18 @@ void SensorBoard::adcInterrupt() {
         discardConversions--;
         return;
     }
+
+    // Conversion de diagnostic : lisible au gain large, l'entrée est
+    // seulement au-delà de l'étendue précise ; encore saturée, elle est ouverte.
+    if (diagnosingRange)
+    {
+        diagnosingRange = false;
+        rtd[curSensor]->setRangeDiagnostic(
+            value < ADC_POSITIVE_SATURATION);
+        pause();
+        finishSensor();
+        return;
+    }
 	
     rtd[curSensor]->add(value);
     //rtd[curSensor]->addLP(value);
@@ -310,31 +323,51 @@ void SensorBoard::adcInterrupt() {
 	{
         pause();
 
-		//temperatureADC = board.ads1120.readInternalTemp();	// T°C interne de l'ADC
-
-		rtd[curSensor]->compute();
-
-        mux.disableChannel(curSensor);
-		curSensor++;
-        //Serial.print(curSensor);Serial.print("  |  ");Serial.print(numSensors);
-        // If all inputs RTDs are finished, we flag newMeasurement available
-        // Toutes les entrées sont mesurées : la température ADC est lue à
-        // l'IRQ suivante, qui signalera newMeasurement et relancera le cycle.
-        if( curSensor == numSensors ) {
-            curSensor = 0;
-            startAdcTemperature();
-        }
-        else {
-            setWiringRoute(rtd[curSensor]->settings);
-
-            // relance de la conversion continue
-            restart();
-        }
+        if (rtd[curSensor]->needsRangeDiagnostic())
+            startRangeDiagnostic();
+        else
+            finishSensor();
     }
 
     #ifdef PRINT_CONVERSION_TIME
         Serial.println((micros()-time));
     #endif
+}
+
+void SensorBoard::finishSensor()
+{
+    rtd[curSensor]->compute();
+
+    mux.disableChannel(curSensor);
+    curSensor++;
+
+    // Toutes les entrées sont mesurées : la température ADC est lue à
+    // l'IRQ suivante, qui signalera newMeasurement et relancera le cycle.
+    if (curSensor == numSensors)
+    {
+        curSensor = 0;
+        startAdcTemperature();
+    }
+    else
+    {
+        setWiringRoute(rtd[curSensor]->settings);
+
+        // relance de la conversion continue
+        restart();
+    }
+}
+
+void SensorBoard::startRangeDiagnostic()
+{
+    // pause() a déjà repassé l'ADC en single-shot. Même voie et même
+    // routage, seul le gain change ; restart() ignore les conversions
+    // d'établissement (environ 16 ms en tout, uniquement après une saturation).
+    Sensor::Settings extended = rtd[curSensor]->settings;
+    extended.range = Sensor::Range::Extended;
+
+    adc.setGain(Sensor::adcGain(extended));
+    diagnosingRange = true;
+    restart();
 }
 
 void SensorBoard::startAdcTemperature()
@@ -377,9 +410,17 @@ double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
 
     const CalibrationProfile& calibration = calibrationFor(rtdSensor.settings.type);
 
-    const double_t gain = measurementGain(rtdSensor.settings.wiring);
+    const double_t gain = Sensor::measurementGain(rtdSensor.settings);
 
-    const double_t correctedValue = rtdSensor.readValue() - settings.zeroOffset[channel];
+    /*
+     * N0 est mesuré en 4 fils, au gain ADC de l'étendue précise. Le décalage
+     * vient de l'entrée : en points ADC, il est proportionnel au gain ADC.
+     */
+    const double_t zeroOffset =
+        settings.zeroOffset[channel] *
+        Sensor::adcGain(rtdSensor.settings) / RTD_PRECISE_GAIN;
+
+    const double_t correctedValue = rtdSensor.readValue() - zeroOffset;
 
     double_t Rrtd = correctedValue * calibration.refResistanceValue / (ADC_FULL_SCALE * gain);
 
@@ -389,8 +430,9 @@ double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
 
     //Rrtd = Rrtd * (1 + ppm/1000000.0);
 
-    // Une résistance nulle ou négative signale un court-circuit ou un câblage inversé.
-    return Rrtd > 0.0 ? Rrtd : NAN;
+    // Valeur brute, éventuellement nulle ou négative : Resistance la classe
+    // (court-circuit, hors étendue). NaN si l'acquisition n'a pas abouti.
+    return Rrtd;
 }
 
 uint8_t SensorBoard::thermocoupleGain(Physics::Thermocouple::Type type)
@@ -792,8 +834,7 @@ bool SensorBoard::calibrateReference(
     const double_t calibratedReference =
         calibration.calResistanceValue *
         ADC_FULL_SCALE *
-        measurementGain(
-            Sensor::Wiring::FourWire) /
+        RTD_PRECISE_GAIN /
         correctedValue;
 
     const double_t nominalReference =
@@ -851,6 +892,7 @@ bool SensorBoard::readCalibrationSamples(
     resetAcquisition();
     curSensor = channel;
 
+    // Étendue précise par défaut : N0 et Rref sont pris au gain de référence.
     Sensor::Settings calibrationSettings{
         type,
         Sensor::Wiring::FourWire,
@@ -952,21 +994,6 @@ uint16_t SensorBoard::conversionsToDiscard() const
     return 1;
 }
 
-double_t SensorBoard::measurementGain(
-    Sensor::Wiring wiring)
-{
-    switch (wiring)
-    {
-    case Sensor::Wiring::TwoWire:
-    case Sensor::Wiring::ThreeWire:
-    case Sensor::Wiring::FourWire:
-        return 8.0;
-        
-    default:
-        return 1.0;
-    }
-}
-
 void SensorBoard::resetAcquisition()
 {
     pauseInterrupts = true;
@@ -976,6 +1003,7 @@ void SensorBoard::resetAcquisition()
     // Une mesure de température ADC interrompue ne doit pas laisser l'ADC
     // en mode capteur interne pour le cycle suivant.
     measuringAdcTemperature = false;
+    diagnosingRange = false;
     adc.setTemperatureMode(TEMP_OFF);
 
     for (uint8_t i = 0; i < MAX_RTD; i++)

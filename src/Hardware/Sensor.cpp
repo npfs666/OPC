@@ -36,6 +36,19 @@ namespace
         }
     };
 
+    constexpr ParameterOption RANGE_OPTIONS[] = {
+        {
+            static_cast<int32_t>(
+                Sensor::Range::Precise),
+            "-200..280°C"
+        },
+        {
+            static_cast<int32_t>(
+                Sensor::Range::Extended),
+            "-200..850°C"
+        }
+    };
+
     constexpr ParameterOption SAMPLE_OPTIONS[] = {
         {2, "2"},
         {4, "4"},
@@ -117,9 +130,15 @@ void Sensor::begin(
     reset();
 }
 
+void Sensor::trackSaturation(int32_t value)
+{
+    saturatedHigh |= value >= 32767;
+    saturatedLow |= value <= -32768;
+}
+
 void Sensor::add(int32_t value)
 {
-    saturated |= value <= -32768 || value >= 32767;
+    trackSaturation(value);
     sum += value;
     sampleCount++;
 }
@@ -130,7 +149,7 @@ void Sensor::add(int32_t value)
  */
 void Sensor::addLP(int32_t value)
 {
-    saturated |= value <= -32768 || value >= 32767;
+    trackSaturation(value);
     if( nMinusOneValue == 0 ) 
         nMinusOneValue = value;
     else
@@ -142,21 +161,68 @@ void Sensor::addLP(int32_t value)
 void Sensor::reset()
 {
     avgValue = NAN;
-    saturated = false;
+    lastAcquisition = MeasurementStatus::NotReady;
+    saturatedHigh = false;
+    saturatedLow = false;
+    readableAtExtendedGain = false;
     sum = 0.0;
     sampleCount = 0.0;
     nMinusOneValue = 0.0;
 }
 void Sensor::compute()
 {
-    const double_t result = sampleCount > 0 && !saturated
+    MeasurementStatus status = MeasurementStatus::Ok;
+
+    if (sampleCount == 0)
+        status = MeasurementStatus::NotReady;
+    // La saturation haute, signature d'une ligne ouverte, est prioritaire.
+    else if (saturatedHigh)
+        status = readableAtExtendedGain
+            ? MeasurementStatus::OverRange
+            : MeasurementStatus::Open;
+    else if (saturatedLow)
+        status = MeasurementStatus::Invalid;
+
+    const double_t result = status == MeasurementStatus::Ok
         ? sum / sampleCount : NAN;
     reset();
     avgValue = result;
+    lastAcquisition = status;
 }
 double_t Sensor::readValue() const
 {
     return avgValue;
+}
+
+MeasurementStatus Sensor::acquisitionStatus() const
+{
+    return lastAcquisition;
+}
+
+uint8_t Sensor::measurementGain(const Settings& settings)
+{
+    return settings.range == Range::Extended
+        ? RTD_EXTENDED_GAIN
+        : RTD_PRECISE_GAIN;
+}
+
+uint8_t Sensor::adcGain(const Settings& settings)
+{
+    return settings.wiring == Wiring::ThreeWire
+        ? 2 * measurementGain(settings)
+        : measurementGain(settings);
+}
+
+bool Sensor::needsRangeDiagnostic() const
+{
+    return settings.type != Type::Tc &&
+           settings.range == Range::Precise &&
+           saturatedHigh;
+}
+
+void Sensor::setRangeDiagnostic(bool readableAtExtendedGain)
+{
+    this->readableAtExtendedGain = readableAtExtendedGain;
 }
 
 bool Sensor::isAccumulationHalfWay()
@@ -219,6 +285,12 @@ void Sensor::registerParameters(ParameterList& list)
             "Câblage",
             settings.wiring,
             WIRING_OPTIONS);
+
+        parameters.addSelection(
+            "sensor.range",
+            "Plage",
+            settings.range,
+            RANGE_OPTIONS);
 
     }
 

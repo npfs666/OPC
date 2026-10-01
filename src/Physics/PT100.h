@@ -27,6 +27,19 @@ public:
      */
     static double_t getResistanceToTemperatureNewton(double_t resistance);
 
+    /**
+     * @brief Résistance d'une PT100 à une température donnée
+     *        (Callendar-Van Dusen, IEC 60751)
+     *
+     * @param temperature Température en °C
+     * @return Résistance en ohms (pas de contrôle de plage)
+     */
+    static double_t getTemperatureToResistance(double_t temperature);
+
+    // Étendue de la norme IEC 60751.
+    static constexpr double_t MINIMUM_TEMPERATURE = -200.0;
+    static constexpr double_t MAXIMUM_TEMPERATURE = 850.0;
+
 private:
 
     /*

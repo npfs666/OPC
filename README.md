@@ -159,16 +159,27 @@ Points à retenir :
 
 `printHomeScreen()` reçoit un `HomeScreenContext` contenant l'écran
 (`context.display`, API Adafruit GFX), un indicateur `fullRefresh` et le
-snapshot des données :
+snapshot des données. `MeasurementDisplay::print()`
+([hmi/MeasurementDisplay.h](src/hmi/MeasurementDisplay.h)) affiche une mesure
+au curseur courant : sa valeur et son unité, ou son état en couleur si elle
+est invalide (voir [Défauts de mesure](#défauts-de-mesure)).
 
 ```cpp
-const MeasurementSample* s = context.snapshot.find(temperature);
+#include <hmi/MeasurementDisplay.h>
 
-if (s == nullptr || !s->valid)
-    context.display.print("--.-");
-else
-    context.display.print(s->value, s->decimals);
+context.display.setCursor(8, 48);
+context.display.setTextSize(3);
+
+MeasurementDisplay::print(
+    context.display,
+    context.snapshot.find(temperature),
+    0xFFFF,     // couleur de la valeur
+    0x0000,     // fond
+    7);         // place disponible : au-delà, libellé court ("RUPT")
 ```
+
+`MeasurementDisplay::format()` et `MeasurementDisplay::color()` donnent le
+texte et la couleur séparément, par exemple pour centrer le texte.
 
 Utilisez uniquement le snapshot pour lire les valeurs, jamais les objets
 directement (ils appartiennent à l'autre cœur).
@@ -396,6 +407,18 @@ Notes sur les mesures :
   l'ADC et le bornier.
 - L'humidité psychrométrique se calcule à partir d'une température sèche,
   d'une température humide et de la pression (`Psychrometer`).
+- Une PT100 ou PT1000 se mesure sur l'une des deux plages suivantes,
+  choisies dans `Input > <sonde> > Plage` :
+
+  | Plage | Gain | Étendue | Usage |
+  | --- | --- | --- | --- |
+  | `-200..280°C` (défaut) | 8 | -200 à environ +280 °C | Chauffage, eau, air : meilleure résolution |
+  | `-200..850°C` | 4 | Toute la norme, -200 à +850 °C | Fours, fumées : pas de quantification deux fois plus grand |
+
+  Pour changer la valeur par défaut dans une installation, après
+  `begin()` : `sonde.settings.range = Sensor::Range::Extended;`. La consigne
+  d'un PID est limitée à 250 °C par défaut : l'élargir avec
+  `setSetpointLimits()`.
 
 Les tailles des listes internes sont fixes (pas d'allocation dynamique) et
 réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 16 régulateurs,
@@ -430,6 +453,11 @@ valeur invalide reste dans le menu pour correction.
 Une mesure de calibration instable ou hors plage est rejetée sans écraser la
 calibration existante.
 
+Les calibrations se font sur la plage `-200..280°C` et valent aussi pour la
+plage `-200..850°C` : Rref ne dépend pas du gain, et N0, mesuré en points ADC,
+est mis à l'échelle du gain de chaque entrée (deux fois plus de points en
+3 fils, deux fois moins sur la plage large).
+
 ### Horloge
 
 `Divers > Horloge` affiche et règle la date et l'heure locales. `Valider`
@@ -454,6 +482,41 @@ La configuration est sauvegardée dans la flash (LittleFS). Branchée à un PC,
 la carte apparaît comme un petit disque USB contenant une copie `config.json`,
 en plus du port série. Cette copie est **en lecture seule** : la modifier
 depuis le PC ne change pas la configuration.
+
+## Défauts de mesure
+
+Chaque mesure porte un état (`getStatus()`, `MeasurementStatus`) en plus de
+sa valeur. Seul l'état `Ok` rend la mesure valide ; dans tous les autres cas,
+les régulateurs mettent leurs sorties en état sûr, comme avant.
+
+| État | Écran (long / court) | Cause |
+| --- | --- | --- |
+| `NotReady` | `...` (gris) | Pas encore de mesure depuis le démarrage |
+| `Open` | `RUPTURE` / `RUPT` (rouge) | ADC saturé vers le haut : sonde ou ligne coupée |
+| `Short` | `C-CIRCUIT` / `C-C` (rouge) | Résistance < 10 Ω (PT100), < 100 Ω (PT1000) |
+| `UnderRange` | `TROP BAS` / `BAS` (orange) | Sous l'étendue : RTD sous -200 °C, thermocouple sous son domaine NIST |
+| `OverRange` | `TROP HAUT` / `HAUT` (orange) | Au-dessus de l'étendue : RTD au-delà de sa plage (environ 280 ou 850 °C), thermocouple au-delà de son domaine NIST |
+| `Invalid` | `ERREUR` / `ERR` (rouge) | ADC saturé vers le bas (câblage inversé), jonction froide inconnue, calcul impossible |
+
+- **Thermocouple** : la polarisation 1 MΩ (+ vers VCC, − vers GND) sature
+  l'entrée quand le thermocouple est ouvert. Un court-circuit au bornier
+  (température de la jonction froide affichée) et une inversion de polarité
+  ne sont pas détectables.
+- **RTD** : une ligne ouverte sature la source de courant, mais un
+  dépassement de la plage `-200..280°C` sature aussi l'ADC. Après une
+  saturation sur cette plage, une conversion supplémentaire au gain de la
+  plage large (environ 16 ms) les départage : lisible, l'entrée est
+  `TROP HAUT` ; encore saturée, elle est en `RUPTURE`. Sur la plage
+  `-200..850°C`, une saturation est forcément une rupture.
+- Les mesures calculées reprennent l'état de leur source : une température
+  RTD affiche la rupture de sa résistance, une humidité psychrométrique celle
+  de la sonde sèche ou humide.
+- Le port série affiche l'état à la place de la valeur, et une ligne à chaque
+  changement d'état, par exemple `[12345 ms] Temperature : OK -> RUPTURE`.
+  Le passage `...` -> `OK` du démarrage n'est pas journalisé.
+
+Pour une mesure personnalisée, appeler `setStatus()` avec la cause plutôt que
+`setValid(false)`, qui donne `Invalid`.
 
 ## Sécurité
 

@@ -3,6 +3,8 @@
 
 #include <cmath>
 
+#include <Measurements/MeasurementStatus.h>
+
 class Pressure;
 class Temperature;
 
@@ -17,6 +19,12 @@ public:
                  const Pressure& pressure);
 
     bool isValid() const;
+
+    /**
+     * Ok si les trois entrées sont exploitables ; sinon l'état de la
+     * première entrée en défaut (sèche, humide, pression), ou Invalid.
+     */
+    MeasurementStatus status() const;
 
     double_t relativeHumidity() const;
 

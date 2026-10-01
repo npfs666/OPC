@@ -8,6 +8,8 @@
 #include <Regulator/Regulator.h>
 #include <hmi/ParameterList.h>
 
+#include <cstdio>
+
 ProcessControl::ProcessControl()
 {
     measurementCount = 0;
@@ -158,10 +160,79 @@ void ProcessControl::updateMeasurementsAndRegulators(
             measurements[i]->update();
     }
 
+    recordStatusChanges(now);
+
     for (uint8_t i = 0; i < regulatorCount; i++)
         regulators[i]->update(now);
 
     poll(now);
+}
+
+void ProcessControl::recordStatusChanges(uint32_t now)
+{
+    for (uint8_t i = 0; i < measurementCount; i++)
+    {
+        if (measurements[i] == nullptr)
+            continue;
+
+        const MeasurementStatus status =
+            measurements[i]->getStatus();
+
+        const MeasurementStatus previous = loggedStatus[i];
+
+        if (status == previous)
+            continue;
+
+        loggedStatus[i] = status;
+
+        if (previous == MeasurementStatus::NotReady &&
+            status == MeasurementStatus::Ok)
+            continue;
+
+        if (statusEventCount >= MAX_STATUS_EVENTS)
+        {
+            if (lostStatusEvents < UINT16_MAX)
+                lostStatusEvents++;
+            continue;
+        }
+
+        statusEvents[statusEventCount++] = {now, i, previous, status};
+    }
+}
+
+void ProcessControl::printStatusEvents(Stream& stream)
+{
+    char line[96];
+
+    for (uint8_t i = 0; i < statusEventCount; i++)
+    {
+        const StatusEvent& event = statusEvents[i];
+
+        std::snprintf(
+            line,
+            sizeof(line),
+            "[%lu ms] %s : %s -> %s",
+            static_cast<unsigned long>(event.time),
+            measurements[event.measurement]->getName(),
+            measurementStatusLabel(event.from),
+            measurementStatusLabel(event.to));
+
+        stream.println(line);
+    }
+
+    if (lostStatusEvents > 0)
+    {
+        std::snprintf(
+            line,
+            sizeof(line),
+            "(%u changement(s) d'etat non journalise(s))",
+            static_cast<unsigned>(lostStatusEvents));
+
+        stream.println(line);
+    }
+
+    statusEventCount = 0;
+    lostStatusEvents = 0;
 }
 
 void ProcessControl::poll(uint32_t now)

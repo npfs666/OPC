@@ -34,12 +34,15 @@ fi
     "${project_dir}/test/host/test_pwm.cpp" \
     "${project_dir}/test/host/test_digital_input.cpp" \
     "${project_dir}/test/host/test_schedule.cpp" \
+    "${project_dir}/test/host/test_measurement_status.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
     "${project_dir}/src/Hardware/Sensor.cpp" \
     "${project_dir}/src/Installation.cpp" \
     "${project_dir}/src/hmi/Displayable.cpp" \
+    "${project_dir}/src/hmi/DisplayTextCodec.cpp" \
+    "${project_dir}/src/hmi/MeasurementDisplay.cpp" \
     "${project_dir}/src/hmi/MenuBuilder.cpp" \
     "${project_dir}/src/hmi/ParameterEditor.cpp" \
     "${project_dir}/src/hmi/ParameterList.cpp" \
