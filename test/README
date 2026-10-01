@@ -28,6 +28,9 @@ Ils couvrent actuellement :
 - la détection de l'alerte horloge dans le snapshot.
 - les plages RTD : gains ADC selon le câblage et la plage, diagnostic de
   saturation (rupture ou dépassement) ;
+- les temps minimaux de marche et d'arrêt des relais (démarrage, état sûr
+  prioritaire, validation du menu, attente dans le snapshot) et l'impulsion
+  minimale de l'actionneur temporel ;
 - les états de mesure : acquisition (saturations), classement des
   résistances RTD, thermocouple ouvert ou hors domaine, propagation,
   affichage (libellés, couleurs), journal des changements et snapshot.

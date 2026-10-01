@@ -5,28 +5,77 @@
 #include <ProcessControl.h>
 
 #include <Adafruit_GFX.h>
-#include <PrintSize.h>
 
-#include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
 #include <hmi/MeasurementDisplay.h>
+#include <hmi/TextField.h>
 #include <ProcessSnapshot.h>
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace
 {
     constexpr uint16_t COLOR_BLACK = 0x0000;
     constexpr uint16_t COLOR_WHITE = 0xFFFF;
+    constexpr uint16_t COLOR_GREY = 0x8410;
+    constexpr uint16_t COLOR_CYAN = 0x07FF;
     constexpr uint16_t COLOR_GREEN = 0x07E0;
-    constexpr uint16_t COLOR_RED = 0xF800;
+    constexpr uint16_t COLOR_DARK_GREEN = 0x03E0;
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
 
-    constexpr int16_t BORDER_SIZE = 2;
-    constexpr int16_t ACTUAL_TEMPERATURE_Y = 24;
-    constexpr int16_t SETPOINT_Y = 91;
-    constexpr int16_t OUTPUT_Y = 166;
+    using TextField::Align;
+
+    // Écran d'accueil 240 × 240, champs à largeur fixe (voir TextField).
+    constexpr int16_t SCREEN_WIDTH = 240;
+    constexpr int16_t MARGIN = 8;
+    constexpr int16_t RIGHT = 232;              // bord droit des valeurs
+
+    constexpr int16_t HEADER_Y = 8;             // taille 2
+    constexpr int16_t SEPARATOR_Y = 30;
+    constexpr int16_t MEASUREMENT_Y = 42;       // zone de 48 px
+    constexpr int16_t MEASUREMENT_HEIGHT = 48;
+    constexpr int16_t SETPOINT_Y = 104;         // taille 2
+    constexpr int16_t GAUGE_Y = 138;
+    constexpr int16_t GAUGE_HEIGHT = 14;
+    constexpr int16_t MARKER_OVERHANG = 5;      // repère plus haut que la jauge
+    constexpr int16_t RELAY_Y = 172;            // taille 2
+    constexpr int16_t SAFETY_Y = 208;           // taille 2
+
+    /*
+     * Mesure : nombre en taille 6 (36 × 48 px par caractère) et unité en
+     * taille 3, en exposant. Un défaut capteur s'affiche en taille 4 pour
+     * garder son libellé complet ("RUPTURE", "C-CIRCUIT").
+     */
+    constexpr uint8_t NUMBER_SIZE = 6;
+    constexpr size_t NUMBER_CHARS = 5;          // "123.4", "-12.5"
+    constexpr uint8_t UNIT_SIZE = 3;
+    constexpr int16_t UNIT_GAP = 6;
+    constexpr int16_t NUMBER_X =
+        (SCREEN_WIDTH -
+         TextField::pixelWidth(NUMBER_CHARS, NUMBER_SIZE) -
+         UNIT_GAP -
+         TextField::pixelWidth(2, UNIT_SIZE)) / 2;
+    constexpr uint8_t STATUS_LABEL_SIZE = 4;
+    constexpr size_t STATUS_LABEL_CHARS = 9;
+
+    constexpr size_t LABEL_CHARS = 8;           // "Consigne"
+    constexpr size_t VALUE_CHARS = 9;           // "-123.4 °C"
+    constexpr size_t TIME_CHARS = 5;            // "14:32"
+    constexpr size_t SAFETY_CHARS = 8;          // "SECURITE"
+
+    /*
+     * Jauge : bande d'hystérésis (vert foncé) autour de la consigne (trait
+     * vert), repère blanc à la mesure. L'échelle couvre consigne ± 2 ×
+     * hystérésis, au moins ± 1 K ; au-delà, le repère reste en butée.
+     */
+    constexpr int16_t GAUGE_LEFT = MARGIN;
+    constexpr int16_t GAUGE_WIDTH = RIGHT - MARGIN;
+    constexpr double_t GAUGE_MIN_HALF_SPAN = 1.0;
+
+    constexpr const char* DEGREES_C = "\xF8" "C"; // "°C" en CP437
 
     constexpr const char* RAMP_OWNER_KEY =
         "thermostat.ramp";
@@ -34,176 +83,22 @@ namespace
     constexpr const char* RAMP_OWNER_NAME =
         "Rampe thermostat";
 
-    void printCenteredText(
+    // Champ de valeur aligné sur le bord droit.
+    void printValue(
         Adafruit_GFX& display,
         int16_t y,
-        uint8_t textSize,
         uint16_t color,
         const char* text)
     {
-        display.setTextSize(textSize);
-
-        int16_t boundsX = 0;
-        int16_t boundsY = 0;
-        uint16_t boundsWidth = 0;
-        uint16_t boundsHeight = 0;
-
-        display.getTextBounds(
-            text,
-            0,
+        TextField::print(
+            display,
+            RIGHT - TextField::pixelWidth(VALUE_CHARS, 2),
             y,
-            &boundsX,
-            &boundsY,
-            &boundsWidth,
-            &boundsHeight);
-
-        const int16_t x =
-            static_cast<int16_t>(
-                (display.width() -
-                 boundsWidth) /
-                2);
-
-        display.setCursor(x, y);
-        display.setTextColor(
+            2,
             color,
-            COLOR_BLACK);
-        display.print(text);
-    }
-
-    void printCenteredTemperature(
-        Adafruit_GFX& display,
-        int16_t y,
-        uint8_t textSize,
-        uint16_t color,
-        double_t value,
-        uint8_t decimals,
-        bool valid)
-    {
-        char unit[8] = {};
-
-        DisplayTextCodec::utf8ToCp437(
-            "°C",
-            unit,
-            sizeof(unit));
-
-        const bool valueIsValid =
-            valid &&
-            std::isfinite(value);
-
-        PrintSize printSize;
-
-        const size_t valueLength =
-            valueIsValid
-                ? printSize.print(value, decimals)
-                : std::strlen("--.-");
-
-        const size_t textLength =
-            valueLength +
-            1 +
-            std::strlen(unit);
-
-        constexpr int16_t CHARACTER_WIDTH = 6;
-
-        const int16_t textWidth =
-            static_cast<int16_t>(
-                textLength *
-                CHARACTER_WIDTH *
-                textSize);
-
-        const int16_t x =
-            textWidth < display.width()
-                ? (display.width() - textWidth) / 2
-                : 0;
-
-        display.setCursor(x, y);
-        display.setTextSize(textSize);
-        display.setTextColor(
-            color,
-            COLOR_BLACK);
-
-        if (valueIsValid)
-            display.print(value, decimals);
-        else
-            display.print("--.-");
-
-        display.print(' ');
-        display.print(unit);
-    }
-
-    void printActualTemperature(
-        Adafruit_GFX& display,
-        const MeasurementSample* sample)
-    {
-        display.fillRect(
-            BORDER_SIZE,
-            ACTUAL_TEMPERATURE_Y - 2,
-            display.width() -
-                2 * BORDER_SIZE,
-            36,
-            COLOR_BLACK);
-
-        // Taille 4 : 9 caractères tiennent dans la largeur de l'écran.
-        char text[24];
-
-        MeasurementDisplay::format(
-            sample,
             text,
-            sizeof(text),
-            9);
-
-        printCenteredText(
-            display,
-            ACTUAL_TEMPERATURE_Y,
-            4,
-            MeasurementDisplay::color(
-                sample,
-                COLOR_RED),
-            text);
-    }
-
-    void printSetpoint(
-        Adafruit_GFX& display,
-        double_t setpoint)
-    {
-        display.fillRect(
-            BORDER_SIZE,
-            SETPOINT_Y - 2,
-            display.width() -
-                2 * BORDER_SIZE,
-            36,
-            COLOR_BLACK);
-
-        printCenteredTemperature(
-            display,
-            SETPOINT_Y,
-            4,
-            COLOR_GREEN,
-            setpoint,
-            1,
-            std::isfinite(setpoint));
-    }
-
-    void printOutputState(
-        Adafruit_GFX& display,
-        bool outputIsOn)
-    {
-        display.fillRect(
-            BORDER_SIZE,
-            OUTPUT_Y - 2,
-            display.width() -
-                2 * BORDER_SIZE,
-            28,
-            COLOR_BLACK);
-
-        if (!outputIsOn)
-            return;
-
-        printCenteredText(
-            display,
-            OUTPUT_Y,
-            3,
-            COLOR_ORANGE,
-            "OUTPUT 1");
+            VALUE_CHARS,
+            Align::Right);
     }
 }
 
@@ -303,6 +198,27 @@ bool ThermostatInstallation::begin(
     return true;
 }
 
+void ThermostatInstallation::captureHomeScreenState()
+{
+    homeState.mode = thermostat.settings.mode;
+    homeState.hysteresis = thermostat.settings.hysteresis;
+    homeState.commandValid = thermostat.isCommandValid();
+
+    const bool rampActive =
+        thermostat.setpointRamp.hasActiveSetpoint();
+
+    homeState.setpoint =
+        rampActive
+            ? thermostat.setpointRamp.activeSetpoint()
+            : thermostat.settings.setpoint;
+
+    homeState.ramping =
+        rampActive &&
+        std::fabs(
+            homeState.setpoint -
+            thermostat.settings.setpoint) > 0.05;
+}
+
 void ThermostatInstallation::printHomeScreen(
     HomeScreenContext& context)
 {
@@ -314,43 +230,307 @@ void ThermostatInstallation::printHomeScreen(
     if (context.fullRefresh)
     {
         display.fillScreen(COLOR_BLACK);
-
         display.drawRect(
             0,
             0,
             display.width(),
             display.height(),
             COLOR_WHITE);
+        display.drawFastHLine(
+            MARGIN,
+            SEPARATOR_Y,
+            RIGHT - MARGIN,
+            COLOR_GREY);
 
-        display.drawRect(
-            1,
-            1,
-            display.width() - 2,
-            display.height() - 2,
+        TextField::print(display, MARGIN, RELAY_Y, 2, COLOR_WHITE, "Relais", LABEL_CHARS);
+
+        measurementDrawn = false;
+        gauge.drawn = false;
+    }
+
+    const bool cooling =
+        homeState.mode == Thermostat::Mode::Cooling;
+
+    // ----- En-tête : sens d'action et heure -----
+
+    TextField::print(
+        display,
+        MARGIN,
+        HEADER_Y,
+        2,
+        cooling ? COLOR_CYAN : COLOR_ORANGE,
+        cooling ? "FROID" : "CHAUD",
+        5);
+
+    char text[24];
+
+    const ClockSample& clock = context.snapshot.clock();
+
+    if (clock.valid)
+    {
+        snprintf(
+            text,
+            sizeof(text),
+            "%02u:%02u",
+            clock.dateTime.hour,
+            clock.dateTime.minute);
+    }
+    else
+    {
+        snprintf(text, sizeof(text), "--:--");
+    }
+
+    TextField::print(
+        display,
+        RIGHT - TextField::pixelWidth(TIME_CHARS, 2),
+        HEADER_Y,
+        2,
+        COLOR_WHITE,
+        text,
+        TIME_CHARS);
+
+    // ----- Mesure -----
+
+    const MeasurementSample* sample =
+        context.snapshot.find(temperature);
+
+    printMeasurement(display, sample);
+
+    // ----- Consigne active ("Rampe" pendant une rampe) -----
+
+    TextField::print(
+        display,
+        MARGIN,
+        SETPOINT_Y,
+        2,
+        COLOR_WHITE,
+        homeState.ramping ? "Rampe" : "Consigne",
+        LABEL_CHARS);
+
+    if (std::isfinite(homeState.setpoint))
+    {
+        snprintf(
+            text,
+            sizeof(text),
+            "%.1f %s",
+            homeState.setpoint,
+            DEGREES_C);
+    }
+    else
+    {
+        snprintf(text, sizeof(text), "--");
+    }
+
+    printValue(display, SETPOINT_Y, COLOR_GREEN, text);
+
+    // ----- Jauge des seuils -----
+
+    printGauge(display, sample);
+
+    // ----- Relais -----
+
+    const OutputSample* relaySample =
+        context.snapshot.find(relayOutput);
+
+    if (relaySample == nullptr || !relaySample->healthy)
+        printValue(display, RELAY_Y, COLOR_GREY, "--");
+    else if (relaySample->appliedCommand >= 0.5)
+        printValue(display, RELAY_Y, COLOR_GREEN, "ON");
+    else if (relaySample->waitingToStart())
+        printValue(display, RELAY_Y, COLOR_ORANGE, "ATTENTE");
+    else
+        printValue(display, RELAY_Y, COLOR_GREY, "OFF");
+
+    // ----- Relais forcé en état sûr (pas de commande valide) -----
+
+    TextField::print(
+        display,
+        (SCREEN_WIDTH - TextField::pixelWidth(SAFETY_CHARS, 2)) / 2,
+        SAFETY_Y,
+        2,
+        COLOR_ORANGE,
+        homeState.commandValid ? "" : "SECURITE",
+        SAFETY_CHARS,
+        Align::Center);
+}
+
+void ThermostatInstallation::printMeasurement(
+    Adafruit_GFX& display,
+    const MeasurementSample* sample)
+{
+    const bool asNumber =
+        sample != nullptr &&
+        sample->valid &&
+        std::isfinite(sample->value);
+
+    // Le nombre et le libellé d'état n'ont pas la même taille : on efface
+    // la zone quand on passe de l'un à l'autre.
+    if (!measurementDrawn || asNumber != measurementAsNumber)
+    {
+        display.fillRect(
+            MARGIN,
+            MEASUREMENT_Y,
+            RIGHT - MARGIN,
+            MEASUREMENT_HEIGHT,
+            COLOR_BLACK);
+    }
+
+    measurementDrawn = true;
+    measurementAsNumber = asNumber;
+
+    char text[24];
+
+    if (!asNumber)
+    {
+        MeasurementDisplay::format(
+            sample,
+            text,
+            sizeof(text),
+            STATUS_LABEL_CHARS);
+
+        TextField::print(
+            display,
+            (SCREEN_WIDTH -
+                TextField::pixelWidth(STATUS_LABEL_CHARS, STATUS_LABEL_SIZE)) / 2,
+            MEASUREMENT_Y + 8,
+            STATUS_LABEL_SIZE,
+            MeasurementDisplay::color(sample, COLOR_WHITE),
+            text,
+            STATUS_LABEL_CHARS,
+            Align::Center);
+        return;
+    }
+
+    // Une décimale ; aucune si la valeur ne tient pas (-123.4).
+    snprintf(text, sizeof(text), "%.1f", sample->value);
+
+    if (std::strlen(text) > NUMBER_CHARS)
+        snprintf(text, sizeof(text), "%.0f", sample->value);
+
+    TextField::print(
+        display,
+        NUMBER_X,
+        MEASUREMENT_Y,
+        NUMBER_SIZE,
+        COLOR_WHITE,
+        text,
+        NUMBER_CHARS,
+        Align::Right);
+
+    TextField::print(
+        display,
+        NUMBER_X +
+            TextField::pixelWidth(NUMBER_CHARS, NUMBER_SIZE) +
+            UNIT_GAP,
+        MEASUREMENT_Y,
+        UNIT_SIZE,
+        COLOR_WHITE,
+        DEGREES_C,
+        2);
+}
+
+void ThermostatInstallation::printGauge(
+    Adafruit_GFX& display,
+    const MeasurementSample* sample)
+{
+    GaugeState next;
+
+    const double_t hysteresis =
+        std::isfinite(homeState.hysteresis)
+            ? homeState.hysteresis
+            : 0.0;
+
+    const double_t halfSpan =
+        std::max(2.0 * hysteresis, GAUGE_MIN_HALF_SPAN);
+
+    const auto xFor = [&](double_t value) -> int16_t
+    {
+        const double_t ratio =
+            (value - homeState.setpoint + halfSpan) / (2.0 * halfSpan);
+
+        const double_t clamped = constrain(ratio, 0.0, 1.0);
+
+        // Intérieur du cadre, repère de 3 px compris.
+        return static_cast<int16_t>(
+            GAUGE_LEFT + 2 +
+            std::lround(clamped * (GAUGE_WIDTH - 5)));
+    };
+
+    if (std::isfinite(homeState.setpoint))
+    {
+        next.setpointX = xFor(homeState.setpoint);
+        next.bandStart = xFor(homeState.setpoint - hysteresis / 2.0);
+        next.bandEnd = xFor(homeState.setpoint + hysteresis / 2.0);
+
+        if (sample != nullptr &&
+            sample->valid &&
+            std::isfinite(sample->value))
+        {
+            next.markerX = xFor(sample->value);
+        }
+    }
+
+    const bool backgroundChanged =
+        !gauge.drawn ||
+        next.setpointX != gauge.setpointX ||
+        next.bandStart != gauge.bandStart ||
+        next.bandEnd != gauge.bandEnd;
+
+    if (backgroundChanged)
+    {
+        // Fond complet (cadre, bande, consigne), colonne par colonne et sans
+        // effacement préalable : pas de scintillement pendant une rampe.
+        for (int16_t x = GAUGE_LEFT; x < GAUGE_LEFT + GAUGE_WIDTH; x++)
+            drawGaugeColumn(display, next, x);
+    }
+    else if (next.markerX != gauge.markerX && gauge.markerX >= 0)
+    {
+        // Seul le repère a bougé : on restaure le fond sous l'ancien.
+        for (int16_t x = gauge.markerX - 1; x <= gauge.markerX + 1; x++)
+            drawGaugeColumn(display, next, x);
+    }
+
+    if (next.markerX >= 0)
+    {
+        display.fillRect(
+            next.markerX - 1,
+            GAUGE_Y - MARKER_OVERHANG,
+            3,
+            GAUGE_HEIGHT + 2 * MARKER_OVERHANG,
             COLOR_WHITE);
     }
 
-    printActualTemperature(
-        display,
-        context.snapshot.find(
-            temperature));
+    next.drawn = true;
+    gauge = next;
+}
 
-    printSetpoint(
-        display,
-        thermostat.setpointRamp.hasActiveSetpoint()
-            ? thermostat.setpointRamp.activeSetpoint()
-            : thermostat.settings.setpoint);
+void ThermostatInstallation::drawGaugeColumn(
+    Adafruit_GFX& display,
+    const GaugeState& state,
+    int16_t x)
+{
+    // Débords au-dessus et au-dessous du cadre.
+    display.drawFastVLine(x, GAUGE_Y - MARKER_OVERHANG, MARKER_OVERHANG, COLOR_BLACK);
+    display.drawFastVLine(x, GAUGE_Y + GAUGE_HEIGHT, MARKER_OVERHANG, COLOR_BLACK);
 
-    const OutputSample* relaySample =
-        context.snapshot.find(
-            relayOutput);
+    const bool border =
+        x == GAUGE_LEFT ||
+        x == GAUGE_LEFT + GAUGE_WIDTH - 1;
 
-    const bool outputIsOn =
-        relaySample != nullptr &&
-        relaySample->healthy &&
-        relaySample->appliedCommand >= 0.5;
+    if (border)
+    {
+        display.drawFastVLine(x, GAUGE_Y, GAUGE_HEIGHT, COLOR_GREY);
+        return;
+    }
 
-    printOutputState(
-        display,
-        outputIsOn);
+    uint16_t inside = COLOR_BLACK;
+
+    if (state.setpointX >= 0 && x == state.setpointX)
+        inside = COLOR_GREEN;
+    else if (state.setpointX >= 0 && x >= state.bandStart && x <= state.bandEnd)
+        inside = COLOR_DARK_GREEN;
+
+    display.drawPixel(x, GAUGE_Y, COLOR_GREY);
+    display.drawFastVLine(x, GAUGE_Y + 1, GAUGE_HEIGHT - 2, inside);
+    display.drawPixel(x, GAUGE_Y + GAUGE_HEIGHT - 1, COLOR_GREY);
 }

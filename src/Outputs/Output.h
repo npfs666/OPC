@@ -37,6 +37,15 @@ public:
     double_t appliedCommand() const;
     uint32_t lastCommandAt() const;
 
+    /**
+     * Vrai si la sortie retarde la commande demandée (temps minimal de
+     * marche ou d'arrêt d'un relais).
+     */
+    virtual bool isWaiting() const
+    {
+        return false;
+    }
+
     void registerParameters(
         ParameterList& list) override
     {

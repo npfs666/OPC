@@ -101,19 +101,24 @@ void Thermostat::update(uint32_t now)
         activeSetpoint +
         settings.hysteresis / 2.0;
 
+    /*
+     * Dans la bande, l'état précédent est conservé. Sans état précédent
+     * (démarrage, retour du menu ou d'une mesure valide), la sortie part à
+     * l'arrêt plutôt que de rester invalide jusqu'au prochain seuil.
+     */
     switch (settings.mode)
     {
     case Mode::Heating:
         if (value <= lowerThreshold)
             writeCommand(1.0);
-        else if (value >= upperThreshold)
+        else if (value >= upperThreshold || !isCommandValid())
             writeCommand(0.0);
         break;
 
     case Mode::Cooling:
         if (value >= upperThreshold)
             writeCommand(1.0);
-        else if (value <= lowerThreshold)
+        else if (value <= lowerThreshold || !isCommandValid())
             writeCommand(0.0);
         break;
 

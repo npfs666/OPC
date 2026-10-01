@@ -8,88 +8,93 @@
 
 #include <hmi/HomeScreen.h>
 #include <hmi/MeasurementDisplay.h>
+#include <hmi/TextField.h>
 #include <ProcessSnapshot.h>
 
-#include <cstring>
+#include <cmath>
+#include <cstdio>
 
 namespace
 {
     constexpr uint16_t COLOR_BLACK = 0x0000;
     constexpr uint16_t COLOR_WHITE = 0xFFFF;
+    constexpr uint16_t COLOR_GREY = 0x8410;
+    constexpr uint16_t COLOR_CYAN = 0x07FF;
     constexpr uint16_t COLOR_GREEN = 0x07E0;
-    constexpr uint16_t COLOR_RED = 0xF800;
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
 
-    constexpr int16_t BORDER_SIZE = 2;
-    constexpr int16_t LABEL_X = 10;
-    constexpr int16_t VALUE_X = 98;
-    constexpr int16_t VALUE_HEIGHT = 30;
+    using TextField::Align;
 
-    constexpr uint16_t COLOR_CYAN = 0x07FF;
+    // Écran d'accueil 240 × 240, champs à largeur fixe (voir TextField) ;
+    // toutes les lignes en taille 2, tous les 24 px.
+    constexpr int16_t MARGIN = 8;
+    constexpr int16_t RIGHT = 232;          // bord droit des valeurs
 
-    constexpr int16_t COLLECTOR_Y = 16;
-    constexpr int16_t TANK_TOP_Y = 56;
-    constexpr int16_t TANK_BOTTOM_Y = 96;
+    constexpr int16_t HEADER_Y = 8;
+    constexpr int16_t SEPARATOR_1_Y = 30;
+    constexpr int16_t COLLECTOR_Y = 40;
+    constexpr int16_t TANK_TOP_Y = 64;
+    constexpr int16_t TANK_BOTTOM_Y = 88;
+    constexpr int16_t DELTA_Y = 112;
+    constexpr int16_t SEPARATOR_2_Y = 136;
     constexpr int16_t PUMP_Y = 146;
-    constexpr int16_t HEATER_Y = 192;
+    constexpr int16_t HEATER_Y = 170;
 
+    constexpr size_t LABEL_CHARS = 8;       // "Ballon H"
+    constexpr size_t VALUE_CHARS = 9;       // "-123.4 °C", "C-CIRCUIT"
+    constexpr size_t TITLE_CHARS = 8;       // "VACANCES"
+    constexpr size_t TIME_CHARS = 5;        // "14:32"
+
+    // Champ de valeur aligné sur le bord droit.
+    void printValue(
+        Adafruit_GFX& display,
+        int16_t y,
+        uint16_t color,
+        const char* text)
+    {
+        TextField::print(
+            display,
+            RIGHT - TextField::pixelWidth(VALUE_CHARS, 2),
+            y,
+            2,
+            color,
+            text,
+            VALUE_CHARS,
+            Align::Right);
+    }
+
+    // Température à une décimale, ou état du capteur en couleur.
     void printTemperature(
         Adafruit_GFX& display,
         int16_t y,
         const MeasurementSample* sample)
     {
-        display.fillRect(
-            VALUE_X,
-            y,
-            display.width() -
-                VALUE_X -
-                BORDER_SIZE,
-            VALUE_HEIGHT,
-            COLOR_BLACK);
+        char text[24];
 
-        display.setTextSize(3);
-        display.setCursor(VALUE_X, y);
+        if (sample != nullptr)
+        {
+            MeasurementSample rounded = *sample;
+            rounded.decimals = 1;
+            MeasurementDisplay::format(&rounded, text, sizeof(text), VALUE_CHARS);
+        }
+        else
+        {
+            MeasurementDisplay::format(nullptr, text, sizeof(text), VALUE_CHARS);
+        }
 
-        // Taille 3 depuis VALUE_X : 7 caractères avant le bord.
-        MeasurementDisplay::print(
+        printValue(
             display,
-            sample,
-            COLOR_ORANGE,
-            COLOR_BLACK,
-            7);
+            y,
+            MeasurementDisplay::color(sample, COLOR_WHITE),
+            text);
     }
 
-    void printState(
-        Adafruit_GFX& display,
-        int16_t y,
-        const char* text,
-        uint16_t color)
+    bool isUsable(const MeasurementSample* sample)
     {
-        display.fillRect(
-            BORDER_SIZE,
-            y - 2,
-            display.width() -
-                (2 * BORDER_SIZE),
-            VALUE_HEIGHT + 4,
-            COLOR_BLACK);
-
-        constexpr int16_t CHARACTER_WIDTH = 18;
-
-        const int16_t textWidth =
-            static_cast<int16_t>(
-                std::strlen(text) *
-                CHARACTER_WIDTH);
-
-        display.setTextSize(3);
-        display.setCursor(
-            (display.width() - textWidth) / 2,
-            y);
-
-        display.setTextColor(
-            color,
-            COLOR_BLACK);
-
-        display.print(text);
+        return
+            sample != nullptr &&
+            sample->valid &&
+            std::isfinite(sample->value);
     }
 }
 
@@ -285,8 +290,13 @@ bool SolarInstallation::begin(
 
 void SolarInstallation::captureHomeScreenState()
 {
-    homeDischarging = solarRegulator.isDischarging();
-    homeHolidayMode = solarRegulator.settings.holidayMode;
+    homeState.discharging = solarRegulator.isDischarging();
+    homeState.holidayMode = solarRegulator.settings.holidayMode;
+    homeState.startDelta = solarRegulator.settings.startDelta;
+
+    bool offPeak = false;
+    homeState.offPeakKnown = offPeakSchedule.isActive(offPeak);
+    homeState.offPeak = offPeak;
 }
 
 void SolarInstallation::printHomeScreen(
@@ -296,94 +306,142 @@ void SolarInstallation::printHomeScreen(
 
     display.cp437(true);
     display.setTextWrap(false);
-    display.setTextSize(2);
 
     if (context.fullRefresh)
     {
         display.fillScreen(COLOR_BLACK);
-
         display.drawRect(
             0,
             0,
             display.width(),
             display.height(),
             COLOR_WHITE);
+        display.drawFastHLine(MARGIN, SEPARATOR_1_Y, RIGHT - MARGIN, COLOR_GREY);
+        display.drawFastHLine(MARGIN, SEPARATOR_2_Y, RIGHT - MARGIN, COLOR_GREY);
 
-        display.drawRect(
-            1,
-            1,
-            display.width() - 2,
-            display.height() - 2,
-            COLOR_WHITE);
+        const struct
+        {
+            int16_t y;
+            const char* label;
+        } labels[] = {
+            {COLLECTOR_Y, "Capteur"},
+            {TANK_TOP_Y, "Ballon H"},
+            {TANK_BOTTOM_Y, "Ballon B"},
+            {DELTA_Y, "Ecart"},
+            {PUMP_Y, "Pompe"},
+            {HEATER_Y, "Appoint"}
+        };
 
-        display.setTextColor(
-            COLOR_WHITE,
-            COLOR_BLACK);
-
-        display.setCursor(
-            LABEL_X,
-            COLLECTOR_Y);
-        display.print("T cap. :");
-
-        display.setCursor(
-            LABEL_X,
-            TANK_TOP_Y);
-        display.print("T haut :");
-
-        display.setCursor(
-            LABEL_X,
-            TANK_BOTTOM_Y);
-        display.print("T bas  :");
+        for (const auto& row : labels)
+        {
+            TextField::print(
+                display, MARGIN, row.y, 2, COLOR_WHITE, row.label, LABEL_CHARS);
+        }
     }
 
-    printTemperature(
-        display,
-        COLLECTOR_Y,
-        context.snapshot.find(
-            collectorTemperature));
+    char text[24];
 
+    // ----- En-tête : mode et heure -----
+
+    TextField::print(
+        display,
+        MARGIN,
+        HEADER_Y,
+        2,
+        homeState.holidayMode ? COLOR_CYAN : COLOR_WHITE,
+        homeState.holidayMode ? "VACANCES" : "SOLAIRE",
+        TITLE_CHARS);
+
+    const ClockSample& clock = context.snapshot.clock();
+
+    if (clock.valid)
+    {
+        snprintf(
+            text,
+            sizeof(text),
+            "%02u:%02u",
+            clock.dateTime.hour,
+            clock.dateTime.minute);
+    }
+    else
+    {
+        snprintf(text, sizeof(text), "--:--");
+    }
+
+    TextField::print(
+        display,
+        RIGHT - TextField::pixelWidth(TIME_CHARS, 2),
+        HEADER_Y,
+        2,
+        COLOR_WHITE,
+        text,
+        TIME_CHARS);
+
+    // ----- Températures et écart capteur - bas du ballon -----
+
+    const MeasurementSample* collector =
+        context.snapshot.find(collectorTemperature);
+    const MeasurementSample* tankBottom =
+        context.snapshot.find(tankBottomTemperature);
+
+    printTemperature(display, COLLECTOR_Y, collector);
     printTemperature(
         display,
         TANK_TOP_Y,
-        context.snapshot.find(
-            tankTopTemperature));
+        context.snapshot.find(tankTopTemperature));
+    printTemperature(display, TANK_BOTTOM_Y, tankBottom);
 
-    printTemperature(
-        display,
-        TANK_BOTTOM_Y,
-        context.snapshot.find(
-            tankBottomTemperature));
+    if (isUsable(collector) && isUsable(tankBottom))
+    {
+        const double_t delta = collector->value - tankBottom->value;
+
+        snprintf(text, sizeof(text), "%+.1f K", delta);
+
+        // Vert : écart suffisant pour démarrer la charge solaire.
+        printValue(
+            display,
+            DELTA_Y,
+            delta >= homeState.startDelta ? COLOR_GREEN : COLOR_WHITE,
+            text);
+    }
+    else
+    {
+        printValue(display, DELTA_Y, COLOR_GREY, "--");
+    }
+
+    // ----- Pompe -----
 
     const OutputSample* pumpSample =
-        context.snapshot.find(
-            pumpRelay);
+        context.snapshot.find(pumpRelay);
 
-    const bool pumpIsOn =
-        pumpSample != nullptr &&
-        pumpSample->healthy &&
-        pumpSample->appliedCommand >= 0.5;
-
-    if (pumpIsOn && homeDischarging)
-        printState(display, PUMP_Y, "DECHARGE", COLOR_CYAN);
-    else if (pumpIsOn)
-        printState(display, PUMP_Y, "POMPE : ON", COLOR_GREEN);
-    else if (homeHolidayMode)
-        printState(display, PUMP_Y, "VACANCES", COLOR_CYAN);
+    if (pumpSample == nullptr || !pumpSample->healthy)
+        printValue(display, PUMP_Y, COLOR_GREY, "--");
+    else if (pumpSample->appliedCommand >= 0.5)
+    {
+        printValue(
+            display,
+            PUMP_Y,
+            homeState.discharging ? COLOR_CYAN : COLOR_GREEN,
+            homeState.discharging ? "DECHARGE" : "ON");
+    }
+    else if (pumpSample->waitingToStart())
+        printValue(display, PUMP_Y, COLOR_ORANGE, "ATTENTE");
     else
-        printState(display, PUMP_Y, "POMPE : OFF", COLOR_RED);
+        printValue(display, PUMP_Y, COLOR_GREY, "OFF");
+
+    // ----- Appoint électrique -----
 
     const OutputSample* heaterSample =
-        context.snapshot.find(
-            heaterRelay);
+        context.snapshot.find(heaterRelay);
 
-    const bool heaterIsOn =
-        heaterSample != nullptr &&
-        heaterSample->healthy &&
-        heaterSample->appliedCommand >= 0.5;
-
-    printState(
-        display,
-        HEATER_Y,
-        heaterIsOn ? "APPOINT : ON" : "APPOINT : OFF",
-        heaterIsOn ? COLOR_ORANGE : COLOR_RED);
+    if (heaterSample == nullptr || !heaterSample->healthy)
+        printValue(display, HEATER_Y, COLOR_GREY, "--");
+    else if (heaterSample->appliedCommand >= 0.5)
+        printValue(display, HEATER_Y, COLOR_ORANGE, "ON");
+    else if (heaterSample->waitingToStart())
+        printValue(display, HEATER_Y, COLOR_ORANGE, "ATTENTE");
+    else if (homeState.offPeakKnown && !homeState.offPeak)
+        printValue(display, HEATER_Y, COLOR_GREY, "HORS HC");
+    else
+        printValue(display, HEATER_Y, COLOR_GREY, "OFF");
 }

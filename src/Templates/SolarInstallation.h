@@ -78,8 +78,18 @@ private:
     RelayOutput heaterRelay;
 
     // Copie pour le cœur UI, faite par captureHomeScreenState().
-    bool homeDischarging = false;
-    bool homeHolidayMode = false;
+    struct HomeState
+    {
+        bool discharging = false;
+        bool holidayMode = false;
+        double_t startDelta = 0.0;
+
+        // Programme heures creuses : état connu (heure valide) et en cours.
+        bool offPeakKnown = false;
+        bool offPeak = false;
+    };
+
+    HomeState homeState;
 };
 
 #endif

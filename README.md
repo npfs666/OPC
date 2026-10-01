@@ -211,7 +211,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | --- | --- |
 | `ThermostatInstallation` | 1 PT100, thermostat avec hystérésis et rampe de consigne, relais 1 |
 | `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), régulateur solaire avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (relais 2) |
-| `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s) |
+| `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 
 ### PID et autotune
@@ -276,8 +276,8 @@ d'oscillations instables.
 >   puissance et une plage de température prudentes.
 > - Ne jamais choisir `Refroidissement` avec un chauffage raccordé.
 > - Un compresseur ne doit pas être piloté avec la période de 10 s de ce
->   template : il faut un actionneur imposant des temps minimaux de marche et
->   d'arrêt.
+>   template : allonger la période et régler `Marche mini` et `Arrêt mini`
+>   sur son relais (voir [Outputs/README.md](src/Outputs/README.md)).
 > - Les limites de mesure ne protègent que l'autotune : prévoir une sécurité
 >   thermique indépendante.
 

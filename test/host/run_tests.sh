@@ -35,6 +35,7 @@ fi
     "${project_dir}/test/host/test_digital_input.cpp" \
     "${project_dir}/test/host/test_schedule.cpp" \
     "${project_dir}/test/host/test_measurement_status.cpp" \
+    "${project_dir}/test/host/test_relay_timing.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -58,6 +59,7 @@ fi
     "${project_dir}/src/Outputs/ActuatorPWM.cpp" \
     "${project_dir}/src/Outputs/Output.cpp" \
     "${project_dir}/src/Outputs/RelayOutput.cpp" \
+    "${project_dir}/src/Outputs/TimeProportionalActuator.cpp" \
     "${project_dir}/src/Outputs/PWMOutput.cpp" \
     "${project_dir}/src/Physics/PT100.cpp" \
     "${project_dir}/src/Physics/Thermocouple.cpp" \

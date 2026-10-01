@@ -78,10 +78,10 @@ nécessaire.
 
 ### Autres combinaisons
 
-PID sur relais, avec une période de 10 s :
+PID sur relais, avec une période de 10 s et une impulsion minimale de 0,5 s :
 
 ```cpp
-actionneur.begin("pid_actuator", "Commande PID", pid, 10000);   // TimeProportionalActuator
+actionneur.begin("pid_actuator", "Commande PID", pid, 10000, 500);   // TimeProportionalActuator
 relais.begin("pid_relay", "Relais PID", Board::Rp2040::OUTPUT_1, true, false);
 ```
 
@@ -110,6 +110,27 @@ configuration sauvegardée les remplace.
 | Broche | `settings.pin` | Relais 1 ou Relais 2 |
 | Actif à HIGH | `settings.activeHigh` | `true` : HIGH = relais activé |
 | État de sécurité | `settings.safeState` | État logique appliqué en cas de repli |
+| Marche mini | `settings.minOnTime` | 0 à 1800 s par pas de 5 s (0 = sans contrainte) |
+| Arrêt mini | `settings.minOffTime` | 0 à 1800 s par pas de 5 s (0 = sans contrainte) |
+
+**Temps minimaux d'un relais.** Ils protègent un appareil sensible aux cycles
+courts (compresseur, contacteur) :
+
+- un changement demandé n'est appliqué qu'une fois écoulé le temps minimal de
+  l'état en cours, compté depuis le dernier basculement réel. En attendant,
+  l'écran d'accueil des templates affiche `ATTENTE` ;
+- au démarrage, le relais est considéré comme venant de s'arrêter : après une
+  coupure de courant, un compresseur attend `Arrêt mini` avant de repartir ;
+- le passage à l'**état sûr n'attend pas** la marche mini, mais il compte
+  comme un basculement : l'arrêt mini protège le redémarrage suivant. Un état
+  sûr à ON est lui aussi appliqué immédiatement ;
+- la validation du menu met les sorties en état sûr (voir
+  [État sûr](#état-sûr)) : un compresseur s'arrête, puis repart après
+  `Arrêt mini`. Elle ne relance pas les chronos, sauf si la broche change.
+
+Avec un `TimeProportionalActuator`, préférer son `Impulsion mini` : les temps
+minimaux du relais allongent ou suppriment des impulsions et faussent la
+puissance moyenne.
 
 **Menu `Sorties > <nom de la sortie PWM>`** (`PWMOutput`)
 
@@ -134,6 +155,14 @@ donnent un niveau constant, sans impulsions.
 | Paramètre | Champ | Rôle |
 | --- | --- | --- |
 | Période | `settings.period` | 1 s à 1 h, par pas de 1 s |
+| Impulsion mini | `settings.minPulse` | 0 à 60 s par pas de 0,1 s, au plus la moitié de la période (0 = sans contrainte) |
+
+**Impulsion minimale.** Avec une période P et une impulsion minimale m, une
+durée à ON `commande × P` inférieure à m est supprimée, et une coupure
+`P − commande × P` inférieure à m est remplacée par une période entière à ON.
+Les commandes 0 et 1 (autotune) basculent toujours immédiatement. Les
+commandes inférieures à m / P ne chauffent pas : choisir une période assez
+longue devant m (le template PID utilise 0,5 s sur 10 s, soit 5 %).
 
 Le menu refuse d'affecter la même broche à deux sorties. En code, utiliser une
 broche distincte par sortie.
@@ -174,14 +203,15 @@ const bool relaisActif =
     s != nullptr && s->healthy && s->appliedCommand >= 0.5;
 ```
 
-`OutputSample` contient `appliedCommand` (0 à 1, réellement appliquée) et
-`healthy`.
+`OutputSample` contient `appliedCommand` (0 à 1, réellement appliquée),
+`healthy` et `waiting` (commande retardée par un temps minimal).
+`waitingToStart()` indique un relais arrêté qui attend la fin de son arrêt
+minimal pour démarrer.
 
 ## Limites
 
-- `TimeProportionalActuator` n'impose aucun temps minimal de marche ou d'arrêt :
-  il ne convient pas à un compresseur ou à tout appareil sensible aux cycles
-  courts.
+- Un compresseur piloté par un `TimeProportionalActuator` doit avoir une
+  période longue et des temps minimaux réglés sur son relais.
 - Une sortie PWM ne peut utiliser que `OUTPUT_3` ou `OUTPUT_4`. Une autre broche
   fait échouer l'initialisation et le démarrage.
 - Les sorties Modbus ne sont pas encore implémentées.

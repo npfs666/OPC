@@ -18,6 +18,17 @@ namespace FakeDigitalIO
     inline int levels[256] = {};
 }
 
+// Horloge pilotée par les tests.
+namespace FakeTime
+{
+    inline uint32_t milliseconds = 0;
+}
+
+inline uint32_t millis()
+{
+    return FakeTime::milliseconds;
+}
+
 inline void pinMode(uint8_t pin, uint8_t mode)
 {
     FakeDigitalIO::modes[pin] = mode;

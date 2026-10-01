@@ -58,6 +58,18 @@ bool RelayOutput::begin()
     if (safeStateLocked)
         settings.safeState = lockedSafeState;
 
+    // Une nouvelle application des réglages ne relance pas les temps
+    // minimaux ; une nouvelle broche repart comme au démarrage.
+    const bool newPin =
+        !initialized ||
+        configuredPin != settings.pin;
+
+    if (newPin)
+    {
+        lastSwitchTime = millis();
+        setAppliedCommand(0.0);
+    }
+
     if (initialized)
     {
         writePhysicalState(
@@ -94,10 +106,29 @@ void RelayOutput::poll(uint32_t now)
     const bool appliedState =
         appliedCommand() >= 0.5;
 
-    if (requestedState == appliedState)
+    if (requestedState == appliedState ||
+        !minimumTimeElapsed(appliedState))
         return;
 
     applyLogicalState(requestedState);
+}
+
+bool RelayOutput::minimumTimeElapsed(bool appliedState) const
+{
+    const uint32_t minimumMs =
+        (appliedState
+            ? settings.minOnTime
+            : settings.minOffTime) * 1000UL;
+
+    return millis() - lastSwitchTime >= minimumMs;
+}
+
+bool RelayOutput::isWaiting() const
+{
+    return
+        initialized &&
+        (requestedCommand() >= 0.5) !=
+            (appliedCommand() >= 0.5);
 }
 
 void RelayOutput::forceSafe()
@@ -144,6 +175,9 @@ void RelayOutput::lockSafeState(bool safeState)
 
 void RelayOutput::applyLogicalState(bool state)
 {
+    if (state != (appliedCommand() >= 0.5))
+        lastSwitchTime = millis();
+
     writePhysicalState(
         configuredPin,
         state,
@@ -192,6 +226,24 @@ void RelayOutput::registerParameters(
         "État de sécurité",
         settings.safeState,
         safeStateLocked);
+
+    parameters.addInteger(
+        "min_on_time",
+        "Marche mini",
+        settings.minOnTime,
+        0,
+        1800,
+        5,
+        "s");
+
+    parameters.addInteger(
+        "min_off_time",
+        "Arrêt mini",
+        settings.minOffTime,
+        0,
+        1800,
+        5,
+        "s");
 }
 
 bool RelayOutput::validateParameters(

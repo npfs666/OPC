@@ -12,6 +12,13 @@ public:
         uint8_t pin = 0;
         bool activeHigh = true;
         bool safeState = false;
+
+        /*
+         * Temps minimaux en secondes (0 = sans contrainte), comptés depuis le
+         * dernier basculement réel. Le passage à l'état sûr n'attend pas.
+         */
+        uint32_t minOnTime = 0;
+        uint32_t minOffTime = 0;
     };
 
     Settings settings;
@@ -41,6 +48,8 @@ public:
 
     bool isHealthy() const override;
 
+    bool isWaiting() const override;
+
     /**
      * Impose l'état logique de sécurité et interdit sa restauration/édition.
      * Utile lorsqu'un état ON ne peut jamais être considéré comme sûr.
@@ -57,6 +66,9 @@ public:
 private:
     void applyLogicalState(bool state);
 
+    // Temps minimal de l'état appliqué écoulé (horloge millis()).
+    bool minimumTimeElapsed(bool appliedState) const;
+
     static void writePhysicalState(
         uint8_t pin,
         bool logicalState,
@@ -66,6 +78,10 @@ private:
     uint8_t configuredPin = 0;
     bool configuredActiveHigh = true;
     bool configuredSafeState = false;
+
+    // Date (millis()) du dernier basculement, ou de la mise en service : au
+    // démarrage, l'arrêt minimal s'applique avant la première mise en marche.
+    uint32_t lastSwitchTime = 0;
 
     bool safeStateLocked = false;
     bool lockedSafeState = false;

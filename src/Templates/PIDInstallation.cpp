@@ -8,35 +8,45 @@
 #include <Arduino.h>
 
 #include <ProcessSnapshot.h>
-#include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
 #include <hmi/MeasurementDisplay.h>
+#include <hmi/TextField.h>
 
 #include <cmath>
+#include <cstdio>
 
 namespace
 {
     constexpr uint16_t COLOR_BLACK = 0x0000;
     constexpr uint16_t COLOR_WHITE = 0xFFFF;
+    constexpr uint16_t COLOR_GREY = 0x8410;
     constexpr uint16_t COLOR_CYAN = 0x07FF;
     constexpr uint16_t COLOR_GREEN = 0x07E0;
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
 
-    constexpr int16_t LABEL_X = 10;
-    constexpr int16_t VALUE_X = 90;
-    constexpr int16_t VALUE_WIDTH = 145;
+    using TextField::Align;
 
-    constexpr int16_t STATUS_X = 105;
-    constexpr int16_t STATUS_Y = 8;
-    constexpr int16_t STATUS_WIDTH = 125;
-    constexpr int16_t STATUS_HEIGHT = 16;
+    // Écran d'accueil 240 × 240, champs à largeur fixe (voir TextField).
+    constexpr int16_t MARGIN = 8;
+    constexpr int16_t RIGHT = 232;          // bord droit des valeurs
 
-    constexpr int16_t TEMPERATURE_LABEL_Y = 36;
-    constexpr int16_t TEMPERATURE_Y = 52;
-    constexpr int16_t SETPOINT_LABEL_Y = 92;
-    constexpr int16_t SETPOINT_Y = 108;
-    constexpr int16_t OUTPUT_LABEL_Y = 148;
-    constexpr int16_t OUTPUT_Y = 164;
+    constexpr int16_t HEADER_Y = 8;         // taille 2
+    constexpr int16_t SEPARATOR_Y = 30;
+    constexpr int16_t MEASUREMENT_Y = 44;   // taille 4
+    constexpr int16_t SETPOINT_Y = 92;      // taille 2
+    constexpr int16_t OUTPUT_Y = 120;       // taille 2
+    constexpr int16_t BAR_Y = 144;
+    constexpr int16_t BAR_HEIGHT = 14;
+    constexpr int16_t RELAY_Y = 172;        // taille 2
+    constexpr int16_t GAINS_Y = 216;        // taille 1
+
+    constexpr size_t MEASUREMENT_CHARS = 9; // 9 × 24 px = 216 px
+    constexpr size_t LABEL_CHARS = 8;       // "Consigne"
+    constexpr size_t VALUE_CHARS = 9;       // "-123.4 °C"
+    constexpr size_t STATUS_CHARS = 12;     // "TUNE ATTENTE"
+    constexpr size_t GAINS_CHARS = 38;
+
+    constexpr const char* DEGREES_C = "\xF8" "C"; // "°C" en CP437
 
     constexpr const char* AUTOTUNE_OWNER_KEY =
         "tune_pid.autotune";
@@ -50,38 +60,22 @@ namespace
     constexpr const char* RAMP_OWNER_NAME =
         "Rampe PID";
 
-    void prepareValue(
+    // Champ de valeur de taille 2 aligné sur le bord droit.
+    void printValue(
         Adafruit_GFX& display,
         int16_t y,
-        uint16_t color)
+        uint16_t color,
+        const char* text)
     {
-        display.fillRect(
-            VALUE_X,
+        TextField::print(
+            display,
+            RIGHT - TextField::pixelWidth(VALUE_CHARS, 2),
             y,
-            VALUE_WIDTH,
-            30,
-            COLOR_BLACK);
-
-        display.setTextSize(3);
-        display.setCursor(VALUE_X, y);
-        display.setTextColor(
+            2,
             color,
-            COLOR_BLACK);
-    }
-
-    void printUnit(
-        Adafruit_GFX& display,
-        const char* unit)
-    {
-        char encodedUnit[8] = {};
-
-        DisplayTextCodec::utf8ToCp437(
-            unit,
-            encodedUnit,
-            sizeof(encodedUnit));
-
-        display.print(' ');
-        display.print(encodedUnit);
+            text,
+            VALUE_CHARS,
+            Align::Right);
     }
 }
 
@@ -160,7 +154,8 @@ bool PIDInstallation::begin(
         "pid_tune_heater",
         "Actionneur PID",
         pid,
-        10000);
+        10000,
+        500);   // impulsion minimale : 5 % de la période
 
     if (!process.add(actuator))
         return fail("Actionneur PID non enregistré");
@@ -267,6 +262,19 @@ void PIDInstallation::captureHomeScreenState()
 
     homeState.requestedCycles =
         pid.autoTuneSettings.cycles;
+
+    homeState.output = pid.readCommand();
+    homeState.outputValid = pid.isCommandValid();
+
+    homeState.ramping =
+        pid.setpointRamp.hasActiveSetpoint() &&
+        std::fabs(
+            pid.setpointRamp.activeSetpoint() -
+            pid.settings.setpoint) > 0.05;
+
+    homeState.kp = pid.settings.kp;
+    homeState.ti = pid.settings.ti;
+    homeState.td = pid.settings.td;
 }
 
 void PIDInstallation::printHomeScreen(
@@ -276,7 +284,6 @@ void PIDInstallation::printHomeScreen(
 
     display.cp437(true);
     display.setTextWrap(false);
-    display.setTextSize(3);
 
     if (context.fullRefresh)
     {
@@ -287,182 +294,229 @@ void PIDInstallation::printHomeScreen(
             display.width(),
             display.height(),
             COLOR_WHITE);
+        display.drawFastHLine(
+            MARGIN,
+            SEPARATOR_Y,
+            RIGHT - MARGIN,
+            COLOR_GREY);
+        display.drawRect(
+            MARGIN,
+            BAR_Y,
+            RIGHT - MARGIN,
+            BAR_HEIGHT,
+            COLOR_GREY);
 
-        display.setCursor(10, 8);
-        display.setTextColor(
-            COLOR_CYAN,
-            COLOR_BLACK);
-        display.print("PID");
-
-        display.setTextSize(1);
-        display.setCursor(52, 12);
-
-        const bool heatingMode =
-            homeState.mode ==
-                PID::Mode::Heating;
-
-        const bool coolingMode =
-            homeState.mode ==
-                PID::Mode::Cooling;
-
-        display.setTextColor(
-            heatingMode
-                ? COLOR_ORANGE
-                : coolingMode
-                    ? COLOR_CYAN
-                    : COLOR_WHITE,
-            COLOR_BLACK);
-
-        display.print(
-            heatingMode
-                ? "CHAUD"
-                : coolingMode
-                    ? "FROID"
-                    : "ERR");
-
-        display.setTextSize(2);
-
-        display.setTextColor(
-            COLOR_WHITE,
-            COLOR_BLACK);
-
-        display.setCursor(
-            LABEL_X,
-            TEMPERATURE_LABEL_Y);
-        display.print("Temp :");
-
-        display.setCursor(
-            LABEL_X,
-            SETPOINT_LABEL_Y);
-        display.print("SP   :");
-
-        display.setCursor(
-            LABEL_X,
-            OUTPUT_LABEL_Y);
-        display.print("Relais:");
+        TextField::print(display, MARGIN, OUTPUT_Y, 2, COLOR_WHITE, "Sortie", LABEL_CHARS);
+        TextField::print(display, MARGIN, RELAY_Y, 2, COLOR_WHITE, "Relais", LABEL_CHARS);
     }
 
-    display.fillRect(
-        STATUS_X,
-        STATUS_Y,
-        STATUS_WIDTH,
-        STATUS_HEIGHT,
-        COLOR_BLACK);
+    const bool cooling =
+        homeState.mode == PID::Mode::Cooling;
 
-    display.setTextSize(1);
-    display.setCursor(
-        STATUS_X,
-        STATUS_Y + 4);
+    const uint16_t modeColor =
+        cooling ? COLOR_CYAN : COLOR_ORANGE;
 
-    const PID::AutoTuneStatus tuneStatus =
-        homeState.autoTuneStatus;
+    char text[48];
+
+    // ----- En-tête : sens d'action et état de la régulation -----
+
+    TextField::print(
+        display,
+        MARGIN,
+        HEADER_Y,
+        2,
+        modeColor,
+        cooling ? "FROID" : "CHAUD",
+        5);
+
+    const char* status = "ARRET";
+    uint16_t statusColor = COLOR_WHITE;
 
     if (homeState.autoTuneActive)
     {
-        display.setTextColor(
-            COLOR_ORANGE,
-            COLOR_BLACK);
+        statusColor = COLOR_ORANGE;
 
-        if (tuneStatus ==
+        if (homeState.autoTuneStatus ==
             PID::AutoTuneStatus::WaitingForMeasurement)
         {
-            display.print("TUNE ATTENTE");
+            status = "TUNE ATTENTE";
         }
         else
         {
-            display.print("TUNE ");
-            display.print(
-                homeState.completedCycles);
-            display.print('/');
-            display.print(
+            snprintf(
+                text,
+                sizeof(text),
+                "TUNE %u/%u",
+                homeState.completedCycles,
                 homeState.requestedCycles);
+            status = text;
         }
     }
     else if (homeState.pidEnabled)
     {
-        display.setTextColor(
-            COLOR_GREEN,
-            COLOR_BLACK);
-        display.print("PID ACTIF");
+        status = "ACTIF";
+        statusColor = COLOR_GREEN;
     }
-    else if (tuneStatus ==
+    else if (homeState.autoTuneStatus ==
              PID::AutoTuneStatus::Succeeded)
     {
-        display.setTextColor(
-            COLOR_GREEN,
-            COLOR_BLACK);
-        display.print("TUNE OK");
+        status = "TUNE OK";
+        statusColor = COLOR_GREEN;
     }
-    else if (tuneStatus ==
+    else if (homeState.autoTuneStatus ==
              PID::AutoTuneStatus::Failed)
     {
-        display.setTextColor(
-            COLOR_ORANGE,
-            COLOR_BLACK);
-        display.print("TUNE ERREUR");
+        status = "TUNE ERREUR";
+        statusColor = COLOR_ORANGE;
     }
-    else if (tuneStatus ==
+    else if (homeState.autoTuneStatus ==
              PID::AutoTuneStatus::Cancelled)
     {
-        display.setTextColor(
-            COLOR_WHITE,
-            COLOR_BLACK);
-        display.print("TUNE ANNULE");
+        status = "TUNE ANNULE";
+    }
+
+    TextField::print(
+        display,
+        RIGHT - TextField::pixelWidth(STATUS_CHARS, 2),
+        HEADER_Y,
+        2,
+        statusColor,
+        status,
+        STATUS_CHARS,
+        Align::Right);
+
+    // ----- Mesure : valeur ou état du capteur, en grand -----
+
+    const MeasurementSample* sample =
+        context.snapshot.find(temperature);
+
+    size_t length = MeasurementDisplay::format(
+        sample,
+        text,
+        sizeof(text),
+        MEASUREMENT_CHARS);
+
+    // Les décimales sont réduites seulement si la valeur ne tient pas.
+    if (sample != nullptr && length > MEASUREMENT_CHARS)
+    {
+        MeasurementSample shorter = *sample;
+
+        while (length > MEASUREMENT_CHARS &&
+               shorter.decimals > 0)
+        {
+            shorter.decimals--;
+            length = MeasurementDisplay::format(
+                &shorter,
+                text,
+                sizeof(text));
+        }
+    }
+
+    TextField::print(
+        display,
+        (display.width() -
+            TextField::pixelWidth(MEASUREMENT_CHARS, 4)) / 2,
+        MEASUREMENT_Y,
+        4,
+        MeasurementDisplay::color(sample, COLOR_WHITE),
+        text,
+        MEASUREMENT_CHARS,
+        Align::Center);
+
+    // ----- Consigne active ("Rampe" pendant une rampe) -----
+
+    TextField::print(
+        display,
+        MARGIN,
+        SETPOINT_Y,
+        2,
+        COLOR_WHITE,
+        homeState.ramping ? "Rampe" : "Consigne",
+        LABEL_CHARS);
+
+    if (std::isfinite(homeState.setpoint))
+    {
+        snprintf(
+            text,
+            sizeof(text),
+            "%.1f %s",
+            homeState.setpoint,
+            DEGREES_C);
     }
     else
     {
-        display.setTextColor(
-            COLOR_WHITE,
-            COLOR_BLACK);
-        display.print("PID ARRET");
+        snprintf(text, sizeof(text), "--");
     }
 
-    display.setTextSize(2);
+    printValue(display, SETPOINT_Y, COLOR_GREEN, text);
 
-    const MeasurementSample* temperatureSample =
-        context.snapshot.find(temperature);
+    // ----- Commande du PID : valeur et barre -----
 
-    prepareValue(
-        display,
-        TEMPERATURE_Y,
-        COLOR_ORANGE);
+    const bool outputShown =
+        homeState.outputValid &&
+        std::isfinite(homeState.output);
 
-    // Taille 3 sur VALUE_WIDTH : 8 caractères.
-    MeasurementDisplay::print(
-        display,
-        temperatureSample,
-        COLOR_ORANGE,
-        COLOR_BLACK,
-        8);
+    const double_t output =
+        outputShown
+            ? constrain(homeState.output, 0.0, 1.0)
+            : 0.0;
 
-    prepareValue(
-        display,
-        SETPOINT_Y,
-        COLOR_GREEN);
+    if (outputShown)
+        snprintf(text, sizeof(text), "%.0f %%", output * 100.0);
+    else
+        snprintf(text, sizeof(text), "--");
 
-    display.print(
-        homeState.setpoint,
-        1);
-    printUnit(display, "°C");
+    printValue(display, OUTPUT_Y, COLOR_WHITE, text);
+
+    const int16_t barWidth = RIGHT - MARGIN - 2;
+    const int16_t filled =
+        static_cast<int16_t>(std::lround(output * barWidth));
+
+    display.fillRect(
+        MARGIN + 1,
+        BAR_Y + 1,
+        filled,
+        BAR_HEIGHT - 2,
+        modeColor);
+    display.fillRect(
+        MARGIN + 1 + filled,
+        BAR_Y + 1,
+        barWidth - filled,
+        BAR_HEIGHT - 2,
+        COLOR_BLACK);
+
+    // ----- Relais -----
 
     const OutputSample* relaySample =
-        context.snapshot.find(
-            controlRelay);
+        context.snapshot.find(controlRelay);
 
-    const bool relayIsOn =
-        relaySample != nullptr &&
-        relaySample->healthy &&
-        relaySample->appliedCommand >= 0.5;
+    if (relaySample == nullptr || !relaySample->healthy)
+        printValue(display, RELAY_Y, COLOR_GREY, "--");
+    else if (relaySample->appliedCommand >= 0.5)
+        printValue(display, RELAY_Y, COLOR_GREEN, "ON");
+    else if (relaySample->waitingToStart())
+        printValue(display, RELAY_Y, COLOR_ORANGE, "ATTENTE");
+    else
+        printValue(display, RELAY_Y, COLOR_GREY, "OFF");
 
-    prepareValue(
+    // ----- Gains -----
+
+    snprintf(
+        text,
+        sizeof(text),
+        "Kp %.3g  Ti %.0f s  Td %.0f s",
+        homeState.kp,
+        homeState.ti,
+        homeState.td);
+
+    TextField::print(
         display,
-        OUTPUT_Y,
-        relayIsOn
-            ? COLOR_GREEN
-            : COLOR_WHITE);
-
-    display.print(
-        relayIsOn
-            ? "ON"
-            : "OFF");
+        (display.width() -
+            TextField::pixelWidth(GAINS_CHARS, 1)) / 2,
+        GAINS_Y,
+        1,
+        COLOR_GREY,
+        text,
+        GAINS_CHARS,
+        Align::Center);
 }

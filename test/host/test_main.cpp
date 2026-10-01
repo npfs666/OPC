@@ -734,7 +734,9 @@ namespace
             thermostat.setpointRamp.activeSetpoint(),
             20.0,
             0.0001);
-        CHECK_FALSE(thermostat.isCommandValid());
+        // La rampe part de la mesure, dans la bande : départ à l'arrêt.
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
 
         thermostat.update(60000);
         CHECK_NEAR(
@@ -826,6 +828,25 @@ namespace
         thermostat.update(4000);
         CHECK_FALSE(
             thermostat.isCommandValid());
+
+        // Retour dans la bande sans état précédent : arrêt, pas d'invalidité.
+        temperature.setReading(20.5);
+        thermostat.update(5000);
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
+
+        // Après un passage en marche, la bande conserve la marche...
+        temperature.setReading(18.0);
+        thermostat.update(6000);
+        temperature.setReading(20.5);
+        thermostat.update(7000);
+        CHECK_NEAR(thermostat.readCommand(), 1.0, 0.0);
+
+        // ... sauf après une reprise (menu), qui repart à l'arrêt.
+        thermostat.resume(8000);
+        thermostat.update(9000);
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
     }
 
     void testCoolingThermostat()
@@ -855,6 +876,13 @@ namespace
             thermostat.readCommand(),
             0.0,
             0.0);
+
+        // Dans la bande après une reprise : arrêt.
+        temperature.setReading(20.5);
+        thermostat.resume(2000);
+        thermostat.update(3000);
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
     }
 
     void testSolarRegulator()
@@ -1826,10 +1854,11 @@ namespace
 
         relay.lockSafeState(false);
 
-        Parameter storage[4];
+        Parameter storage[8];
         ParameterList parameters;
-        parameters.begin(storage, 4);
+        parameters.begin(storage, 8);
         relay.registerParameters(parameters);
+        CHECK_FALSE(parameters.hasError());
 
         const Parameter* safeState =
             parameters.find(
@@ -3032,6 +3061,7 @@ void runPWMTests();
 void runDigitalInputTests();
 void runScheduleTests();
 void runMeasurementStatusTests();
+void runRelayTimingTests();
 
 int main()
 {
@@ -3215,6 +3245,7 @@ int main()
     runDigitalInputTests();
     runScheduleTests();
     runMeasurementStatusTests();
+    runRelayTimingTests();
 
     return TestHarness::finish();
 }

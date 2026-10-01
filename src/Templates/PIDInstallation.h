@@ -66,6 +66,17 @@ private:
 
         bool pidEnabled = false;
         bool autoTuneActive = false;
+
+        // Commande du PID (0 à 1), invalide si la régulation est arrêtée.
+        double_t output = 0.0;
+        bool outputValid = false;
+
+        // Consigne active encore en route vers la consigne réglée.
+        bool ramping = false;
+
+        double_t kp = 0.0;
+        double_t ti = 0.0;
+        double_t td = 0.0;
     };
 
     // Entrée physique

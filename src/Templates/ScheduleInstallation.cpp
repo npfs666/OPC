@@ -15,6 +15,7 @@ namespace
     constexpr uint16_t CYAN = 0x07FF;
     constexpr uint16_t GREEN = 0x07E0;
     constexpr uint16_t GREY = 0x8410;
+    constexpr uint16_t ORANGE = 0xFD20;
 
     constexpr int16_t MARGIN = 12;
     constexpr int16_t DATE_Y = 44;
@@ -158,14 +159,18 @@ void ScheduleInstallation::printHomeScreen(
 
         const bool valid = relay != nullptr && relay->healthy;
         const bool active = valid && relay->appliedCommand >= 0.5;
+        const bool waiting = valid && relay->waitingToStart();
 
         display.setCursor(MARGIN, y);
         display.setTextColor(WHITE, BLACK);
         display.print(relays[i].getName());
 
         display.setCursor(120, y);
-        display.setTextColor(active ? GREEN : GREY, BLACK);
-        display.print(!valid ? "--  " : active ? "ON  " : "OFF ");
+        display.setTextColor(
+            active ? GREEN : waiting ? ORANGE : GREY,
+            BLACK);
+        display.print(
+            !valid ? "--  " : active ? "ON  " : waiting ? "ATT." : "OFF ");
 
         // Rappel d'une dérogation manuelle en cours.
         display.setCursor(MARGIN, y + 18);

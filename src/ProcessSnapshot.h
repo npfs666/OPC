@@ -47,6 +47,14 @@ struct OutputSample
 {
     double_t appliedCommand = 0.0;
     bool healthy = false;
+    // Commande demandée retardée par un temps minimal (Output::isWaiting()).
+    bool waiting = false;
+
+    /** Arrêtée, mise en marche retardée par un temps minimal d'arrêt. */
+    bool waitingToStart() const
+    {
+        return healthy && waiting && appliedCommand < 0.5;
+    }
 
 private:
     friend class ProcessSnapshot;

@@ -156,6 +156,7 @@ bool ProcessSnapshot::add(
     sample.appliedCommand =
         output.appliedCommand();
     sample.healthy = output.isHealthy();
+    sample.waiting = output.isWaiting();
 
     return true;
 }
