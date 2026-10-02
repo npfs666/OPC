@@ -154,10 +154,14 @@ void ProcessControl::updateMeasurementsAndRegulators(
 {
     pollInputs(now);
 
+    // Chaque mesure est filtrée avant d'être lue par les mesures calculées.
     for (uint8_t i = 0; i < measurementCount; i++)
     {
         if (measurements[i] != nullptr)
+        {
             measurements[i]->update();
+            measurements[i]->applyFilter(now);
+        }
     }
 
     recordStatusChanges(now);

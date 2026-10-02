@@ -253,6 +253,9 @@ bool SolarInstallation::begin(
 
     // Hors heures creuses, l'appoint est coupé.
     backupHeater.setSchedule(offPeakSchedule, 45.0);
+
+    // Sans mesure, un appoint électrique ne chauffe jamais.
+    backupHeater.lockFaultAction(Regulator::FaultAction::SafeState);
     backupHeater.scheduledSetpoint.settings.outside =
         ScheduledSetpoint::Outside::Off;
 

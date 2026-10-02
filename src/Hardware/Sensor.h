@@ -70,6 +70,10 @@ public:
         int32_t samples;
         Physics::Thermocouple::Type thermocoupleType = Physics::Thermocouple::Type::K;
         Range range = Range::Precise;
+
+        // Constante du filtre d'entrée (2e ordre) en secondes, 0 = sans
+        // filtre. Appliqué à la température calculée.
+        double_t filterTime = 0.0;
     };
 
     Settings settings = {};
@@ -90,7 +94,6 @@ public:
     void begin(const char* key, const char* name, Type type, Wiring wiring, uint16_t samples, float_t offset);
     void reset();
     void add(int32_t value);
-    void addLP(int32_t value);
     void compute();
     bool isAccumulationHalfWay();
     bool isAccumulationDone();
@@ -149,7 +152,6 @@ private:
     int32_t accumulationTarget() const;
 
     const char* ownerName = "";
-    double_t nMinusOneValue;
     double_t sum;
     //double_t resistance;
     uint16_t sampleCount;

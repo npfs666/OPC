@@ -52,6 +52,14 @@ void TemperatureTC::begin(const char* name, Sensor& sensor)
     setStatus(MeasurementStatus::NotReady);
 }
 
+void TemperatureTC::applyFilter(uint32_t now)
+{
+    if (sensor == nullptr)
+        return;
+
+    filterValue(now, sensor->settings.filterTime);
+}
+
 void TemperatureTC::update()
 {
     setValue(NAN);

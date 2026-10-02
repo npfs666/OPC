@@ -36,6 +36,8 @@ fi
     "${project_dir}/test/host/test_schedule.cpp" \
     "${project_dir}/test/host/test_measurement_status.cpp" \
     "${project_dir}/test/host/test_relay_timing.cpp" \
+    "${project_dir}/test/host/test_input_filter.cpp" \
+    "${project_dir}/test/host/test_fault_fallback.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \

@@ -64,6 +64,7 @@ private:
         double_t hysteresis = 0.0;
         bool ramping = false;
         bool commandValid = false;
+        bool fallback = false;      // maintien sur défaut capteur
     };
 
     HomeState homeState;

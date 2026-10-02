@@ -251,12 +251,16 @@ void PID::resetController()
 
 void PID::holdController()
 {
+    freezeController();
+    invalidateCommand();
+}
+
+void PID::freezeController()
+{
     filteredDerivative = 0.0;
     previousMeasurement = 0.0;
     previousTime = 0;
     initialized = false;
-
-    invalidateCommand();
 }
 
 bool PID::setSetpointLimits(
@@ -579,11 +583,19 @@ void PID::update(uint32_t now)
         return;
     }
 
-    // Mesure invalide : sortie en sécurité, intégrale gardée pour la reprise.
+    /*
+     * Mesure invalide : sortie en sécurité ou maintenue selon le réglage de
+     * repli, intégrale gardée pour une reprise sans à-coup.
+     */
     if (!measurementValid)
     {
         setpointRamp.resume(now);
-        holdController();
+        handleMeasurementFault(
+            now,
+            measurement != nullptr
+                ? measurement->getStatus()
+                : MeasurementStatus::Invalid);
+        freezeController();
         return;
     }
 
@@ -621,7 +633,12 @@ void PID::updateAutomatic(
         previousTime = now;
         filteredDerivative = 0.0;
         initialized = true;
-        invalidateCommand();
+
+        // Fin d'un maintien : la commande maintenue couvre ce premier cycle,
+        // sans repasser par l'état sûr.
+        if (!isInFallback())
+            invalidateCommand();
+
         return;
     }
 
@@ -897,6 +914,8 @@ void PID::registerParameters(
         1.0,
         0.01,
         2);
+
+    registerFaultParameters(list);
 }
 
 bool PID::registerAutoTuneParameters(

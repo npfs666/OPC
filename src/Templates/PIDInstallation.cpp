@@ -263,6 +263,7 @@ void PIDInstallation::captureHomeScreenState()
     homeState.requestedCycles =
         pid.autoTuneSettings.cycles;
 
+    homeState.fallback = pid.isInFallback();
     homeState.output = pid.readCommand();
     homeState.outputValid = pid.isCommandValid();
 
@@ -351,6 +352,11 @@ void PIDInstallation::printHomeScreen(
                 homeState.requestedCycles);
             status = text;
         }
+    }
+    else if (homeState.fallback)
+    {
+        status = "REPLI";
+        statusColor = COLOR_ORANGE;
     }
     else if (homeState.pidEnabled)
     {

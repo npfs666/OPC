@@ -31,6 +31,10 @@ Ils couvrent actuellement :
 - les temps minimaux de marche et d'arrêt des relais (démarrage, état sûr
   prioritaire, validation du menu, attente dans le snapshot) et l'impulsion
   minimale de l'actionneur temporel ;
+- le filtre d'entrée du 2e ordre (réponse indicielle, cas limites, remise à
+  zéro sur défaut) ;
+- le repli sur défaut de sonde (sécurité, maintien limité, PID sans à-coup,
+  verrouillage) et le thermostat dans sa bande d'hystérésis ;
 - les états de mesure : acquisition (saturations), classement des
   résistances RTD, thermocouple ouvert ou hors domaine, propagation,
   affichage (libellés, couleurs), journal des changements et snapshot.

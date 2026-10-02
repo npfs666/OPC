@@ -1742,7 +1742,10 @@ namespace
         parameters.begin(storage, 20);
 
         pid.registerParameters(parameters);
-        CHECK_TRUE(parameters.count() == 8);
+        // 8 réglages PID + l'action et la durée du repli sur défaut.
+        CHECK_TRUE(parameters.count() == 10);
+        CHECK_TRUE(parameters.find("pid", "fault_action") != nullptr);
+        CHECK_TRUE(parameters.find("pid", "fault_hold_time") != nullptr);
 
         const Parameter* enabledParameter =
             parameters.find("pid", "enabled");
@@ -1777,7 +1780,7 @@ namespace
                 "pid.autotune",
                 "PID autotune"));
         // 9 réglages d'essai + la règle de calcul des gains.
-        CHECK_TRUE(parameters.count() == 18);
+        CHECK_TRUE(parameters.count() == 20);
 
         CHECK_TRUE(
             parameters.find(
@@ -3062,6 +3065,8 @@ void runDigitalInputTests();
 void runScheduleTests();
 void runMeasurementStatusTests();
 void runRelayTimingTests();
+void runInputFilterTests();
+void runFaultFallbackTests();
 
 int main()
 {
@@ -3246,6 +3251,8 @@ int main()
     runScheduleTests();
     runMeasurementStatusTests();
     runRelayTimingTests();
+    runInputFilterTests();
+    runFaultFallbackTests();
 
     return TestHarness::finish();
 }

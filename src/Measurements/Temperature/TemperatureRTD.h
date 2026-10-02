@@ -16,6 +16,9 @@ public:
 
     void update() override;
 
+    // Filtre réglé sur la sonde (Sensor::Settings::filterTime).
+    void applyFilter(uint32_t now) override;
+
 private:
     Resistance* resistance = nullptr;
 };

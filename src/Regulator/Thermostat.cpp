@@ -63,7 +63,11 @@ void Thermostat::update(uint32_t now)
             temperature->getValue()))
     {
         setpointRamp.resume(now);
-        invalidateCommand();
+        handleMeasurementFault(
+            now,
+            temperature != nullptr
+                ? temperature->getStatus()
+                : MeasurementStatus::Invalid);
         return;
     }
 
@@ -212,4 +216,6 @@ void Thermostat::registerParameters(ParameterList& list) {
         0.1,
         1,
         "°C");
+
+    registerFaultParameters(list);
 }

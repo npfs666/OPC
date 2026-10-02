@@ -4,7 +4,6 @@
 
 // Used in Sensor
 #define MAX_RTD 3
-#define ALPHA 0.6f
 
 // Maxixum array sizes
 #define MAX_MEASUREMENTS 16 // Used in ProcessControl

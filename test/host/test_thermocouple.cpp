@@ -204,8 +204,8 @@ namespace
         sensor.add(200);
         sensor.compute();
         CHECK_NEAR(sensor.readValue(), 150, 0);
-        sensor.addLP(32767);
-        sensor.addLP(100);
+        sensor.add(32767);
+        sensor.add(100);
         sensor.compute();
         CHECK_TRUE(std::isnan(sensor.readValue()));
         sensor.add(-32768);

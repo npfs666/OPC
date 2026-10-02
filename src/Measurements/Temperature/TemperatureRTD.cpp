@@ -18,6 +18,14 @@ void TemperatureRTD::begin(const char* name,
 
 
 
+void TemperatureRTD::applyFilter(uint32_t now)
+{
+    if (resistance == nullptr)
+        return;
+
+    filterValue(now, resistance->getSensor().settings.filterTime);
+}
+
 void TemperatureRTD::update()
 {
     if(!resistance->isValid())

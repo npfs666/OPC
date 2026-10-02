@@ -40,6 +40,17 @@ public:
     virtual void update() = 0;
 
     /**
+     * @brief Filtre la valeur, appelée par ProcessControl juste après
+     * update(). Sans effet par défaut.
+     *
+     * @param[in] now Date de la mesure en ms (uint32_t).
+     */
+    virtual void applyFilter(uint32_t now)
+    {
+        (void)now;
+    }
+
+    /**
      * @return Dernière valeur mesurée (double_t).
      */
     double_t getValue() const;

@@ -200,6 +200,9 @@ private:
      */
     void holdController();
 
+    /** Comme holdController(), sans toucher à la commande. */
+    void freezeController();
+
     bool controlSettingsAreValid() const;
 
     void updateAutomatic(

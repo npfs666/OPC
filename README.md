@@ -419,6 +419,14 @@ Notes sur les mesures :
   `begin()` : `sonde.settings.range = Sensor::Range::Extended;`. La consigne
   d'un PID est limitée à 250 °C par défaut : l'élargir avec
   `setSetpointLimits()`.
+- **Filtre d'entrée** (`Input > <sonde> > Filtre`) : filtre numérique du
+  2e ordre, H = 1 / (1 + τs)², de constante τ réglable de 0 à 100,0 s
+  (0 par défaut, sans filtre), comme sur les régulateurs compacts. Il
+  s'applique à la température calculée, à chaque cycle de mesure, et
+  complète le suréchantillonnage (`Samples`), qui lisse à l'intérieur d'un
+  cycle. Un défaut de sonde n'est pas retardé : le filtre repart de la
+  première valeur valide. Le filtre ajoute du retard à la régulation :
+  relancer l'autotune après l'avoir modifié.
 
 Les tailles des listes internes sont fixes (pas d'allocation dynamique) et
 réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 16 régulateurs,
@@ -517,6 +525,27 @@ les régulateurs mettent leurs sorties en état sûr, comme avant.
 
 Pour une mesure personnalisée, appeler `setStatus()` avec la cause plutôt que
 `setValid(false)`, qui donne `Invalid`.
+
+### Repli sur défaut de sonde
+
+Le PID et le thermostat proposent dans leur menu `Regulateur` :
+
+- **Si défaut** : `Sécurité` (défaut) met les sorties en état sûr ;
+  `Maintien` garde la commande d'avant le défaut, pour passer une coupure
+  brève de la sonde (connecteur, parasite) ;
+- **Maintien max** : durée du maintien, de 5 à 600 s, après laquelle les
+  sorties passent en état sûr.
+
+Le maintien ne s'applique qu'à un vrai défaut (rupture, court-circuit, hors
+étendue), et seulement si la commande était valide juste avant : pas de
+maintien avant la première mesure ni après une validation du menu. Pendant
+un maintien, l'écran affiche `REPLI`. Le PID garde son intégrale et reprend
+sans à-coup au retour de la mesure.
+
+Il n'existe volontairement pas de sortie forcée : sans mesure, l'état sûr
+reste la règle. `lockFaultAction(Regulator::FaultAction::SafeState)` retire le
+choix du menu (l'appoint électrique du template solaire est verrouillé
+ainsi). Le régulateur solaire est toujours en sécurité sur défaut.
 
 ## Sécurité
 
