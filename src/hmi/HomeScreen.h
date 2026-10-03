@@ -12,6 +12,13 @@ struct HomeScreenContext
     const ProcessSnapshot& snapshot;
     uint32_t now;
     bool fullRefresh;
+
+    /*
+     * Consigne en cours de réglage à l'encodeur (Installation::homeSetpoint) :
+     * l'afficher à la place de la consigne, en couleur d'édition.
+     */
+    bool editingSetpoint = false;
+    double editedSetpoint = 0.0;
 };
 
 #endif

@@ -19,6 +19,7 @@
 #include <Storage.h>
 #include <hmi/RotaryEncoder.h>
 #include <hmi/ArduinoMenuUI.h>
+#include <hmi/HomeSetpointEditor.h>
 
 #include <pico/mutex.h>
 
@@ -90,6 +91,11 @@ private:
     static constexpr uint32_t SENSORLESS_CYCLE_MS =
         1000;
 
+    // Sauvegarde d'une consigne réglée depuis l'accueil : après ce délai sans
+    // nouvelle modification, pour ne pas écrire la flash à chaque réglage.
+    static constexpr uint32_t HOME_SETPOINT_SAVE_DELAY_MS =
+        10000;
+
     // Lectures du DS3231 ratées tolérées avant de déclarer l'heure inconnue.
     static constexpr uint8_t CLOCK_READ_FAILURES_TOLERATED =
         3;
@@ -103,7 +109,8 @@ private:
         ClockCaptureRequested,
         ClockApplyRequested,
         Menu,
-        ApplyRequested
+        ApplyRequested,
+        HomeSetpointApplyRequested
     };
 
     Installation& userInstall;
@@ -123,6 +130,7 @@ private:
     bool bmp580Initialized = false;
     bool sensorBoardInitialized = false;
     bool configurationSavePending = false;
+    uint32_t configurationSaveDueAt = 0;
     bool controlCycleStarted = false;
     uint32_t lastMeasurementTime = 0;
 
@@ -134,6 +142,8 @@ private:
         MenuBuilder::NO_ACTION;
 
     mutex_t processDataMutex;
+    // Consigne réglée depuis l'accueil, transmise sous le mutex.
+    double_t pendingHomeSetpoint = 0.0;
     ProcessSnapshot sharedProcessSnapshot;
     ProcessSnapshot displayProcessSnapshot;
     RTC::DateTime sharedClockDateTime;
@@ -143,6 +153,7 @@ private:
 
     // Cœur UI uniquement.
     bool clockAlertShown = false;
+    HomeSetpointEditor setpointEditor;
     uint8_t serialPrintBuffer[
         SERIAL_PRINT_BUFFER_SIZE] = {};
 
@@ -161,6 +172,14 @@ private:
 
     void requestMenu();
     void requestClockApply();
+
+    // Cœur UI : encodeur à l'accueil (réglage de la consigne ou menu).
+    void homePoll(int32_t movement, bool clicked);
+    void commitHomeSetpoint();
+
+    // Cœur contrôle : sauvegarde après delayMs (repoussée par une nouvelle
+    // demande différée, immédiate si delayMs vaut 0).
+    void requestConfigurationSave(uint32_t delayMs = 0);
 
     void requestParameterApply(
         MenuBuilder::ActionId actionId =

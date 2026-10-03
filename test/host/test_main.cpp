@@ -3067,6 +3067,7 @@ void runMeasurementStatusTests();
 void runRelayTimingTests();
 void runInputFilterTests();
 void runFaultFallbackTests();
+void runHomeSetpointTests();
 
 int main()
 {
@@ -3253,6 +3254,7 @@ int main()
     runRelayTimingTests();
     runInputFilterTests();
     runFaultFallbackTests();
+    runHomeSetpointTests();
 
     return TestHarness::finish();
 }

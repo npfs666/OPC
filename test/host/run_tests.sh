@@ -38,6 +38,7 @@ fi
     "${project_dir}/test/host/test_relay_timing.cpp" \
     "${project_dir}/test/host/test_input_filter.cpp" \
     "${project_dir}/test/host/test_fault_fallback.cpp" \
+    "${project_dir}/test/host/test_home_setpoint.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -45,6 +46,7 @@ fi
     "${project_dir}/src/Installation.cpp" \
     "${project_dir}/src/hmi/Displayable.cpp" \
     "${project_dir}/src/hmi/DisplayTextCodec.cpp" \
+    "${project_dir}/src/hmi/HomeSetpointEditor.cpp" \
     "${project_dir}/src/hmi/MeasurementDisplay.cpp" \
     "${project_dir}/src/hmi/MenuBuilder.cpp" \
     "${project_dir}/src/hmi/ParameterEditor.cpp" \

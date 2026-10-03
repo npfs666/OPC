@@ -4,3 +4,5 @@
 src/.garbo
 .gitignore
 __pycache__
+CLAUDE.md
+OPC_v0.2.code-workspace

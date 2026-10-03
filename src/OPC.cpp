@@ -269,7 +269,7 @@ bool OPC::newMeasurement()
     mutex_exit(&processDataMutex);
 
     if (configurationSaveRequested)
-        configurationSavePending = true;
+        requestConfigurationSave();
 
     rp2040.fifo.push_nb(
         interCoreMessageValue(
@@ -326,7 +326,8 @@ void OPC::controlPoll()
         refreshClock();
 
     if (configurationSavePending &&
-        !acquisitionPausedForMenu)
+        !acquisitionPausedForMenu &&
+        static_cast<int32_t>(millis() - configurationSaveDueAt) >= 0)
     {
         configurationSavePending = false;
 
@@ -611,6 +612,9 @@ void OPC::showHomeScreen(
         fullRefresh
     };
 
+    context.editingSetpoint = setpointEditor.isActive();
+    context.editedSetpoint = setpointEditor.value();
+
     userInstall.printHomeScreen(context);
 }
 
@@ -678,6 +682,93 @@ void OPC::requestClockApply()
         InterCoreMessage::ApplyClockParameters));
 }
 
+void OPC::requestConfigurationSave(uint32_t delayMs)
+{
+    const uint32_t now = millis();
+    const uint32_t due = now + delayMs;
+
+    // Une demande immédiate passe devant ; une demande différée repousse
+    // l'échéance (réglages successifs à l'encodeur).
+    if (!configurationSavePending ||
+        delayMs == 0 ||
+        static_cast<int32_t>(due - configurationSaveDueAt) > 0)
+    {
+        configurationSaveDueAt = delayMs == 0 ? now : due;
+    }
+
+    configurationSavePending = true;
+}
+
+void OPC::homePoll(int32_t movement, bool clicked)
+{
+    const uint32_t now = millis();
+    const Parameter* setpoint = userInstall.homeSetpoint();
+
+    // Rotation : réglage de la consigne (pas sous l'alerte horloge).
+    if (movement != 0 && setpoint != nullptr && !clockAlertShown)
+    {
+        if (!setpointEditor.isActive())
+        {
+            mutex_enter_blocking(&processDataMutex);
+            const double_t current = *setpoint->value.number;
+            mutex_exit(&processDataMutex);
+
+            setpointEditor.begin(
+                current,
+                setpoint->data.number.minimum,
+                setpoint->data.number.maximum,
+                setpoint->data.number.step,
+                now);
+        }
+
+        // Même sens que l'édition d'une valeur dans le menu, où un cran
+        // positif (vers le bas de la liste) diminue la valeur.
+        setpointEditor.rotate(-movement, now);
+        showHomeScreen(false);
+        return;
+    }
+
+    // Seul un clic valide. Sans action pendant le délai du menu, le réglage
+    // est abandonné et la consigne en place est conservée.
+    if (setpointEditor.isActive())
+    {
+        if (clicked)
+        {
+            commitHomeSetpoint();
+        }
+        else if (setpointEditor.inactiveFor(now, userInstall.menuTimeoutMs()))
+        {
+            setpointEditor.end();
+            showHomeScreen(false);
+        }
+
+        return;
+    }
+
+    if (clicked)
+        requestMenu();
+}
+
+void OPC::commitHomeSetpoint()
+{
+    if (!setpointEditor.hasChanged())
+    {
+        setpointEditor.end();
+        showHomeScreen(false);
+        return;
+    }
+
+    mutex_enter_blocking(&processDataMutex);
+    pendingHomeSetpoint = setpointEditor.value();
+    mutex_exit(&processDataMutex);
+
+    // La valeur reste affichée jusqu'à l'acquittement du cœur contrôle.
+    uiState = UIState::HomeSetpointApplyRequested;
+    __dmb();
+    rp2040.fifo.push(interCoreMessageValue(
+        InterCoreMessage::ApplyHomeSetpoint));
+}
+
 void OPC::uiPoll()
 {
     int32_t movement =
@@ -700,9 +791,7 @@ void OPC::uiPoll()
 
     if (uiState == UIState::Home)
     {
-        if (clicked)
-            requestMenu();
-
+        homePoll(movement, clicked);
         return;
     }
 
@@ -822,6 +911,28 @@ void OPC::handleControlMessage(
         rp2040.fifo.push(interCoreMessageValue(saved
             ? InterCoreMessage::ClockParametersApplied
             : InterCoreMessage::ClockParametersRejected));
+        break;
+    }
+
+    case InterCoreMessage::ApplyHomeSetpoint:
+    {
+        bool applied = false;
+
+        // Jamais pendant une session de menu : les brouillons l'écraseraient.
+        if (!menuSessionOpen)
+        {
+            mutex_enter_blocking(&processDataMutex);
+            applied = userInstall.applyHomeSetpoint(pendingHomeSetpoint);
+            mutex_exit(&processDataMutex);
+        }
+
+        // Ni pause de l'acquisition ni état sûr : seule la consigne change.
+        if (applied)
+            requestConfigurationSave(HOME_SETPOINT_SAVE_DELAY_MS);
+
+        __dmb();
+        rp2040.fifo.push(interCoreMessageValue(
+            InterCoreMessage::HomeSetpointApplied));
         break;
     }
 
@@ -1091,6 +1202,19 @@ void OPC::handleUIMessage(
             bufferedOutput.size());
         break;
     }
+
+    case InterCoreMessage::HomeSetpointApplied:
+        if (uiState != UIState::HomeSetpointApplyRequested)
+            break;
+
+        __dmb();
+
+        // Nouvelle consigne relue dans l'installation, puis affichage normal.
+        copyProcessSnapshot();
+        setpointEditor.end();
+        uiState = UIState::Home;
+        showHomeScreen(false);
+        break;
 
     case InterCoreMessage::MenuParametersCaptured:
         if (uiState !=

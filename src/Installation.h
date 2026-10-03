@@ -127,6 +127,21 @@ public:
             1000UL;
     }
 
+    /**
+     * Consigne réglable à l'encodeur depuis l'écran d'accueil, ou nullptr.
+     * Ses limites, son pas et ses décimales sont ceux du menu.
+     */
+    const Parameter* homeSetpoint() const
+    {
+        return homeSetpointParameter;
+    }
+
+    /**
+     * Cœur contrôle, sous le mutex : applique une consigne réglée depuis
+     * l'accueil, ramenée dans les limites et sur la grille du pas.
+     */
+    bool applyHomeSetpoint(double_t value);
+
     /** Cause fournie par fail() lors d'un begin() refusé, sinon nullptr. */
     const char* failureReason() const
     {
@@ -146,6 +161,16 @@ protected:
         return false;
     }
 
+    /**
+     * Désigne la consigne réglable depuis l'écran d'accueil, par les clés de
+     * son paramètre, déjà enregistré dans parameterList (réglage décimal
+     * modifiable). À appeler à la fin de begin().
+     * Usage : if (!setHomeSetpoint("thermostat", "setpoint")) return fail(...);
+     */
+    bool setHomeSetpoint(
+        const char* ownerKey,
+        const char* key);
+
     Parameter parameterStorage[MAX_PARAMETERS];
     ParameterList parameterList;
 
@@ -156,6 +181,7 @@ private:
     bool completeParameterRegistration();
 
     const char* startupFailureReason = nullptr;
+    const Parameter* homeSetpointParameter = nullptr;
 };
 
 #endif

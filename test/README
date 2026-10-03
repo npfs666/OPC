@@ -35,6 +35,8 @@ Ils couvrent actuellement :
   zéro sur défaut) ;
 - le repli sur défaut de sonde (sécurité, maintien limité, PID sans à-coup,
   verrouillage) et le thermostat dans sa bande d'hystérésis ;
+- la consigne réglée depuis l'accueil (pas, accélération, limites, grille,
+  abandon sur inactivité, désignation par l'installation) ;
 - les états de mesure : acquisition (saturations), classement des
   résistances RTD, thermocouple ouvert ou hors domaine, propagation,
   affichage (libellés, couleurs), journal des changements et snapshot.

@@ -1,5 +1,7 @@
 #include <Installation.h>
 
+#include <cmath>
+
 #include <hmi/MenuBuilder.h>
 
 #include <cstring>
@@ -265,8 +267,51 @@ bool Installation::buildMenu(
     return addMenuActions(menu);
 }
 
+bool Installation::setHomeSetpoint(
+    const char* ownerKey,
+    const char* key)
+{
+    const Parameter* parameter =
+        parameterList.find(ownerKey, key);
+
+    if (parameter == nullptr ||
+        parameter->type != Parameter::Type::Double ||
+        parameter->value.number == nullptr ||
+        parameter->readOnly)
+    {
+        homeSetpointParameter = nullptr;
+        return false;
+    }
+
+    homeSetpointParameter = parameter;
+    return true;
+}
+
+bool Installation::applyHomeSetpoint(double_t value)
+{
+    const Parameter* parameter = homeSetpointParameter;
+
+    if (parameter == nullptr || !std::isfinite(value))
+        return false;
+
+    const Parameter::Data::Number& limits = parameter->data.number;
+
+    if (limits.step > 0.0)
+        value = std::round(value / limits.step) * limits.step;
+
+    if (value < limits.minimum)
+        value = limits.minimum;
+    else if (value > limits.maximum)
+        value = limits.maximum;
+
+    *parameter->value.number = value;
+    return true;
+}
+
 bool Installation::prepareParameterRegistration()
 {
+    homeSetpointParameter = nullptr;
+
     parameterList.begin(
         parameterStorage,
         MAX_PARAMETERS);

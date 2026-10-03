@@ -23,6 +23,7 @@ namespace
     constexpr uint16_t COLOR_CYAN = 0x07FF;
     constexpr uint16_t COLOR_GREEN = 0x07E0;
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
+    constexpr uint16_t COLOR_YELLOW = 0xFFE0;   // consigne en réglage
 
     using TextField::Align;
 
@@ -195,6 +196,10 @@ bool PIDInstallation::begin(
 
     if (parameterList.hasError())
         return fail("Paramètres PID invalides");
+
+    // Consigne réglable à l'encodeur depuis l'écran d'accueil.
+    if (!setHomeSetpoint("tune_pid", "setpoint"))
+        return fail("Consigne d'accueil introuvable");
 
     return true;
 }
@@ -437,16 +442,22 @@ void PIDInstallation::printHomeScreen(
         SETPOINT_Y,
         2,
         COLOR_WHITE,
-        homeState.ramping ? "Rampe" : "Consigne",
+        !context.editingSetpoint && homeState.ramping ? "Rampe" : "Consigne",
         LABEL_CHARS);
 
-    if (std::isfinite(homeState.setpoint))
+    // En réglage à l'encodeur : la valeur réglée, en jaune.
+    const double_t setpoint =
+        context.editingSetpoint
+            ? context.editedSetpoint
+            : homeState.setpoint;
+
+    if (std::isfinite(setpoint))
     {
         snprintf(
             text,
             sizeof(text),
             "%.1f %s",
-            homeState.setpoint,
+            setpoint,
             DEGREES_C);
     }
     else
@@ -454,7 +465,11 @@ void PIDInstallation::printHomeScreen(
         snprintf(text, sizeof(text), "--");
     }
 
-    printValue(display, SETPOINT_Y, COLOR_GREEN, text);
+    printValue(
+        display,
+        SETPOINT_Y,
+        context.editingSetpoint ? COLOR_YELLOW : COLOR_GREEN,
+        text);
 
     // ----- Commande du PID : valeur et barre -----
 

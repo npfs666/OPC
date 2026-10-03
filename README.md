@@ -154,6 +154,17 @@ Points à retenir :
   qu'un libellé.
 - Si l'installation a besoin du BMP580, surcharger `requiresBMP580()` pour
   renvoyer `true`.
+- Pour régler une consigne à l'encodeur depuis l'écran d'accueil (voir
+  [Consigne depuis l'accueil](#consigne-depuis-laccueil)), la désigner à la
+  fin de `begin()` par les clés de son paramètre :
+
+  ```cpp
+  if (!setHomeSetpoint("thermostat", "setpoint"))
+      return fail("Consigne d'accueil introuvable");
+  ```
+
+  Pendant le réglage, `HomeScreenContext::editingSetpoint` est vrai et
+  `editedSetpoint` contient la valeur à afficher à la place de la consigne.
 
 ### 3. Dessiner l'écran d'accueil
 
@@ -445,6 +456,26 @@ sauvegardées automatiquement à la sortie du menu ou après 10 s d'inactivité
 Pendant l'application de modifications, les sorties sont mises en sécurité,
 puis la régulation reprend dès que de nouvelles mesures valides arrivent. Une
 valeur invalide reste dans le menu pour correction.
+
+### Consigne depuis l'accueil
+
+Comme les touches ▲/▼ d'un régulateur compact, l'encodeur règle la consigne
+directement depuis l'écran d'accueil (templates thermostat et PID) :
+
+- tourner : la consigne s'affiche en jaune et change d'un pas (0,1 °C) par
+  cran, dans le même sens que l'édition d'une valeur dans le menu ; une
+  rotation rapide la change de dix pas (1 °C) par cran ;
+- **seul un clic valide**. Sans action pendant le délai du menu
+  (`Divers > Menu > Timeout`, 10 s par défaut), le réglage est abandonné et
+  la consigne en place est conservée ;
+- hors réglage, un clic ouvre le menu comme avant.
+
+La consigne reste dans les limites et sur le pas du menu. Elle est appliquée
+**sans arrêter la régulation** : contrairement à une validation du menu, ni
+l'acquisition ni les sorties ne sont interrompues, et la rampe de consigne
+s'applique si elle est active. La configuration est sauvegardée 10 s après le
+dernier réglage, pour ne pas écrire la flash à chaque cran : une coupure de
+courant dans ces 10 s perd le réglage.
 
 ### Calibration
 
