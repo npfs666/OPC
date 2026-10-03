@@ -157,7 +157,11 @@ bool ProcessSnapshot::add(
     sample.source = &output;
     sample.appliedCommand =
         output.appliedCommand();
+    sample.name = output.getName();
     sample.healthy = output.isHealthy();
+    sample.maintenanceDue =
+        output.counters() != nullptr &&
+        output.counters()->maintenanceDue();
     sample.waiting = output.isWaiting();
 
     return true;

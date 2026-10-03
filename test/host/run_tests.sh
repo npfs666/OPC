@@ -41,6 +41,7 @@ fi
     "${project_dir}/test/host/test_home_setpoint.cpp" \
     "${project_dir}/test/host/test_limit_alarm.cpp" \
     "${project_dir}/test/host/test_manual_mode.cpp" \
+    "${project_dir}/test/host/test_counters.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -63,6 +64,7 @@ fi
     "${project_dir}/src/Measurements/Temperature/TemperatureRTD.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureTC.cpp" \
     "${project_dir}/src/Outputs/Actuator.cpp" \
+    "${project_dir}/src/Outputs/ActuatorOnOff.cpp" \
     "${project_dir}/src/Outputs/ActuatorPWM.cpp" \
     "${project_dir}/src/Outputs/Output.cpp" \
     "${project_dir}/src/Outputs/RelayOutput.cpp" \

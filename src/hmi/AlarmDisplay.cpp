@@ -45,12 +45,39 @@ size_t AlarmDisplay::format(
             shown = alarm;
     }
 
-    if (signaled == 0)
-        return 0;
-
     char text[48];
 
-    if (signaled == 1)
+    if (signaled == 0)
+    {
+        // Pas d'alarme : rappel d'entretien, moins urgent.
+        size_t due = 0;
+        const OutputSample* dueOutput = nullptr;
+
+        for (size_t i = 0; i < snapshot.outputCount(); i++)
+        {
+            const OutputSample* output = snapshot.outputAt(i);
+
+            if (output == nullptr || !output->maintenanceDue)
+                continue;
+
+            due++;
+
+            if (dueOutput == nullptr)
+                dueOutput = output;
+        }
+
+        if (due == 0)
+            return 0;
+
+        color = COLOR_LATCHED;
+
+        if (due == 1)
+            std::snprintf(text, sizeof(text), "ENTRETIEN %s", dueOutput->name);
+        else
+            std::snprintf(text, sizeof(text), "%u ENTRETIENS",
+                          static_cast<unsigned>(due));
+    }
+    else if (signaled == 1)
         std::snprintf(text, sizeof(text), "ALARME %s", shown->name);
     else
         std::snprintf(text, sizeof(text), "%u ALARMES",

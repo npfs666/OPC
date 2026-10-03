@@ -6,6 +6,7 @@
 #include <Hardware/pinout.h>
 #include <hardware/sync.h>
 
+#include <Outputs/Output.h>
 #include <hmi/DisplayTextCodec.h>
 #include <hmi/HomeScreen.h>
 
@@ -318,7 +319,14 @@ void OPC::controlPoll()
     mutex_enter_blocking(&processDataMutex);
     controller.pollInputs(millis());
     controller.captureInputSnapshot(sharedProcessSnapshot);
+    controller.updateOperatingTime(millis());
     mutex_exit(&processDataMutex);
+
+    if (controller.takeCountersChanged() ||
+        millis() - lastCountersSave >= COUNTERS_SAVE_PERIOD_MS)
+    {
+        saveCounters();
+    }
 
     storage.poll();
 
@@ -439,6 +447,8 @@ bool OPC::initMeasurements()
 
     if (!controller.beginOutputs())
         return failStartup(StartupError::Outputs);
+
+    restoreCounters();
 
     controlOutputsEnabled = false;
     lastMeasurementTime = millis();
@@ -682,6 +692,75 @@ void OPC::requestClockApply()
     __dmb();
     rp2040.fifo.push(interCoreMessageValue(
         InterCoreMessage::ApplyClockParameters));
+}
+
+void OPC::restoreCounters()
+{
+    JsonDocument document;
+
+    lastCountersSave = millis();
+
+    if (!storage.loadCounters(document) ||
+        document["schema"] != COUNTERS_SCHEMA_VERSION)
+    {
+        Serial.println("No saved counters");
+        return;
+    }
+
+    controller.restoreOperatingSeconds(
+        document["operating_s"] | 0.0);
+
+    JsonObjectConst outputs = document["outputs"];
+
+    for (size_t i = 0; i < controller.registeredOutputCount(); i++)
+    {
+        Output* output = controller.registeredOutput(i);
+
+        if (output == nullptr || output->counters() == nullptr)
+            continue;
+
+        JsonObjectConst saved = outputs[output->configurationKey()];
+
+        if (saved.isNull())
+            continue;
+
+        output->restoreCounters(
+            saved["switches"] | 0UL,
+            saved["on_s"] | 0.0);
+    }
+
+    Serial.println("Counters restored");
+}
+
+void OPC::saveCounters()
+{
+    lastCountersSave = millis();
+
+    JsonDocument document;
+    document["schema"] = COUNTERS_SCHEMA_VERSION;
+
+    mutex_enter_blocking(&processDataMutex);
+
+    document["operating_s"] = controller.operatingSeconds();
+
+    JsonObject outputs = document["outputs"].to<JsonObject>();
+
+    for (size_t i = 0; i < controller.registeredOutputCount(); i++)
+    {
+        const Output* output = controller.registeredOutput(i);
+
+        if (output == nullptr || output->counters() == nullptr)
+            continue;
+
+        JsonObject saved = outputs[output->configurationKey()].to<JsonObject>();
+        saved["switches"] = output->counters()->switches;
+        saved["on_s"] = output->onSeconds();
+    }
+
+    mutex_exit(&processDataMutex);
+
+    if (!storage.saveCounters(document))
+        Serial.println("Counters save failed");
 }
 
 void OPC::requestConfigurationSave(uint32_t delayMs)

@@ -4,6 +4,8 @@
 #include <Hardware/pinout.h>
 #include <hmi/ParameterList.h>
 
+#include <ArduinoJson.h>
+
 class ParameterEditor;
 
 class ParameterRestoreValidator
@@ -42,6 +44,14 @@ public:
 
     bool erase();
 
+    /**
+     * Compteurs d'entretien : fichier séparé de la configuration, écrit
+     * périodiquement pour ménager la flash. Écriture atomique (fichier
+     * temporaire puis renommage).
+     */
+    bool saveCounters(const JsonDocument& document);
+    bool loadCounters(JsonDocument& document);
+
 private:
     static constexpr uint32_t SCHEMA_VERSION = 2;
 
@@ -49,6 +59,11 @@ private:
         "/config.json";
     static constexpr const char* TEMP_PATH =
         "/config.tmp";
+
+    static constexpr const char* COUNTERS_PATH =
+        "/counters.json";
+    static constexpr const char* COUNTERS_TEMP_PATH =
+        "/counters.tmp";
 
     /*
      * Le PC lit une copie stable de la configuration. CONFIG_PATH

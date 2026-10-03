@@ -9,6 +9,7 @@
 #include <Regulator/Regulator.h>
 #include <hmi/ParameterList.h>
 
+#include <cmath>
 #include <cstdio>
 
 ProcessControl::ProcessControl()
@@ -117,27 +118,80 @@ void ProcessControl::acknowledgeAlarms()
         alarms[i]->acknowledge();
 }
 
+namespace
+{
+    // Clés stables des actions « RAZ compteurs », une par sortie.
+    constexpr const char* RESET_COUNTER_KEYS[] = {
+        "reset_counters_1", "reset_counters_2", "reset_counters_3",
+        "reset_counters_4", "reset_counters_5", "reset_counters_6",
+        "reset_counters_7", "reset_counters_8", "reset_counters_9",
+        "reset_counters_10", "reset_counters_11", "reset_counters_12",
+        "reset_counters_13", "reset_counters_14", "reset_counters_15",
+        "reset_counters_16"
+    };
+
+    static_assert(
+        sizeof(RESET_COUNTER_KEYS) / sizeof(RESET_COUNTER_KEYS[0]) >=
+            MAX_REGISTERED_OUTPUTS,
+        "Une clé d'action par sortie");
+}
+
 bool ProcessControl::addMenuActions(MenuBuilder& menu) const
 {
-    if (alarmCount == 0)
-        return true;
+    if (alarmCount > 0)
+    {
+        const MenuBuilder::GroupId group =
+            menu.findSubmenu(menu.root(), "alarms");
 
-    const MenuBuilder::GroupId group =
-        menu.findSubmenu(menu.root(), "alarms");
+        if (group == MenuBuilder::INVALID_GROUP ||
+            !menu.addAction(
+                group,
+                ACKNOWLEDGE_ALARMS_ACTION,
+                "acknowledge_alarms",
+                "Acquitter"))
+        {
+            return false;
+        }
+    }
 
-    return
-        group != MenuBuilder::INVALID_GROUP &&
-        menu.addAction(
-            group,
-            ACKNOWLEDGE_ALARMS_ACTION,
-            "acknowledge_alarms",
-            "Acquitter");
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        const char* ownerKey = outputs[i]->countersOwnerKey();
+
+        if (ownerKey == nullptr)
+            continue;
+
+        const MenuBuilder::GroupId group =
+            menu.findGroupForOwner(ownerKey);
+
+        if (group == MenuBuilder::INVALID_GROUP ||
+            !menu.addAction(
+                group,
+                RESET_COUNTERS_ACTION + i,
+                RESET_COUNTER_KEYS[i],
+                "RAZ compteurs"))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool ProcessControl::handlesMenuAction(
     MenuBuilder::ActionId actionId) const
 {
-    return actionId == ACKNOWLEDGE_ALARMS_ACTION && alarmCount > 0;
+    if (actionId == ACKNOWLEDGE_ALARMS_ACTION)
+        return alarmCount > 0;
+
+    if (actionId >= RESET_COUNTERS_ACTION &&
+        actionId < RESET_COUNTERS_ACTION + outputCount)
+    {
+        return outputs[actionId - RESET_COUNTERS_ACTION]->counters() !=
+               nullptr;
+    }
+
+    return false;
 }
 
 bool ProcessControl::executeMenuAction(
@@ -146,8 +200,57 @@ bool ProcessControl::executeMenuAction(
     if (!handlesMenuAction(actionId))
         return false;
 
-    acknowledgeAlarms();
+    if (actionId == ACKNOWLEDGE_ALARMS_ACTION)
+    {
+        acknowledgeAlarms();
+        return true;
+    }
+
+    const uint8_t index = actionId - RESET_COUNTERS_ACTION;
+    outputs[index]->resetCounters();
+    maintenanceLogged[index] = false;
+    countersChanged = true;
     return true;
+}
+
+void ProcessControl::updateOperatingTime(uint32_t now)
+{
+    if (operatingTickStarted)
+        operatingSecondsTotal += (now - lastOperatingTick) / 1000.0;
+
+    operatingTickStarted = true;
+    lastOperatingTick = now;
+    operatingHoursDisplay = operatingSecondsTotal / 3600.0;
+}
+
+double_t ProcessControl::operatingSeconds() const
+{
+    return operatingSecondsTotal;
+}
+
+void ProcessControl::restoreOperatingSeconds(double_t seconds)
+{
+    if (std::isfinite(seconds) && seconds > 0.0)
+        operatingSecondsTotal = seconds;
+
+    operatingHoursDisplay = operatingSecondsTotal / 3600.0;
+}
+
+size_t ProcessControl::registeredOutputCount() const
+{
+    return outputCount;
+}
+
+Output* ProcessControl::registeredOutput(size_t index)
+{
+    return index < outputCount ? outputs[index] : nullptr;
+}
+
+bool ProcessControl::takeCountersChanged()
+{
+    const bool changed = countersChanged;
+    countersChanged = false;
+    return changed;
 }
 
 bool ProcessControl::add(Actuator& actuator)
@@ -228,8 +331,36 @@ void ProcessControl::updateMeasurementsAndRegulators(
         regulators[i]->update(now);
 
     recordAlarmChanges(now);
+    recordMaintenanceChanges(now);
 
     poll(now);
+}
+
+void ProcessControl::recordMaintenanceChanges(uint32_t now)
+{
+    for (uint8_t i = 0; i < outputCount; i++)
+    {
+        const OutputCounters* counters = outputs[i]->counters();
+        const bool due = counters != nullptr && counters->maintenanceDue();
+
+        if (due == maintenanceLogged[i])
+            continue;
+
+        maintenanceLogged[i] = due;
+
+        if (!due)
+            continue;
+
+        if (maintenanceEventCount >= MAX_STATUS_EVENTS)
+        {
+            if (lostStatusEvents < UINT16_MAX)
+                lostStatusEvents++;
+            continue;
+        }
+
+        maintenanceEvents[maintenanceEventCount++] =
+            {now, i, counters->switches};
+    }
 }
 
 ProcessControl::AlarmState ProcessControl::alarmState(uint8_t index) const
@@ -335,6 +466,21 @@ void ProcessControl::printStatusEvents(Stream& stream)
         stream.println(line);
     }
 
+    for (uint8_t i = 0; i < maintenanceEventCount; i++)
+    {
+        const MaintenanceEvent& event = maintenanceEvents[i];
+
+        std::snprintf(
+            line,
+            sizeof(line),
+            "[%lu ms] Entretien %s : seuil atteint (%lu manoeuvres)",
+            static_cast<unsigned long>(event.time),
+            outputs[event.output]->getName(),
+            static_cast<unsigned long>(event.switches));
+
+        stream.println(line);
+    }
+
     if (lostStatusEvents > 0)
     {
         std::snprintf(
@@ -348,6 +494,7 @@ void ProcessControl::printStatusEvents(Stream& stream)
 
     statusEventCount = 0;
     alarmEventCount = 0;
+    maintenanceEventCount = 0;
     lostStatusEvents = 0;
 }
 
@@ -529,6 +676,24 @@ void ProcessControl::print(Stream& stream) const
 
 void ProcessControl::registerParameters(ParameterList& list)
 {
+    // Divers > Compteurs, parent des compteurs de chaque relais : enregistré
+    // avant les sorties.
+    auto counters = list.forOwner({
+        "miscellaneous",
+        "Divers",
+        "counters",
+        "Compteurs",
+        false
+    });
+
+    counters.addDouble(
+        "operating_hours",
+        "Heures carte",
+        operatingHoursDisplay,
+        "h",
+        true,
+        1);
+
     for (uint8_t i = 0; i < digitalInputCount; i++)
         digitalInputs[i]->registerParameters(list);
 

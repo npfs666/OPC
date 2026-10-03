@@ -50,6 +50,17 @@ public:
 
     bool isWaiting() const override;
 
+    const OutputCounters* counters() const override;
+    double_t onSeconds() const override;
+    void resetCounters() override;
+    void restoreCounters(uint32_t switches, double_t onSeconds) override;
+
+    /** Clé du sous-menu Divers > Compteurs > <relais>. */
+    const char* countersOwnerKey() const override
+    {
+        return counterOwnerKey;
+    }
+
     /**
      * Impose l'état logique de sécurité et interdit sa restauration/édition.
      * Utile lorsqu'un état ON ne peut jamais être considéré comme sûr.
@@ -82,6 +93,15 @@ private:
     // Date (millis()) du dernier basculement, ou de la mise en service : au
     // démarrage, l'arrêt minimal s'applique avant la première mise en marche.
     uint32_t lastSwitchTime = 0;
+
+    // Compteurs et copies affichées dans le menu (cœur contrôle).
+    OutputCounters counterData;
+    uint32_t onSpanStart = 0;         // début de la marche en cours
+    uint32_t displayedSwitches = 0;
+    double_t displayedOnHours = 0.0;
+    char counterOwnerKey[40] = {};
+
+    void refreshCounterDisplay();
 
     bool safeStateLocked = false;
     bool lockedSafeState = false;

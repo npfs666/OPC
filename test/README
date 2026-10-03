@@ -40,6 +40,8 @@ Ils couvrent actuellement :
 - le mode manuel du PID et du thermostat (suivi, sortie fixe, défaut de
   sonde ignoré, retour sans à-coup même après le menu, réglages non
   sauvegardés) et les réglages de conduite appliqués sans arrêt ;
+- les compteurs d'entretien (manœuvres, heures en marche, heures de la
+  carte, seuil, remise à zéro, menu Divers > Compteurs, bandeau) ;
 - les alarmes de seuil (types absolus et relatifs, hystérésis, temporisation,
   masquage, mémorisation et acquittement, défaut de sonde, journal, bandeau) ;
 - les états de mesure : acquisition (saturations), classement des

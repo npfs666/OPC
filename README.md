@@ -513,6 +513,27 @@ conduite (voir [Menu](#menu)).
 Le mode manuel n'est **pas sauvegardé** : au démarrage, la régulation repart
 toujours en Auto.
 
+### Compteurs d'entretien
+
+`Divers > Compteurs` affiche, en lecture seule :
+
+- **Heures carte** : durée de fonctionnement cumulée de la carte ;
+- pour chaque relais (`Divers > Compteurs > <relais>`) : **Manœuvres**
+  (basculements réels, mises en sécurité comprises) et **Heures ON** (durée
+  cumulée en marche).
+
+Chaque relais a un **Seuil entret.** en manœuvres (0 = aucun, par pas de
+10 000 ; un relais standard tient environ 150 000 manœuvres à pleine charge).
+Une fois le seuil atteint, l'accueil affiche `ENTRETIEN <relais>` en orange
+(quand aucune alarme n'est signalée) et le port série l'indique une fois.
+Après l'entretien, l'action **RAZ compteurs** du relais remet ses compteurs à
+zéro, sans arrêter la régulation.
+
+Les compteurs sont sauvegardés à part, dans `/counters.json`, toutes les
+heures et après une remise à zéro, pour ménager la flash : une coupure de
+courant perd au plus une heure de comptage. Ils sont relus au démarrage, par
+la clé de configuration de chaque relais.
+
 ### Calibration
 
 `Divers > Calibration` contient :

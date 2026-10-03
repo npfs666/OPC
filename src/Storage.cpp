@@ -294,6 +294,55 @@ bool Storage::save(
     return true;
 }
 
+bool Storage::saveCounters(const JsonDocument& document)
+{
+    if (!mounted)
+        return false;
+
+    InterruptGuard interruptGuard;
+
+    File temporary =
+        LittleFS.open(COUNTERS_TEMP_PATH, "w");
+
+    if (!temporary)
+        return false;
+
+    const size_t expectedSize =
+        measureJson(document);
+    const size_t writtenSize =
+        serializeJson(document, temporary);
+
+    temporary.flush();
+    temporary.close();
+
+    // Une coupure laisse soit l'ancien fichier, soit le nouveau.
+    if (writtenSize != expectedSize ||
+        !LittleFS.rename(COUNTERS_TEMP_PATH, COUNTERS_PATH))
+    {
+        LittleFS.remove(COUNTERS_TEMP_PATH);
+        return false;
+    }
+
+    return true;
+}
+
+bool Storage::loadCounters(JsonDocument& document)
+{
+    if (!mounted || !LittleFS.exists(COUNTERS_PATH))
+        return false;
+
+    File file = LittleFS.open(COUNTERS_PATH, "r");
+
+    if (!file)
+        return false;
+
+    const DeserializationError error =
+        deserializeJson(document, file);
+
+    file.close();
+    return !error;
+}
+
 bool Storage::erase()
 {
     if (!mounted)

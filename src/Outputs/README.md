@@ -130,6 +130,11 @@ courts (compresseur, contacteur) :
   (consignes, commande manuelle) ont été modifiés. Elle ne relance pas les
   chronos, sauf si la broche change.
 
+Chaque relais compte aussi ses manœuvres et sa durée en marche, avec un seuil
+d'entretien (`Divers > Compteurs`, voir le README principal). `counters()`,
+`onSeconds()` et `resetCounters()` y donnent accès ; une sortie PWM n'a pas
+de compteurs.
+
 Avec un `TimeProportionalActuator`, préférer son `Impulsion mini` : les temps
 minimaux du relais allongent ou suppriment des impulsions et faussent la
 puissance moyenne.

@@ -104,7 +104,10 @@ namespace
         parameters.begin(storage, 4);
         process.registerParameters(parameters);
         CHECK_FALSE(parameters.hasError());
-        CHECK_TRUE(parameters.count() == 2);
+        // Les deux réglages de l'entrée, plus les heures de fonctionnement
+        // de la carte (Divers > Compteurs).
+        CHECK_TRUE(parameters.count() == 3);
+        CHECK_TRUE(parameters.find("counters", "operating_hours") != nullptr);
         CHECK_TRUE(parameters.find("permit", "pin") == nullptr);
 
         ParameterEditor editor;

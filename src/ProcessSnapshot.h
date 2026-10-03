@@ -46,8 +46,11 @@ private:
 
 struct OutputSample
 {
+    const char* name = "";
     double_t appliedCommand = 0.0;
     bool healthy = false;
+    // Seuil d'entretien atteint (OutputCounters::maintenanceDue()).
+    bool maintenanceDue = false;
     // Commande demandée retardée par un temps minimal (Output::isWaiting()).
     bool waiting = false;
 

@@ -6,6 +6,24 @@
 
 class ParameterEditor;
 
+/**
+ * Compteurs d'entretien d'une sortie tout-ou-rien, sauvegardés dans
+ * /counters.json (voir OPC).
+ */
+struct OutputCounters
+{
+    uint32_t switches = 0;          // basculements réels de la sortie
+    double_t onSeconds = 0.0;       // durée cumulée en marche
+
+    // Seuil d'entretien en manœuvres (réglage), 0 = aucun.
+    uint32_t maintenanceLimit = 0;
+
+    bool maintenanceDue() const
+    {
+        return maintenanceLimit > 0 && switches >= maintenanceLimit;
+    }
+};
+
 class Output : public Displayable, public Configurable
 {
 public:
@@ -44,6 +62,44 @@ public:
     virtual bool isWaiting() const
     {
         return false;
+    }
+
+    /** Compteurs d'entretien, ou nullptr si la sortie n'en a pas (PWM). */
+    virtual const OutputCounters* counters() const
+    {
+        return nullptr;
+    }
+
+    /** Durée en marche, manœuvre en cours comprise, en secondes. */
+    virtual double_t onSeconds() const
+    {
+        return 0.0;
+    }
+
+    /** Clé de configuration stable, aussi utilisée dans /counters.json. */
+    const char* configurationKey() const
+    {
+        return getConfigurationKey();
+    }
+
+    /** Clé du sous-menu de ses compteurs, ou nullptr. */
+    virtual const char* countersOwnerKey() const
+    {
+        return nullptr;
+    }
+
+    /** Remet les compteurs à zéro (après l'entretien). */
+    virtual void resetCounters()
+    {
+    }
+
+    /** Recharge les compteurs sauvegardés. */
+    virtual void restoreCounters(
+        uint32_t switches,
+        double_t onSeconds)
+    {
+        (void)switches;
+        (void)onSeconds;
     }
 
     void registerParameters(

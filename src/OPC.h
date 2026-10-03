@@ -96,6 +96,13 @@ private:
     static constexpr uint32_t HOME_SETPOINT_SAVE_DELAY_MS =
         10000;
 
+    // Sauvegarde périodique des compteurs d'entretien (/counters.json) :
+    // une coupure perd au plus cette durée de comptage.
+    static constexpr uint32_t COUNTERS_SAVE_PERIOD_MS =
+        3600000;
+
+    static constexpr uint32_t COUNTERS_SCHEMA_VERSION = 1;
+
     // Lectures du DS3231 ratées tolérées avant de déclarer l'heure inconnue.
     static constexpr uint8_t CLOCK_READ_FAILURES_TOLERATED =
         3;
@@ -131,6 +138,7 @@ private:
     bool sensorBoardInitialized = false;
     bool configurationSavePending = false;
     uint32_t configurationSaveDueAt = 0;
+    uint32_t lastCountersSave = 0;
     bool controlCycleStarted = false;
     uint32_t lastMeasurementTime = 0;
 
@@ -176,6 +184,11 @@ private:
     // Cœur UI : encodeur à l'accueil (réglage de la consigne ou menu).
     void homePoll(int32_t movement, bool clicked);
     void commitHomeSetpoint();
+
+    // Cœur contrôle : compteurs d'entretien, relus au démarrage et
+    // sauvegardés périodiquement ou après une remise à zéro.
+    void restoreCounters();
+    void saveCounters();
 
     // Cœur contrôle : sauvegarde après delayMs (repoussée par une nouvelle
     // demande différée, immédiate si delayMs vaut 0).

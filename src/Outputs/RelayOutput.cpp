@@ -5,6 +5,10 @@
 #include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
 
+#include <climits>
+#include <cmath>
+#include <cstdio>
+
 namespace
 {
     constexpr ParameterOption RELAY_PIN_OPTIONS[] = {
@@ -47,6 +51,12 @@ void RelayOutput::begin(
     bool safeState)
 {
     Output::begin(key, name);
+
+    std::snprintf(
+        counterOwnerKey,
+        sizeof(counterOwnerKey),
+        "%s.counters",
+        key);
     
     settings.pin = pin;
     settings.activeHigh = activeHigh;
@@ -106,11 +116,50 @@ void RelayOutput::poll(uint32_t now)
     const bool appliedState =
         appliedCommand() >= 0.5;
 
+    refreshCounterDisplay();
+
     if (requestedState == appliedState ||
         !minimumTimeElapsed(appliedState))
         return;
 
     applyLogicalState(requestedState);
+}
+
+const OutputCounters* RelayOutput::counters() const
+{
+    return &counterData;
+}
+
+double_t RelayOutput::onSeconds() const
+{
+    double_t total = counterData.onSeconds;
+
+    if (initialized && appliedCommand() >= 0.5)
+        total += (millis() - onSpanStart) / 1000.0;
+
+    return total;
+}
+
+void RelayOutput::resetCounters()
+{
+    counterData.switches = 0;
+    counterData.onSeconds = 0.0;
+    onSpanStart = millis();
+    refreshCounterDisplay();
+}
+
+void RelayOutput::restoreCounters(uint32_t switches, double_t onSeconds)
+{
+    counterData.switches = switches;
+    counterData.onSeconds =
+        std::isfinite(onSeconds) && onSeconds > 0.0 ? onSeconds : 0.0;
+    refreshCounterDisplay();
+}
+
+void RelayOutput::refreshCounterDisplay()
+{
+    displayedSwitches = counterData.switches;
+    displayedOnHours = onSeconds() / 3600.0;
 }
 
 bool RelayOutput::minimumTimeElapsed(bool appliedState) const
@@ -175,8 +224,28 @@ void RelayOutput::lockSafeState(bool safeState)
 
 void RelayOutput::applyLogicalState(bool state)
 {
-    if (state != (appliedCommand() >= 0.5))
-        lastSwitchTime = millis();
+    const bool wasOn = appliedCommand() >= 0.5;
+
+    if (state != wasOn)
+    {
+        const uint32_t now = millis();
+
+        // Compteurs d'entretien : chaque basculement réel, et la durée de
+        // la marche qui se termine.
+        if (initialized)
+        {
+            if (wasOn)
+                counterData.onSeconds += (now - onSpanStart) / 1000.0;
+
+            if (counterData.switches < UINT32_MAX)
+                counterData.switches++;
+        }
+
+        if (state)
+            onSpanStart = now;
+
+        lastSwitchTime = now;
+    }
 
     writePhysicalState(
         configuredPin,
@@ -244,6 +313,56 @@ void RelayOutput::registerParameters(
         1800,
         5,
         "s");
+
+    // Divers > Compteurs > <relais> : valeurs en lecture seule (sauvegardées
+    // à part, dans /counters.json) et seuil d'entretien.
+    auto counterValues = list.forOwner({
+        "miscellaneous",
+        "Divers",
+        counterOwnerKey,
+        getName(),
+        false,
+        "counters"
+    });
+
+    counterValues.addInteger(
+        "switches",
+        "Manœuvres",
+        displayedSwitches,
+        0,
+        INT32_MAX,
+        1,
+        nullptr,
+        true);
+
+    counterValues.addDouble(
+        "on_hours",
+        "Heures ON",
+        displayedOnHours,
+        "h",
+        true,
+        1);
+
+    auto counterSettings = list.forOwner({
+        "miscellaneous",
+        "Divers",
+        counterOwnerKey,
+        getName(),
+        true,
+        "counters"
+    });
+
+    // Un relais standard tient environ 150 000 manœuvres à pleine charge.
+    counterSettings.addInteger(
+        "maintenance_limit",
+        "Seuil entret.",
+        counterData.maintenanceLimit,
+        0,
+        2000000,
+        10000);
+
+    // Sans effet sur la régulation : appliqué sans état sûr.
+    list.setLive(counterOwnerKey, "maintenance_limit");
 }
 
 bool RelayOutput::validateParameters(

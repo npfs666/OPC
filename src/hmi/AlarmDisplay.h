@@ -12,7 +12,9 @@ class ProcessSnapshot;
  *  - "ALARME <nom>" pour une alarme, "<n> ALARMES" pour plusieurs ;
  *  - rouge si une alarme est en cours, orange si elles sont seulement
  *    mémorisées (cause disparue, acquittement attendu) ;
- *  - vide sans alarme.
+ *  - sans alarme : "ENTRETIEN <sortie>" (ou "<n> ENTRETIENS") en orange
+ *    quand le seuil d'entretien d'un relais est atteint ;
+ *  - vide sinon.
  */
 namespace AlarmDisplay
 {

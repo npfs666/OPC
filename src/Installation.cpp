@@ -88,15 +88,18 @@ bool Installation::buildMenu(
             continue;
         }
 
-        // Sous-menu placé dans celui de son propriétaire parent.
+        // Sous-menu placé dans celui de son propriétaire parent. Un parent
+        // rangé sous Divers n'existe qu'à la seconde passe : reporté.
         if (parameter->parentOwnerKey != nullptr)
         {
             const MenuBuilder::GroupId parent =
                 menu.findGroupForOwner(
                     parameter->parentOwnerKey);
 
-            if (parent == MenuBuilder::INVALID_GROUP ||
-                !addOwner(
+            if (parent == MenuBuilder::INVALID_GROUP)
+                continue;
+
+            if (!addOwner(
                     parent,
                     *parameter,
                     true))
@@ -219,6 +222,25 @@ bool Installation::buildMenu(
                 parameter->ownerKey) !=
             MenuBuilder::INVALID_GROUP)
         {
+            continue;
+        }
+
+        // Sous-menu d'un parent rangé sous Divers (créé plus haut).
+        if (parameter->parentOwnerKey != nullptr)
+        {
+            const MenuBuilder::GroupId parent =
+                menu.findGroupForOwner(
+                    parameter->parentOwnerKey);
+
+            if (parent == MenuBuilder::INVALID_GROUP ||
+                !addOwner(
+                    parent,
+                    *parameter,
+                    true))
+            {
+                return false;
+            }
+
             continue;
         }
 

@@ -38,6 +38,9 @@ public:
     /** Action « Acquitter » du menu Alarmes, si l'installation en a. */
     static constexpr MenuBuilder::ActionId ACKNOWLEDGE_ALARMS_ACTION = 48;
 
+    /** Action « RAZ compteurs » de la sortie d'indice i : base + i. */
+    static constexpr MenuBuilder::ActionId RESET_COUNTERS_ACTION = 49;
+
     bool addMenuActions(MenuBuilder& menu) const;
     bool handlesMenuAction(MenuBuilder::ActionId actionId) const;
     bool executeMenuAction(MenuBuilder::ActionId actionId);
@@ -94,6 +97,21 @@ public:
      */
     void printStatusEvents(Stream& stream);
 
+    // ----- Compteurs d'entretien -----
+
+    /** Cœur contrôle, à chaque tour : durée de fonctionnement de la carte. */
+    void updateOperatingTime(uint32_t now);
+
+    double_t operatingSeconds() const;
+    void restoreOperatingSeconds(double_t seconds);
+
+    /** Sorties enregistrées, pour la sauvegarde des compteurs. */
+    size_t registeredOutputCount() const;
+    Output* registeredOutput(size_t index);
+
+    /** Vrai une fois après une remise à zéro : compteurs à sauvegarder. */
+    bool takeCountersChanged();
+
     void registerParameters(ParameterList& list);
 
     bool validateParameters(
@@ -131,6 +149,7 @@ private:
     };
 
     void recordAlarmChanges(uint32_t now);
+    void recordMaintenanceChanges(uint32_t now);
     AlarmState alarmState(uint8_t index) const;
 
     LimitAlarm* alarms[MAX_ALARMS] = {};
@@ -138,6 +157,25 @@ private:
     AlarmState loggedAlarmState[MAX_ALARMS] = {};
     AlarmEvent alarmEvents[MAX_STATUS_EVENTS] = {};
     uint8_t alarmEventCount = 0;
+
+    // Seuils d'entretien atteints (journalisés une fois par sortie).
+    struct MaintenanceEvent
+    {
+        uint32_t time;
+        uint8_t output;
+        uint32_t switches;
+    };
+
+    bool maintenanceLogged[MAX_REGISTERED_OUTPUTS] = {};
+    MaintenanceEvent maintenanceEvents[MAX_STATUS_EVENTS] = {};
+    uint8_t maintenanceEventCount = 0;
+
+    // Durée de fonctionnement de la carte, et copie affichée dans le menu.
+    double_t operatingSecondsTotal = 0.0;
+    double_t operatingHoursDisplay = 0.0;
+    uint32_t lastOperatingTick = 0;
+    bool operatingTickStarted = false;
+    bool countersChanged = false;
 
     ClockSample clockSample;
 
