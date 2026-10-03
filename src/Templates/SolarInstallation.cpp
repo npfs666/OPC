@@ -7,6 +7,7 @@
 #include <Adafruit_GFX.h>
 
 #include <hmi/HomeScreen.h>
+#include <hmi/AlarmDisplay.h>
 #include <hmi/MeasurementDisplay.h>
 #include <hmi/TextField.h>
 #include <ProcessSnapshot.h>
@@ -39,6 +40,7 @@ namespace
     constexpr int16_t SEPARATOR_2_Y = 136;
     constexpr int16_t PUMP_Y = 146;
     constexpr int16_t HEATER_Y = 170;
+    constexpr int16_t ALARM_Y = 200;
 
     constexpr size_t LABEL_CHARS = 8;       // "Ballon H"
     constexpr size_t VALUE_CHARS = 9;       // "-123.4 °C", "C-CIRCUIT"
@@ -282,6 +284,13 @@ bool SolarInstallation::begin(
         return fail("Appoint électrique non relié");
     }
 
+    // Alarme de surchauffe du haut du ballon, à activer dans le menu Alarmes.
+    tankAlarm.begin("tank_alarm", "Ballon chaud", tankTopTemperature);
+    tankAlarm.settings.limit = 85.0;
+
+    if (!process.add(tankAlarm))
+        return fail("Alarme ballon non enregistrée");
+
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
@@ -447,4 +456,8 @@ void SolarInstallation::printHomeScreen(
         printValue(display, HEATER_Y, COLOR_GREY, "HORS HC");
     else
         printValue(display, HEATER_Y, COLOR_GREY, "OFF");
+
+    // ----- Alarmes -----
+
+    AlarmDisplay::printBanner(display, context.snapshot, ALARM_Y);
 }

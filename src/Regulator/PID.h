@@ -145,6 +145,9 @@ public:
     void update(uint32_t now) override;
     void resume(uint32_t now) override;
 
+    /** Consigne active, sauf PID arrêté ou autotune en cours. */
+    bool readSetpoint(double_t& setpoint) const override;
+
     /** Enregistre uniquement les réglages du PID automatique. */
     void registerParameters(
         ParameterList& list) override;

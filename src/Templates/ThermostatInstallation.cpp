@@ -7,6 +7,7 @@
 #include <Adafruit_GFX.h>
 
 #include <hmi/HomeScreen.h>
+#include <hmi/AlarmDisplay.h>
 #include <hmi/MeasurementDisplay.h>
 #include <hmi/TextField.h>
 #include <ProcessSnapshot.h>
@@ -43,6 +44,7 @@ namespace
     constexpr int16_t GAUGE_HEIGHT = 14;
     constexpr int16_t MARKER_OVERHANG = 5;      // repère plus haut que la jauge
     constexpr int16_t RELAY_Y = 172;            // taille 2
+    constexpr int16_t ALARM_Y = 190;            // taille 2
     constexpr int16_t SAFETY_Y = 208;           // taille 2
 
     /*
@@ -180,6 +182,15 @@ bool ThermostatInstallation::begin(
     {
         return fail("Relais thermostat non relié à la commande");
     }
+
+    // Alarme de température haute, à activer dans le menu Alarmes. Le
+    // thermostat sert de référence aux types relatifs à la consigne.
+    alarm.begin("thermostat_alarm", "Temp. haute", temperature);
+    alarm.settings.limit = 80.0;
+    alarm.setReference(thermostat);
+
+    if (!process.add(alarm))
+        return fail("Alarme thermostat non enregistrée");
 
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
@@ -356,6 +367,10 @@ void ThermostatInstallation::printHomeScreen(
         printValue(display, RELAY_Y, COLOR_ORANGE, "ATTENTE");
     else
         printValue(display, RELAY_Y, COLOR_GREY, "OFF");
+
+    // ----- Alarmes -----
+
+    AlarmDisplay::printBanner(display, context.snapshot, ALARM_Y);
 
     // ----- Relais forcé en état sûr, ou maintenu sur défaut capteur -----
 

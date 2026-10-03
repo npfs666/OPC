@@ -132,6 +132,15 @@ void Thermostat::update(uint32_t now)
     }
 }
 
+bool Thermostat::readSetpoint(double_t& setpoint) const
+{
+    if (!setpointRamp.hasActiveSetpoint())
+        return false;
+
+    setpoint = setpointRamp.activeSetpoint();
+    return true;
+}
+
 void Thermostat::resume(uint32_t now)
 {
     Regulator::resume(now);

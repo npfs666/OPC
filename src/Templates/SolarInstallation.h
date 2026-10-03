@@ -11,6 +11,7 @@
 #include <Outputs/ActuatorOnOff.h>
 #include <Outputs/RelayOutput.h>
 
+#include <Regulator/LimitAlarm.h>
 #include <Regulator/SolarRegulator.h>
 #include <Regulator/Thermostat.h>
 #include <Regulator/TimeSchedule.h>
@@ -76,6 +77,9 @@ private:
     Thermostat backupHeater;
     ActuatorOnOff heater;
     RelayOutput heaterRelay;
+
+    // Alarme (affichée seulement, désactivée par défaut)
+    LimitAlarm tankAlarm;
 
     // Copie pour le cœur UI, faite par captureHomeScreenState().
     struct HomeState

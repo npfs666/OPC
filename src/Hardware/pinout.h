@@ -12,7 +12,8 @@
 #define MAX_ACTUATORS 16    // Used in ProcessControl
 #define MAX_OUTPUTS 4       // Maximum outputs connected to one Actuator
 #define MAX_REGISTERED_OUTPUTS 16 // Outputs managed by ProcessControl
-#define MAX_PARAMETERS 128  // Used in ParameterList
+#define MAX_PARAMETERS 192  // Used in ParameterList
+#define MAX_ALARMS 8        // Alarmes de seuil suivies par ProcessControl
 
 
 

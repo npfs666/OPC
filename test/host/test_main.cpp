@@ -3068,6 +3068,7 @@ void runRelayTimingTests();
 void runInputFilterTests();
 void runFaultFallbackTests();
 void runHomeSetpointTests();
+void runLimitAlarmTests();
 
 int main()
 {
@@ -3255,6 +3256,7 @@ int main()
     runInputFilterTests();
     runFaultFallbackTests();
     runHomeSetpointTests();
+    runLimitAlarmTests();
 
     return TestHarness::finish();
 }

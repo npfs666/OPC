@@ -406,6 +406,7 @@ pompe, ainsi que l'état de l'appoint.
 | Entrée analogique | `Sensor` : PT100 / PT1000 (2, 3 ou 4 fils), thermocouple B, E, J, K, N, R, S, T |
 | Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
 | Régulateurs | `Thermostat`, `SolarRegulator`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
+| Alarmes | `LimitAlarm` : surveillance de seuil, voir [Alarmes](#alarmes) |
 | Actionneurs | `ActuatorOnOff`, `ActuatorPWM`, `TimeProportionalActuator` |
 | Sorties | `RelayOutput`, `PWMOutput` — voir [src/Outputs/README.md](src/Outputs/README.md) |
 | Entrées numériques | `DigitalInput` — voir [src/Inputs/readme.md](src/Inputs/readme.md) |
@@ -441,8 +442,8 @@ Notes sur les mesures :
 
 Les tailles des listes internes sont fixes (pas d'allocation dynamique) et
 réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 16 régulateurs,
-16 actionneurs, 16 sorties, 2 entrées numériques, 128 paramètres (un
-`TimeSchedule` en utilise 19).
+16 actionneurs, 16 sorties, 2 entrées numériques, 8 alarmes, 192 paramètres
+(un `TimeSchedule` en utilise 19, une `LimitAlarm` 8).
 
 ## Utilisation
 
@@ -577,6 +578,80 @@ Il n'existe volontairement pas de sortie forcée : sans mesure, l'état sûr
 reste la règle. `lockFaultAction(Regulator::FaultAction::SafeState)` retire le
 choix du menu (l'appoint électrique du template solaire est verrouillé
 ainsi). Le régulateur solaire est toujours en sécurité sur défaut.
+
+## Alarmes
+
+Une `LimitAlarm` surveille une mesure, sur le modèle des fonctions d'alarme
+des régulateurs compacts. Les templates thermostat, PID et solaire en ont une,
+**désactivée par défaut**, affichée seulement : menu `Alarmes > <nom>`.
+
+| Type | Alarme quand |
+| --- | --- |
+| `Max` | mesure > seuil |
+| `Min` | mesure < seuil |
+| `Écart haut` | mesure > consigne + seuil |
+| `Écart bas` | mesure < consigne − seuil |
+| `Hors bande` | \|mesure − consigne\| > seuil |
+
+Les types relatifs lisent la consigne active (rampe et programme compris) du
+régulateur de référence donné par `setReference()` ; sans référence, seuls
+`Max` et `Min` sont proposés. Quand ce régulateur est arrêté, l'alarme
+relative est suspendue.
+
+Réglages :
+
+- **Seuil** et **Hystérésis** : l'alarme cesse quand la mesure revient de
+  l'hystérésis en deçà du seuil ;
+- **Tempo** : durée minimale au-delà du seuil avant l'alarme (0 à 3600 s) ;
+- **Masquage dém.** : pour les alarmes basses (`Min`, `Écart bas`, `Hors
+  bande` sous la consigne), pas d'alarme tant que la mesure n'est pas d'abord
+  entrée dans la zone normale, au démarrage, à l'activation de l'alarme ou au
+  redémarrage du régulateur de référence. Évite une alarme `Min` à chaque
+  mise en chauffe. Un dépassement haut (`Max`, `Écart haut`) n'est jamais
+  masqué ;
+- **Mémorisation** : l'alarme reste signalée après la disparition de sa cause,
+  jusqu'à l'acquittement ;
+- **Sur défaut** : un défaut de sonde (rupture, court-circuit, hors étendue)
+  déclenche l'alarme, sans masquage ni attente de la zone normale.
+
+**Acquittement** : action `Alarmes > Acquitter` (sans état sûr ni sauvegarde),
+ou entrée numérique avec `setAcknowledgeInput()` (front montant). Une alarme
+acquittée pendant que sa cause dure reste signalée jusqu'à la fin de la cause,
+mais n'est pas mémorisée.
+
+**Affichage** : bandeau `ALARME <nom>` (ou `<n> ALARMES`) à l'accueil, rouge
+tant qu'une cause est présente, orange quand l'alarme est seulement mémorisée.
+Le port série journalise chaque changement : `[12345 ms] Alarme Temp. haute :
+ACTIVE`, puis `MEMORISEE` ou `FIN`.
+
+### Câbler une alarme sur un relais
+
+La commande d'une alarme vaut 1 quand elle est signalée : elle se branche comme
+un thermostat.
+
+```cpp
+alarme.begin("alarm_max", "Temp. max", temperature);
+alarme.setReference(thermostat);          // optionnel : types relatifs
+commandeAlarme.begin("alarm_cmd", "Alarme", alarme);       // ActuatorOnOff
+relaisAlarme.begin("alarm_relay", "Relais 2", Board::Rp2040::OUTPUT_2,
+                   false,   // actif à LOW : bobine collée hors alarme
+                   true);   // état sûr ON = alarme
+
+if (!process.add(alarme) || !process.add(commandeAlarme) ||
+    !process.connect(commandeAlarme, relaisAlarme))
+    return fail("Alarme non reliée");
+```
+
+Avec `Actif à HIGH` à non et l'état sûr à `ON`, le relais est **à sécurité
+positive** : collé tant que tout va bien, il retombe en alarme, sur coupure de
+courant ou sur fil coupé. L'écran affiche alors l'état logique (`ON` =
+alarme). Une sortie ne peut être reliée qu'à un actionneur : une alarme par
+relais.
+
+Ajouter l'alarme au `ProcessControl` après son régulateur de référence, pour
+qu'elle lise la consigne du même cycle. Une alarme ne remplace pas un
+thermostat de sécurité indépendant : elle dépend de la même sonde et du même
+logiciel que la régulation.
 
 ## Sécurité
 

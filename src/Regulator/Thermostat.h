@@ -49,6 +49,8 @@ public:
     void update(uint32_t now);
     void resume(uint32_t now) override;
 
+    bool readSetpoint(double_t& setpoint) const override;
+
     void print(Stream& stream) const override;
 
     void registerParameters(ParameterList& list) override;

@@ -51,6 +51,17 @@ public:
     bool isInFallback() const;
 
     /**
+     * Consigne active (rampe et programme compris), pour les alarmes
+     * relatives à la consigne. Faux si le régulateur n'en a pas, ou s'il
+     * est arrêté.
+     */
+    virtual bool readSetpoint(double_t& setpoint) const
+    {
+        (void)setpoint;
+        return false;
+    }
+
+    /**
      * Impose l'action en cas de défaut et la retire du menu, par exemple
      * l'état sûr pour un appoint électrique.
      */

@@ -11,6 +11,7 @@
 #include <Outputs/ActuatorOnOff.h>
 #include <Outputs/RelayOutput.h>
 
+#include <Regulator/LimitAlarm.h>
 #include <Regulator/Thermostat.h>
 
 class Adafruit_BMP5xx;
@@ -55,6 +56,9 @@ private:
     // Commande du relais
     ActuatorOnOff relayActuator;
     RelayOutput relayOutput;
+
+    // Alarme (affichée seulement, désactivée par défaut)
+    LimitAlarm alarm;
 
     // Copie pour le cœur UI, faite par captureHomeScreenState().
     struct HomeState

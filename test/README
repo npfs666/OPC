@@ -37,6 +37,8 @@ Ils couvrent actuellement :
   verrouillage) et le thermostat dans sa bande d'hystérésis ;
 - la consigne réglée depuis l'accueil (pas, accélération, limites, grille,
   abandon sur inactivité, désignation par l'installation) ;
+- les alarmes de seuil (types absolus et relatifs, hystérésis, temporisation,
+  masquage, mémorisation et acquittement, défaut de sonde, journal, bandeau) ;
 - les états de mesure : acquisition (saturations), classement des
   résistances RTD, thermocouple ouvert ou hors domaine, propagation,
   affichage (libellés, couleurs), journal des changements et snapshot.

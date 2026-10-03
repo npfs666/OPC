@@ -39,6 +39,7 @@ fi
     "${project_dir}/test/host/test_input_filter.cpp" \
     "${project_dir}/test/host/test_fault_fallback.cpp" \
     "${project_dir}/test/host/test_home_setpoint.cpp" \
+    "${project_dir}/test/host/test_limit_alarm.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -46,6 +47,7 @@ fi
     "${project_dir}/src/Installation.cpp" \
     "${project_dir}/src/hmi/Displayable.cpp" \
     "${project_dir}/src/hmi/DisplayTextCodec.cpp" \
+    "${project_dir}/src/hmi/AlarmDisplay.cpp" \
     "${project_dir}/src/hmi/HomeSetpointEditor.cpp" \
     "${project_dir}/src/hmi/MeasurementDisplay.cpp" \
     "${project_dir}/src/hmi/MenuBuilder.cpp" \
@@ -72,6 +74,7 @@ fi
     "${project_dir}/src/Regulator/PID.cpp" \
     "${project_dir}/src/Regulator/PIDAutoTune.cpp" \
     "${project_dir}/src/Regulator/Regulator.cpp" \
+    "${project_dir}/src/Regulator/LimitAlarm.cpp" \
     "${project_dir}/src/Regulator/ScheduledSetpoint.cpp" \
     "${project_dir}/src/Regulator/SetpointRamp.cpp" \
     "${project_dir}/src/Regulator/SolarRegulator.cpp" \

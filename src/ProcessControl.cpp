@@ -5,6 +5,7 @@
 #include <Outputs/Actuator.h>
 #include <Outputs/Output.h>
 #include <ProcessSnapshot.h>
+#include <Regulator/LimitAlarm.h>
 #include <Regulator/Regulator.h>
 #include <hmi/ParameterList.h>
 
@@ -92,6 +93,63 @@ bool ProcessControl::add(Regulator& regulator)
     return true;
 }
 
+bool ProcessControl::add(LimitAlarm& alarm)
+{
+    if (alarmCount >= MAX_ALARMS)
+        return false;
+
+    for (uint8_t i = 0; i < alarmCount; i++)
+    {
+        if (alarms[i] == &alarm)
+            return false;
+    }
+
+    if (!add(static_cast<Regulator&>(alarm)))
+        return false;
+
+    alarms[alarmCount++] = &alarm;
+    return true;
+}
+
+void ProcessControl::acknowledgeAlarms()
+{
+    for (uint8_t i = 0; i < alarmCount; i++)
+        alarms[i]->acknowledge();
+}
+
+bool ProcessControl::addMenuActions(MenuBuilder& menu) const
+{
+    if (alarmCount == 0)
+        return true;
+
+    const MenuBuilder::GroupId group =
+        menu.findSubmenu(menu.root(), "alarms");
+
+    return
+        group != MenuBuilder::INVALID_GROUP &&
+        menu.addAction(
+            group,
+            ACKNOWLEDGE_ALARMS_ACTION,
+            "acknowledge_alarms",
+            "Acquitter");
+}
+
+bool ProcessControl::handlesMenuAction(
+    MenuBuilder::ActionId actionId) const
+{
+    return actionId == ACKNOWLEDGE_ALARMS_ACTION && alarmCount > 0;
+}
+
+bool ProcessControl::executeMenuAction(
+    MenuBuilder::ActionId actionId)
+{
+    if (!handlesMenuAction(actionId))
+        return false;
+
+    acknowledgeAlarms();
+    return true;
+}
+
 bool ProcessControl::add(Actuator& actuator)
 {
     if (actuatorCount >= MAX_ACTUATORS)
@@ -169,7 +227,41 @@ void ProcessControl::updateMeasurementsAndRegulators(
     for (uint8_t i = 0; i < regulatorCount; i++)
         regulators[i]->update(now);
 
+    recordAlarmChanges(now);
+
     poll(now);
+}
+
+ProcessControl::AlarmState ProcessControl::alarmState(uint8_t index) const
+{
+    const LimitAlarm& alarm = *alarms[index];
+
+    if (alarm.isLatched())
+        return AlarmState::Latched;
+
+    return alarm.isActive() ? AlarmState::Active : AlarmState::Clear;
+}
+
+void ProcessControl::recordAlarmChanges(uint32_t now)
+{
+    for (uint8_t i = 0; i < alarmCount; i++)
+    {
+        const AlarmState state = alarmState(i);
+
+        if (state == loggedAlarmState[i])
+            continue;
+
+        loggedAlarmState[i] = state;
+
+        if (alarmEventCount >= MAX_STATUS_EVENTS)
+        {
+            if (lostStatusEvents < UINT16_MAX)
+                lostStatusEvents++;
+            continue;
+        }
+
+        alarmEvents[alarmEventCount++] = {now, i, state};
+    }
 }
 
 void ProcessControl::recordStatusChanges(uint32_t now)
@@ -224,6 +316,25 @@ void ProcessControl::printStatusEvents(Stream& stream)
         stream.println(line);
     }
 
+    for (uint8_t i = 0; i < alarmEventCount; i++)
+    {
+        const AlarmEvent& event = alarmEvents[i];
+
+        std::snprintf(
+            line,
+            sizeof(line),
+            "[%lu ms] Alarme %s : %s",
+            static_cast<unsigned long>(event.time),
+            alarms[event.alarm]->getName(),
+            event.state == AlarmState::Active
+                ? "ACTIVE"
+                : event.state == AlarmState::Latched
+                    ? "MEMORISEE"
+                    : "FIN");
+
+        stream.println(line);
+    }
+
     if (lostStatusEvents > 0)
     {
         std::snprintf(
@@ -236,6 +347,7 @@ void ProcessControl::printStatusEvents(Stream& stream)
     }
 
     statusEventCount = 0;
+    alarmEventCount = 0;
     lostStatusEvents = 0;
 }
 
@@ -342,6 +454,9 @@ void ProcessControl::captureSnapshot(
         if (outputs[i] != nullptr)
             destination.add(*outputs[i]);
     }
+
+    for (uint8_t i = 0; i < alarmCount; i++)
+        destination.add(*alarms[i]);
 }
 
 /*Measurement* ProcessControl::getMeasurement(uint8_t id) {

@@ -489,6 +489,19 @@ bool PID::controlSettingsAreValid() const
             settings.outputMax;
 }
 
+bool PID::readSetpoint(double_t& setpoint) const
+{
+    if (!settings.enabled ||
+        autoTune.isActive() ||
+        !setpointRamp.hasActiveSetpoint())
+    {
+        return false;
+    }
+
+    setpoint = setpointRamp.activeSetpoint();
+    return true;
+}
+
 void PID::update(uint32_t now)
 {
     const bool measurementValid =

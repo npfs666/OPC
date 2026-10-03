@@ -9,6 +9,7 @@
 
 #include <ProcessSnapshot.h>
 #include <hmi/HomeScreen.h>
+#include <hmi/AlarmDisplay.h>
 #include <hmi/MeasurementDisplay.h>
 #include <hmi/TextField.h>
 
@@ -39,6 +40,7 @@ namespace
     constexpr int16_t BAR_Y = 144;
     constexpr int16_t BAR_HEIGHT = 14;
     constexpr int16_t RELAY_Y = 172;        // taille 2
+    constexpr int16_t ALARM_Y = 194;        // taille 2
     constexpr int16_t GAINS_Y = 216;        // taille 1
 
     constexpr size_t MEASUREMENT_CHARS = 9; // 9 × 24 px = 216 px
@@ -177,6 +179,17 @@ bool PIDInstallation::begin(
     {
         return fail("Relais PID non relié à l'actionneur");
     }
+
+    // Alarme d'écart à la consigne, à activer dans le menu Alarmes :
+    // hors de ± 10 °C pendant 5 min.
+    alarm.begin("pid_alarm", "Ecart PID", temperature);
+    alarm.settings.type = LimitAlarm::Type::Band;
+    alarm.settings.limit = 10.0;
+    alarm.settings.delay = 300;
+    alarm.setReference(pid);
+
+    if (!process.add(alarm))
+        return fail("Alarme PID non enregistrée");
 
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
@@ -519,6 +532,10 @@ void PIDInstallation::printHomeScreen(
         printValue(display, RELAY_Y, COLOR_ORANGE, "ATTENTE");
     else
         printValue(display, RELAY_Y, COLOR_GREY, "OFF");
+
+    // ----- Alarmes -----
+
+    AlarmDisplay::printBanner(display, context.snapshot, ALARM_Y);
 
     // ----- Gains -----
 

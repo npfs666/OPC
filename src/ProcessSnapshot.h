@@ -11,6 +11,7 @@
 
 class Measurement;
 class DigitalInput;
+class LimitAlarm;
 class Output;
 class ProcessControl;
 class ProcessSnapshot;
@@ -62,6 +63,21 @@ private:
     const Output* source = nullptr;
 };
 
+struct AlarmSample
+{
+    const char* name = "";
+    bool enabled = false;
+    // Signalée : en cours ou mémorisée.
+    bool active = false;
+    // Mémorisée : cause disparue, acquittement attendu.
+    bool latched = false;
+
+private:
+    friend class ProcessSnapshot;
+
+    const LimitAlarm* source = nullptr;
+};
+
 class ProcessSnapshot
 {
 public:
@@ -87,6 +103,12 @@ public:
     const OutputSample* find(
         const Output& output) const;
 
+    size_t alarmCount() const;
+
+    const AlarmSample* alarmAt(size_t index) const;
+
+    const AlarmSample* find(const LimitAlarm& alarm) const;
+
     uint32_t capturedAt() const;
 
     /** Heure du DS3231 ; valid est faux si elle est inconnue. */
@@ -108,12 +130,16 @@ private:
     bool add(
         const Output& output);
 
+    bool add(const LimitAlarm& alarm);
+
     MeasurementSample measurementSamples[MAX_MEASUREMENTS] = {};
     DigitalInputSample digitalInputSamples[MAX_DIGITAL_INPUTS] = {};
     size_t digitalInputSampleCount = 0;
     OutputSample outputSamples[MAX_REGISTERED_OUTPUTS] = {};
     size_t measurementSampleCount = 0;
     size_t outputSampleCount = 0;
+    AlarmSample alarmSamples[MAX_ALARMS] = {};
+    size_t alarmSampleCount = 0;
     uint32_t captureTime = 0;
     ClockSample clockSample;
     bool clockNeeded = false;

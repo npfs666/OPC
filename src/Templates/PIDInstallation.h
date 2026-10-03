@@ -11,6 +11,7 @@
 #include <Outputs/RelayOutput.h>
 #include <Outputs/TimeProportionalActuator.h>
 
+#include <Regulator/LimitAlarm.h>
 #include <Regulator/PID.h>
 
 class Adafruit_BMP5xx;
@@ -93,6 +94,9 @@ private:
     // Commande temporisée du relais
     TimeProportionalActuator actuator;
     RelayOutput controlRelay;
+
+    // Alarme (affichée seulement, désactivée par défaut)
+    LimitAlarm alarm;
 
     HomeState homeState;
 

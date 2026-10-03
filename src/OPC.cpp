@@ -515,6 +515,8 @@ void OPC::initMenu()
     if (!userInstall.buildMenu(
             menuDefinition) ||
         !input.addMenuActions(
+            menuDefinition) ||
+        !controller.addMenuActions(
             menuDefinition))
     {
         Serial.println("Menu generation failed");
@@ -979,6 +981,25 @@ void OPC::handleControlMessage(
             break;
         }
 
+        /*
+         * Acquittement seul : il ne modifie aucun réglage, donc ni pause de
+         * l'acquisition, ni état sûr, ni sauvegarde.
+         */
+        if (!parameterEditor.hasChanges() &&
+            controller.handlesMenuAction(actionId) &&
+            !acquisitionPausedForMenu)
+        {
+            mutex_enter_blocking(&processDataMutex);
+            controller.executeMenuAction(actionId);
+            mutex_exit(&processDataMutex);
+
+            menuSessionOpen = false;
+            __dmb();
+            rp2040.fifo.push(interCoreMessageValue(
+                InterCoreMessage::MenuParametersApplied));
+            break;
+        }
+
         // Une consultation seule ne touche ni au PID ni à l'acquisition.
         if (!parameterEditor.hasChanges() &&
             actionId == MenuBuilder::NO_ACTION &&
@@ -1036,6 +1057,7 @@ void OPC::handleControlMessage(
 
         bool actionSucceeded = true;
         bool sensorBoardAction = false;
+        bool controllerAction = false;
 
         if (actionId != MenuBuilder::NO_ACTION)
         {
@@ -1046,12 +1068,19 @@ void OPC::handleControlMessage(
                 input.handlesMenuAction(
                     actionId);
 
+            controllerAction =
+                controller.handlesMenuAction(
+                    actionId);
+
             actionSucceeded =
                 sensorBoardAction
                     ? input.executeMenuAction(
                           actionId)
-                    : userInstall.executeMenuAction(
-                          actionId);
+                    : controllerAction
+                        ? controller.executeMenuAction(
+                              actionId)
+                        : userInstall.executeMenuAction(
+                              actionId);
 
             controller.forceSafeOutputs();
 
@@ -1075,7 +1104,8 @@ void OPC::handleControlMessage(
                 input.onMenuActionSaveFailed(
                     actionId);
             }
-            else
+            // L'acquittement n'a rien à sauvegarder ni à annuler.
+            else if (!controllerAction)
             {
                 userInstall.onMenuActionSaveFailed(
                     actionId);
