@@ -68,6 +68,7 @@ private:
         bool pidEnabled = false;
         bool autoTuneActive = false;
         bool fallback = false;              // maintien sur défaut capteur
+        bool manual = false;                // sortie fixée par l'opérateur
 
         // Commande du PID (0 à 1), invalide si la régulation est arrêtée.
         double_t output = 0.0;

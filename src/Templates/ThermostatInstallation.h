@@ -69,6 +69,7 @@ private:
         bool ramping = false;
         bool commandValid = false;
         bool fallback = false;      // maintien sur défaut capteur
+        bool manual = false;        // relais forcé par l'opérateur
     };
 
     HomeState homeState;

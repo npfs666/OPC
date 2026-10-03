@@ -37,6 +37,9 @@ Ils couvrent actuellement :
   verrouillage) et le thermostat dans sa bande d'hystérésis ;
 - la consigne réglée depuis l'accueil (pas, accélération, limites, grille,
   abandon sur inactivité, désignation par l'installation) ;
+- le mode manuel du PID et du thermostat (suivi, sortie fixe, défaut de
+  sonde ignoré, retour sans à-coup même après le menu, réglages non
+  sauvegardés) et les réglages de conduite appliqués sans arrêt ;
 - les alarmes de seuil (types absolus et relatifs, hystérésis, temporisation,
   masquage, mémorisation et acquittement, défaut de sonde, journal, bandeau) ;
 - les états de mesure : acquisition (saturations), classement des

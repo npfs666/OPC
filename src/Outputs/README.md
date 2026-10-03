@@ -126,7 +126,9 @@ courts (compresseur, contacteur) :
   sûr à ON est lui aussi appliqué immédiatement ;
 - la validation du menu met les sorties en état sûr (voir
   [État sûr](#état-sûr)) : un compresseur s'arrête, puis repart après
-  `Arrêt mini`. Elle ne relance pas les chronos, sauf si la broche change.
+  `Arrêt mini`. Ce n'est pas le cas si seuls des réglages de conduite
+  (consignes, commande manuelle) ont été modifiés. Elle ne relance pas les
+  chronos, sauf si la broche change.
 
 Avec un `TimeProportionalActuator`, préférer son `Impulsion mini` : les temps
 minimaux du relais allongent ou suppriment des impulsions et faussent la

@@ -122,6 +122,13 @@ struct Parameter
     /* Indique si Storage doit sauvegarder et restaurer ce paramètre. */
     bool persistent = true;
 
+    /*
+     * Réglage de conduite (consigne, commande manuelle...) : modifié seul,
+     * il est appliqué sans pause de l'acquisition ni état sûr des sorties.
+     * Voir ParameterList::setLive().
+     */
+    bool live = false;
+
     union Value
     {
         bool* boolean;

@@ -546,11 +546,6 @@ void ProcessControl::registerParameters(ParameterList& list)
     {
         outputs[i]->registerParameters(list);
     }
-
-    /*for (size_t i = 0; i < measurementCount; i++)
-    {
-        measurements[i]->registerParameters(list);
-    }*/
 }
 
 bool ProcessControl::validateParameters(

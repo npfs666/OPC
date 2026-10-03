@@ -98,6 +98,24 @@ bool ParameterEditor::hasChanges(const char* ownerKey) const
     return false;
 }
 
+bool ParameterEditor::hasOnlyLiveChanges() const
+{
+    bool changed = false;
+
+    for (size_t i = 0; i < draftCount; i++)
+    {
+        if (!isChanged(i))
+            continue;
+
+        if (!drafts[i].parameter->live)
+            return false;
+
+        changed = true;
+    }
+
+    return changed;
+}
+
 void ParameterEditor::refreshUnchanged()
 {
     for (size_t i = 0; i < draftCount; i++)

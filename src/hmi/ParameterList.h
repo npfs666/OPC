@@ -371,6 +371,14 @@ public:
         const char* ownerKey,
         const char* key) const;
 
+    /**
+     * Marque un paramètre déjà enregistré comme réglage de conduite
+     * (Parameter::live). Faux s'il n'existe pas.
+     */
+    bool setLive(
+        const char* ownerKey,
+        const char* key);
+
     Writer forOwner(
         const ParameterOwner& owner);
 

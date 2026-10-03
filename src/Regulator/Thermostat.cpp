@@ -9,6 +9,12 @@
 
 namespace
 {
+    constexpr ParameterOption THERMOSTAT_OPERATION_OPTIONS[] = {
+        {static_cast<int32_t>(Thermostat::Operation::Auto), "Auto"},
+        {static_cast<int32_t>(Thermostat::Operation::ForcedOn), "Marche"},
+        {static_cast<int32_t>(Thermostat::Operation::ForcedOff), "Arrêt"}
+    };
+
     constexpr ParameterOption THERMOSTAT_MODE_OPTIONS[] = {
         {
             static_cast<int32_t>(
@@ -57,6 +63,19 @@ void Thermostat::setSchedule(
 
 void Thermostat::update(uint32_t now)
 {
+    /*
+     * Mode manuel : ni mesure ni repli. Au retour en Auto, la sortie forcée
+     * est conservée dans la bande d'hystérésis (pas d'à-coup) et la rampe
+     * repart de la mesure.
+     */
+    if (settings.operation != Operation::Auto)
+    {
+        setpointRamp.restart();
+        writeCommand(
+            settings.operation == Operation::ForcedOn ? 1.0 : 0.0);
+        return;
+    }
+
     if (temperature == nullptr ||
         !temperature->isValid() ||
         !std::isfinite(
@@ -192,6 +211,22 @@ void Thermostat::registerParameters(ParameterList& list) {
         getName()
     });
 
+    // Mode manuel en tête du menu, non sauvegardé (retour en Auto au
+    // démarrage).
+    auto operation = list.forOwner({
+        "regulators",
+        "Regulateur",
+        getConfigurationKey(),
+        getName(),
+        false
+    });
+
+    operation.addSelection(
+        "operation",
+        "Commande",
+        settings.operation,
+        THERMOSTAT_OPERATION_OPTIONS);
+
     parameters.addSelection(
         "mode",
         "Mode",
@@ -227,4 +262,9 @@ void Thermostat::registerParameters(ParameterList& list) {
         "°C");
 
     registerFaultParameters(list);
+
+    // Réglages de conduite : appliqués sans arrêter la régulation.
+    list.setLive(getConfigurationKey(), "operation");
+    list.setLive(getConfigurationKey(), "setpoint");
+    list.setLive(getConfigurationKey(), "reduced_setpoint");
 }

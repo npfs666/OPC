@@ -282,6 +282,8 @@ void PIDInstallation::captureHomeScreenState()
         pid.autoTuneSettings.cycles;
 
     homeState.fallback = pid.isInFallback();
+    homeState.manual =
+        pid.settings.operation == PID::Operation::Manual;
     homeState.output = pid.readCommand();
     homeState.outputValid = pid.isCommandValid();
 
@@ -351,7 +353,12 @@ void PIDInstallation::printHomeScreen(
     const char* status = "ARRET";
     uint16_t statusColor = COLOR_WHITE;
 
-    if (homeState.autoTuneActive)
+    if (homeState.manual)
+    {
+        status = "MANUEL";
+        statusColor = COLOR_ORANGE;
+    }
+    else if (homeState.autoTuneActive)
     {
         statusColor = COLOR_ORANGE;
 

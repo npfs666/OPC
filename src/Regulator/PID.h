@@ -18,6 +18,13 @@ public:
         Cooling = 1
     };
 
+    /** Commande automatique, ou sortie fixée par l'opérateur. */
+    enum class Operation : uint8_t
+    {
+        Auto = 0,
+        Manual = 1
+    };
+
     using AutoTuneSettings =
         PIDAutoTune::Settings;
 
@@ -61,6 +68,15 @@ public:
 
         /** Régulation automatique, indépendante d'un autotune en cours. */
         bool enabled = true;
+
+        /*
+         * Mode manuel : la sortie vaut manualOutput, sans tenir compte de la
+         * mesure ni de enabled. Non sauvegardé : retour en Auto au démarrage.
+         */
+        Operation operation = Operation::Auto;
+
+        /** Sortie manuelle en %. En Auto, elle suit la sortie calculée. */
+        double_t manualOutput = 0.0;
     };
 
     Settings settings;
@@ -205,6 +221,17 @@ private:
 
     /** Comme holdController(), sans toucher à la commande. */
     void freezeController();
+
+    /*
+     * Retour de manuel en automatique : au premier cycle, l'intégrale est
+     * recalculée pour que la sortie reprenne la dernière sortie manuelle
+     * (mémorisée ici : la validation du menu efface la commande).
+     */
+    bool manualHandover = false;
+    double_t handoverCommand = 0.0;
+
+    void updateManual();
+    void updateControl(uint32_t now);
 
     bool controlSettingsAreValid() const;
 

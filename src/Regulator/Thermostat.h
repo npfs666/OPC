@@ -17,11 +17,25 @@ public:
         Cooling
     };
 
+    /** Commande automatique, ou relais forcé par l'opérateur. */
+    enum class Operation : uint8_t
+    {
+        Auto,
+        ForcedOn,
+        ForcedOff
+    };
+
     struct Settings
     {
         Mode mode = Mode::Heating;
         double_t setpoint = 20.0;
         double_t hysteresis = 1.0;
+
+        /*
+         * Mode manuel : sortie forcée sans tenir compte de la mesure. Non
+         * sauvegardé : retour en Auto au démarrage.
+         */
+        Operation operation = Operation::Auto;
     };
 
     Settings settings;

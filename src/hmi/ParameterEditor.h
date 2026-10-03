@@ -22,6 +22,12 @@ public:
     bool validate() const;
     bool apply();
     bool hasChanges(const char* ownerKey = nullptr) const;
+
+    /**
+     * Vrai s'il y a des modifications et qu'elles ne portent que sur des
+     * réglages de conduite (Parameter::live).
+     */
+    bool hasOnlyLiveChanges() const;
     // À appeler sur le cœur de contrôle avant de valider le menu.
     void refreshUnchanged();
 

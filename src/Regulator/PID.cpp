@@ -19,6 +19,11 @@ namespace
     constexpr double_t DEFAULT_SETPOINT_MIN = -50.0;
     constexpr double_t DEFAULT_SETPOINT_MAX = 250.0;
 
+    constexpr ParameterOption PID_OPERATION_OPTIONS[] = {
+        {static_cast<int32_t>(PID::Operation::Auto), "Auto"},
+        {static_cast<int32_t>(PID::Operation::Manual), "Manuel"}
+    };
+
     constexpr ParameterOption AUTOTUNE_RULE_OPTIONS[] = {
         {
             static_cast<int32_t>(
@@ -244,6 +249,7 @@ void PID::begin(
 
 void PID::resetController()
 {
+    manualHandover = false;
     integralTerm = 0.0;
     integralMode = settings.mode;
     holdController();
@@ -387,6 +393,10 @@ bool PID::setOutputLimits(
 
 bool PID::startAutoTune(uint32_t now)
 {
+    // L'opérateur a la main : pas d'essai en manuel.
+    if (settings.operation == Operation::Manual)
+        return false;
+
     /* L'essai ne doit jamais réactiver le PID automatique au redémarrage. */
     settings.enabled = false;
 
@@ -504,6 +514,41 @@ bool PID::readSetpoint(double_t& setpoint) const
 
 void PID::update(uint32_t now)
 {
+    if (settings.operation == Operation::Manual)
+    {
+        updateManual();
+        return;
+    }
+
+    updateControl(now);
+
+    // Suivi : un passage en manuel part de la sortie du moment.
+    if (isCommandValid())
+        settings.manualOutput = readCommand() * 100.0;
+}
+
+void PID::updateManual()
+{
+    // L'opérateur prend la main : un essai en cours est abandonné.
+    if (autoTune.isActive())
+    {
+        autoTune.cancel();
+        settings.enabled = false;
+    }
+
+    // La rampe repartira de la mesure au retour en automatique.
+    setpointRamp.restart();
+    freezeController();
+    manualHandover = true;
+
+    // Ni mesure ni repli : la sortie manuelle s'applique telle quelle.
+    handoverCommand =
+        constrain(settings.manualOutput, 0.0, 100.0) / 100.0;
+    writeCommand(handoverCommand);
+}
+
+void PID::updateControl(uint32_t now)
+{
     const bool measurementValid =
         measurement != nullptr &&
         measurement->isValid() &&
@@ -602,6 +647,8 @@ void PID::update(uint32_t now)
      */
     if (!measurementValid)
     {
+        // Après un défaut, la sortie manuelle n'est plus une référence.
+        manualHandover = false;
         setpointRamp.resume(now);
         handleMeasurementFault(
             now,
@@ -646,6 +693,35 @@ void PID::updateAutomatic(
         previousTime = now;
         filteredDerivative = 0.0;
         initialized = true;
+
+        /*
+         * Retour de manuel : l'intégrale reprend la sortie manuelle, qui
+         * couvre ce premier cycle. La dérivée repart de zéro.
+         */
+        if (manualHandover)
+        {
+            manualHandover = false;
+
+            const double_t actionSign =
+                settings.mode == Mode::Heating ? 1.0 : -1.0;
+
+            const double_t proportionalTerm =
+                settings.kp *
+                actionSign *
+                (activeSetpoint - processValue);
+
+            integralTerm =
+                settings.ti > 0.0
+                    ? constrain(
+                          handoverCommand - proportionalTerm,
+                          settings.outputMin,
+                          settings.outputMax)
+                    : 0.0;
+
+            integralMode = settings.mode;
+            writeCommand(handoverCommand);
+            return;
+        }
 
         // Fin d'un maintien : la commande maintenue couvre ce premier cycle,
         // sans repasser par l'état sûr.
@@ -846,6 +922,34 @@ void PID::registerParameters(
             ? measurement->getUnit()
             : nullptr;
 
+    // Mode manuel en tête du menu, non sauvegardé (retour en Auto au
+    // démarrage).
+    auto operation = list.forOwner({
+        "regulators",
+        "Regulateur",
+        getConfigurationKey(),
+        getName(),
+        false
+    });
+
+    operation.addSelection(
+        "operation",
+        "Commande",
+        settings.operation,
+        PID_OPERATION_OPTIONS);
+
+    operation.addDouble(
+        "manual_output",
+        "Sortie man.",
+        settings.manualOutput,
+        0.0,
+        100.0,
+        1.0,
+        1,
+        "%",
+        false,
+        0.1);
+
     parameters.addBool(
         "enabled",
         "Activé",
@@ -929,6 +1033,12 @@ void PID::registerParameters(
         2);
 
     registerFaultParameters(list);
+
+    // Réglages de conduite : appliqués sans arrêter la régulation.
+    list.setLive(getConfigurationKey(), "operation");
+    list.setLive(getConfigurationKey(), "manual_output");
+    list.setLive(getConfigurationKey(), "setpoint");
+    list.setLive(getConfigurationKey(), "reduced_setpoint");
 }
 
 bool PID::registerAutoTuneParameters(

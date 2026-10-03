@@ -40,6 +40,7 @@ fi
     "${project_dir}/test/host/test_fault_fallback.cpp" \
     "${project_dir}/test/host/test_home_setpoint.cpp" \
     "${project_dir}/test/host/test_limit_alarm.cpp" \
+    "${project_dir}/test/host/test_manual_mode.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \

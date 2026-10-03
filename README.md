@@ -229,8 +229,10 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 
 Le menu `Regulateur` du template PID contient :
 
-- **PID** : activation, mode (`Chauffage` / `Refroidissement`), consigne,
-  `Kp`, `Ti`, `Td`, limites de sortie ;
+- **PID** : commande `Auto` / `Manuel` et sortie manuelle (voir
+  [Mode manuel](#mode-manuel)), activation, mode (`Chauffage` /
+  `Refroidissement`), consigne, `Kp`, `Ti`, `Td`, limites de sortie, repli
+  sur défaut de sonde ;
 - **Rampe PID** : limitation de la vitesse de variation de la consigne
   (°C/min) ;
 - **PID autotune** : paramètres de l'essai, règle de calcul des gains et
@@ -458,6 +460,15 @@ Pendant l'application de modifications, les sorties sont mises en sécurité,
 puis la régulation reprend dès que de nouvelles mesures valides arrivent. Une
 valeur invalide reste dans le menu pour correction.
 
+Exception : les **réglages de conduite** sont appliqués sans arrêter la
+régulation (ni pause de l'acquisition, ni état sûr), quand ce sont les seuls
+réglages modifiés : consigne et consigne réduite, `Commande` (Auto / Manuel /
+Marche / Arrêt) et `Sortie man.` du PID et du thermostat. Ils sont ensuite
+sauvegardés par la boucle de contrôle. Si un autre réglage est modifié en même
+temps, l'application complète s'applique à l'ensemble. Une installation
+marque ses propres réglages de conduite avec `parameterList.setLive(clé
+propriétaire, clé)`.
+
 ### Consigne depuis l'accueil
 
 Comme les touches ▲/▼ d'un régulateur compact, l'encodeur règle la consigne
@@ -477,6 +488,30 @@ l'acquisition ni les sorties ne sont interrompues, et la rampe de consigne
 s'applique si elle est active. La configuration est sauvegardée 10 s après le
 dernier réglage, pour ne pas écrire la flash à chaque cran : une coupure de
 courant dans ces 10 s perd le réglage.
+
+### Mode manuel
+
+Le PID et le thermostat ont un réglage `Commande`, en tête de leur menu
+`Regulateur` :
+
+- **PID** : `Auto` ou `Manuel`. En manuel, la sortie vaut `Sortie man.`
+  (0 à 100 %). En Auto, `Sortie man.` suit la sortie calculée : un passage en
+  manuel part de la sortie du moment. Au retour en Auto, l'intégrale est
+  recalculée pour que la sortie reparte de la valeur manuelle, et la rampe de
+  consigne repart de la mesure : pas d'à-coup. Un autotune en cours est
+  abandonné, et ne peut pas être lancé en manuel ;
+- **Thermostat** : `Auto`, `Marche` ou `Arrêt`. Au retour en Auto, l'état
+  forcé est conservé tant que la mesure reste dans la bande d'hystérésis.
+
+En manuel, la sortie s'applique **sans tenir compte de la mesure** : ni défaut
+de sonde, ni repli, ni `Activé` du PID. Les sécurités des sorties restent
+actives (timeout d'acquisition, temps minimaux des relais). L'écran d'accueil
+affiche `MANUEL` en orange. Passer d'Auto à Manuel, revenir, ou changer la
+sortie manuelle n'interrompt pas les sorties : ce sont des réglages de
+conduite (voir [Menu](#menu)).
+
+Le mode manuel n'est **pas sauvegardé** : au démarrage, la régulation repart
+toujours en Auto.
 
 ### Calibration
 

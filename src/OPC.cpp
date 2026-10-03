@@ -1030,6 +1030,40 @@ void OPC::handleControlMessage(
             break;
         }
 
+        /*
+         * Réglages de conduite seuls (consignes, commande manuelle) : ils
+         * sont appliqués sans pause de l'acquisition ni état sûr des sorties,
+         * puis sauvegardés par la boucle de contrôle.
+         */
+        if (actionId == MenuBuilder::NO_ACTION &&
+            !acquisitionPausedForMenu &&
+            parameterEditor.hasOnlyLiveChanges())
+        {
+            mutex_enter_blocking(&processDataMutex);
+
+            const bool liveApplied = parameterEditor.apply();
+
+            if (liveApplied)
+                userInstall.onParametersApplied();
+
+            mutex_exit(&processDataMutex);
+
+            if (!liveApplied)
+            {
+                rp2040.fifo.push(
+                    interCoreMessageValue(
+                        InterCoreMessage::MenuParametersRejected));
+                break;
+            }
+
+            requestConfigurationSave();
+            menuSessionOpen = false;
+            __dmb();
+            rp2040.fifo.push(interCoreMessageValue(
+                InterCoreMessage::MenuParametersApplied));
+            break;
+        }
+
         input.pause();
         input.resetAcquisition();
         acquisitionPausedForMenu = true;
@@ -1217,7 +1251,7 @@ void OPC::handleUIMessage(
         //controller.printCSVPsychro(bufferedOutput);
 
         // Juste une méthode temporaire pour avoir la temp de l'ADC sur un sweep
-        bufferedOutput.printf("ADC_temp : %.2f\n", input.getAdcTemperature());
+        //bufferedOutput.printf("ADC_temp : %.2f\n", input.getAdcTemperature());
 
         mutex_exit(&processDataMutex);
 

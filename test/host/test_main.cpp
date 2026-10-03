@@ -1501,14 +1501,14 @@ namespace
     {
         FakeTemperature measurement;
         PID pid;
-        Parameter storage[10];
+        Parameter storage[12];
         ParameterList parameters;
 
         pid.begin("pid", measurement);
         CHECK_FALSE(pid.setSetpointLimits(50.0, 20.0));
         CHECK_TRUE(pid.setSetpointLimits(-20.0, 400.0));
 
-        parameters.begin(storage, 10);
+        parameters.begin(storage, 12);
         pid.registerParameters(parameters);
         CHECK_FALSE(parameters.hasError());
 
@@ -1735,15 +1735,16 @@ namespace
     {
         FakeTemperature measurement;
         PID pid;
-        Parameter storage[20];
+        Parameter storage[22];
         ParameterList parameters;
 
         pid.begin("pid", measurement);
-        parameters.begin(storage, 20);
+        parameters.begin(storage, 22);
 
         pid.registerParameters(parameters);
-        // 8 réglages PID + l'action et la durée du repli sur défaut.
-        CHECK_TRUE(parameters.count() == 10);
+        // Commande et sortie manuelle, 8 réglages PID, puis l'action et la
+        // durée du repli sur défaut.
+        CHECK_TRUE(parameters.count() == 12);
         CHECK_TRUE(parameters.find("pid", "fault_action") != nullptr);
         CHECK_TRUE(parameters.find("pid", "fault_hold_time") != nullptr);
 
@@ -1780,7 +1781,7 @@ namespace
                 "pid.autotune",
                 "PID autotune"));
         // 9 réglages d'essai + la règle de calcul des gains.
-        CHECK_TRUE(parameters.count() == 20);
+        CHECK_TRUE(parameters.count() == 22);
 
         CHECK_TRUE(
             parameters.find(
@@ -3069,6 +3070,7 @@ void runInputFilterTests();
 void runFaultFallbackTests();
 void runHomeSetpointTests();
 void runLimitAlarmTests();
+void runManualModeTests();
 
 int main()
 {
@@ -3257,6 +3259,7 @@ int main()
     runFaultFallbackTests();
     runHomeSetpointTests();
     runLimitAlarmTests();
+    runManualModeTests();
 
     return TestHarness::finish();
 }

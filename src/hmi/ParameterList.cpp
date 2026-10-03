@@ -198,6 +198,20 @@ Parameter* ParameterList::get(size_t index)
     return &parameters[index];
 }
 
+bool ParameterList::setLive(
+    const char* ownerKey,
+    const char* key)
+{
+    const Parameter* parameter = find(ownerKey, key);
+
+    if (parameter == nullptr)
+        return false;
+
+    // find() renvoie un élément de parameters[], possédé par la liste.
+    parameters[parameter - parameters].live = true;
+    return true;
+}
+
 const Parameter* ParameterList::find(
     const char* ownerKey,
     const char* key) const

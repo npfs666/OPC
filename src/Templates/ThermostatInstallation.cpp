@@ -220,6 +220,8 @@ void ThermostatInstallation::captureHomeScreenState()
     homeState.hysteresis = thermostat.settings.hysteresis;
     homeState.commandValid = thermostat.isCommandValid();
     homeState.fallback = thermostat.isInFallback();
+    homeState.manual =
+        thermostat.settings.operation != Thermostat::Operation::Auto;
 
     const bool rampActive =
         thermostat.setpointRamp.hasActiveSetpoint();
@@ -372,7 +374,7 @@ void ThermostatInstallation::printHomeScreen(
 
     AlarmDisplay::printBanner(display, context.snapshot, ALARM_Y);
 
-    // ----- Relais forcé en état sûr, ou maintenu sur défaut capteur -----
+    // ----- Mode manuel, relais forcé en état sûr ou maintenu sur défaut -----
 
     TextField::print(
         display,
@@ -380,9 +382,11 @@ void ThermostatInstallation::printHomeScreen(
         SAFETY_Y,
         2,
         COLOR_ORANGE,
-        homeState.fallback
-            ? "REPLI"
-            : homeState.commandValid ? "" : "SECURITE",
+        homeState.manual
+            ? "MANUEL"
+            : homeState.fallback
+                ? "REPLI"
+                : homeState.commandValid ? "" : "SECURITE",
         SAFETY_CHARS,
         Align::Center);
 }
