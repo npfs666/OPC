@@ -408,7 +408,7 @@ pompe, ainsi que l'état de l'appoint.
 | Entrée analogique | `Sensor` : PT100 / PT1000 (2, 3 ou 4 fils), thermocouple B, E, J, K, N, R, S, T |
 | Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
 | Régulateurs | `Thermostat`, `SolarRegulator`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
-| Alarmes | `LimitAlarm` : surveillance de seuil, voir [Alarmes](#alarmes) |
+| Alarmes | `LimitAlarm` (seuil), `LoopBreakAlarm` (boucle ouverte), voir [Alarmes](#alarmes) |
 | Actionneurs | `ActuatorOnOff`, `ActuatorPWM`, `TimeProportionalActuator` |
 | Sorties | `RelayOutput`, `PWMOutput` — voir [src/Outputs/README.md](src/Outputs/README.md) |
 | Entrées numériques | `DigitalInput` — voir [src/Inputs/readme.md](src/Inputs/readme.md) |
@@ -679,6 +679,57 @@ mais n'est pas mémorisée.
 tant qu'une cause est présente, orange quand l'alarme est seulement mémorisée.
 Le port série journalise chaque changement : `[12345 ms] Alarme Temp. haute :
 ACTIVE`, puis `MEMORISEE` ou `FIN`.
+
+### Alarme de boucle ouverte
+
+Une `LoopBreakAlarm` surveille la **boucle** d'un régulateur : quand sa
+commande est en butée, la mesure doit se rapprocher de la consigne. Elle
+détecte ce que la surveillance de sonde ne voit pas :
+
+| Situation | Attendu | Cause probable sinon |
+| --- | --- | --- |
+| Chauffage à 100 % (relais collé en continu) | la mesure monte | Résistance grillée, contacteur ou SSR qui ne colle plus, sonde sortie du process |
+| Chauffage à 0 %, mesure au-dessus de la consigne | la mesure baisse | Contacteur ou SSR collé, source de chaleur externe |
+| Froid | sens inverse | Compresseur ou ventilateur en panne |
+
+La surveillance s'arme quand la commande est à sa butée (`Sortie max` /
+`Sortie min` du PID, ON / OFF du thermostat) et que l'écart à la consigne
+dépasse `Variation min.`. Chaque rapprochement de la consigne d'au moins
+`Variation min.` relance la fenêtre ; sans rapprochement pendant `Temps
+détect.`, l'alarme se déclenche. Rien n'est surveillé en manuel, en
+autotune, régulateur arrêté ou sur défaut de sonde.
+
+Réglages (menu `Alarmes > Boucle`) :
+
+| Réglage | Défaut | Rôle |
+| --- | --- | --- |
+| `Active` | Non | L'alarme n'a aucun effet tant qu'elle est désactivée |
+| `Temps détect.` | 0 (automatique) | 0 = 2 × Ti du PID (au moins 60 s), 600 s pour un thermostat. Sinon, durée en secondes |
+| `Variation min.` | 2 °C | Rapprochement attendu pendant la fenêtre, et bande autour de la consigne sans surveillance |
+| `Mémorisation` | Oui | L'alarme reste signalée jusqu'à l'acquittement |
+| `Mise en sécu.` | Oui | Sorties du régulateur en état sûr tant que l'alarme est signalée |
+
+Avec `Mise en sécu.`, le régulateur est **verrouillé** jusqu'à l'acquittement
+(`Alarmes > Acquitter`) : sa commande est invalide, ses sorties en état sûr,
+l'écran PID affiche `SECURITE` et le PID fige son intégrale. Le verrouillage
+ne s'applique qu'en régulation automatique : en manuel, l'opérateur garde la
+main. Sans mémorisation, la sécurité se lève avec sa cause et la surveillance
+reprend : l'alarme revient après un nouveau temps de détection si la boucle
+est toujours ouverte.
+
+L'alarme est **optionnelle** : un régulateur sans `LoopBreakAlarm` reliée
+n'est jamais verrouillé. Les templates PID et thermostat en déclarent une,
+désactivée par défaut :
+
+```cpp
+boucle.begin("pid_loop", "Boucle PID", temperature, pid);
+if (!process.add(boucle))
+    return fail("Alarme de boucle non enregistrée");
+```
+
+Un régulateur personnalisé peut être surveillé s'il fournit `readSetpoint()`,
+`readOutputLimits()`, `actionDirection()`, `isAutomatic()` et, pour le temps
+de détection automatique, `integralTime()`.
 
 ### Câbler une alarme sur un relais
 

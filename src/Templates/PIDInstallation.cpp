@@ -191,6 +191,13 @@ bool PIDInstallation::begin(
     if (!process.add(alarm))
         return fail("Alarme PID non enregistrée");
 
+    // Alarme de boucle ouverte, à activer dans le menu Alarmes : temps de
+    // détection automatique (2 × Ti), mise en sécurité du PID.
+    loopAlarm.begin("pid_loop", "Boucle PID", temperature, pid);
+
+    if (!process.add(loopAlarm))
+        return fail("Alarme de boucle non enregistrée");
+
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
@@ -284,6 +291,7 @@ void PIDInstallation::captureHomeScreenState()
     homeState.fallback = pid.isInFallback();
     homeState.manual =
         pid.settings.operation == PID::Operation::Manual;
+    homeState.interlocked = pid.isInterlocked();
     homeState.output = pid.readCommand();
     homeState.outputValid = pid.isCommandValid();
 
@@ -356,6 +364,11 @@ void PIDInstallation::printHomeScreen(
     if (homeState.manual)
     {
         status = "MANUEL";
+        statusColor = COLOR_ORANGE;
+    }
+    else if (homeState.interlocked)
+    {
+        status = "SECURITE";
         statusColor = COLOR_ORANGE;
     }
     else if (homeState.autoTuneActive)

@@ -192,6 +192,13 @@ bool ThermostatInstallation::begin(
     if (!process.add(alarm))
         return fail("Alarme thermostat non enregistrée");
 
+    // Alarme de boucle ouverte, à activer dans le menu Alarmes : 10 min
+    // sans rapprochement de 2 °C, mise en sécurité du thermostat.
+    loopAlarm.begin("thermostat_loop", "Boucle", temperature, thermostat);
+
+    if (!process.add(loopAlarm))
+        return fail("Alarme de boucle non enregistrée");
+
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 

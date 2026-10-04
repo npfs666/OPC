@@ -10,7 +10,7 @@
 
 class Actuator;
 class DigitalInput;
-class LimitAlarm;
+class Alarm;
 class Measurement;
 class Output;
 class ParameterEditor;
@@ -30,7 +30,7 @@ public:
     bool add(Actuator& actuator);
 
     /** Une alarme est un régulateur, suivi en plus pour l'affichage. */
-    bool add(LimitAlarm& alarm);
+    bool add(Alarm& alarm);
 
     /** Efface la mémorisation de toutes les alarmes. */
     void acknowledgeAlarms();
@@ -152,7 +152,7 @@ private:
     void recordMaintenanceChanges(uint32_t now);
     AlarmState alarmState(uint8_t index) const;
 
-    LimitAlarm* alarms[MAX_ALARMS] = {};
+    Alarm* alarms[MAX_ALARMS] = {};
     uint8_t alarmCount = 0;
     AlarmState loggedAlarmState[MAX_ALARMS] = {};
     AlarmEvent alarmEvents[MAX_STATUS_EVENTS] = {};

@@ -1,24 +1,20 @@
 #ifndef LIMIT_ALARM_H
 #define LIMIT_ALARM_H
 
-#include <Regulator/Regulator.h>
+#include <Regulator/Alarm.h>
 
-class DigitalInput;
 class Measurement;
 
 /**
  * Surveillance d'une mesure (alarme de seuil), sur le modèle des fonctions
- * d'alarme des régulateurs compacts.
- *
- * C'est un régulateur dont la commande vaut 1 quand l'alarme est signalée :
- * elle peut piloter un relais par un ActuatorOnOff, ou n'être qu'affichée.
- * L'enregistrer avec process.add(alarme), après le régulateur de référence.
+ * d'alarme des régulateurs compacts. Voir Alarm pour l'affichage, la
+ * mémorisation et l'acquittement.
  *
  * Types : Max et Min comparent la mesure à un seuil absolu ; Ecart haut,
  * Ecart bas et Hors bande la comparent à la consigne active d'un régulateur
  * de référence (setReference()), décalée de l'écart réglé.
  */
-class LimitAlarm : public Regulator
+class LimitAlarm : public Alarm
 {
 public:
     enum class Type : uint8_t
@@ -74,25 +70,9 @@ public:
      */
     void setReference(const Regulator& regulator);
 
-    /** Entrée numérique d'acquittement (front montant). Optionnel. */
-    void setAcknowledgeInput(const DigitalInput& input);
-
-    /** Alarme signalée, en cours ou mémorisée. */
-    bool isActive() const;
-
-    /** Mémorisée : la cause a disparu, l'acquittement est attendu. */
-    bool isLatched() const;
-
-    /**
-     * Efface la mémorisation. Une alarme dont la cause est toujours
-     * présente reste signalée, mais ne sera plus mémorisée à sa fin.
-     */
-    void acknowledge();
+    bool isEnabled() const override;
 
     void update(uint32_t now) override;
-
-    /** L'état de l'alarme survit à une reprise (validation du menu). */
-    void resume(uint32_t now) override;
 
     void registerParameters(
         ParameterList& list) override;
@@ -100,22 +80,15 @@ public:
     bool validateParameters(
         const ParameterEditor& editor) const override;
 
-    void print(Stream& stream) const override;
-
 private:
     Measurement* measurement = nullptr;
     const Regulator* reference = nullptr;
-    const DigitalInput* acknowledgeInput = nullptr;
-    bool acknowledgeInputWasActive = false;
 
     bool started = false;       // état initialisé depuis l'activation
     bool beyond = false;        // seuil franchi (hystérésis comprise)
     bool masked = false;
     bool pending = false;       // condition présente, temporisation en cours
     uint32_t pendingSince = 0;
-    bool active = false;        // condition confirmée
-    bool latched = false;
-    bool acknowledged = false;  // acquittée pendant l'épisode en cours
 
     bool isRelative(Type type) const;
 

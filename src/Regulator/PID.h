@@ -164,6 +164,17 @@ public:
     /** Consigne active, sauf PID arrêté ou autotune en cours. */
     bool readSetpoint(double_t& setpoint) const override;
 
+    void readOutputLimits(
+        double_t& minimum,
+        double_t& maximum) const override;
+
+    int8_t actionDirection() const override;
+
+    /** Auto, activé, sans autotune en cours. */
+    bool isAutomatic() const override;
+
+    double_t integralTime() const override;
+
     /** Enregistre uniquement les réglages du PID automatique. */
     void registerParameters(
         ParameterList& list) override;

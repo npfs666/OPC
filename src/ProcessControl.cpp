@@ -5,7 +5,7 @@
 #include <Outputs/Actuator.h>
 #include <Outputs/Output.h>
 #include <ProcessSnapshot.h>
-#include <Regulator/LimitAlarm.h>
+#include <Regulator/Alarm.h>
 #include <Regulator/Regulator.h>
 #include <hmi/ParameterList.h>
 
@@ -94,7 +94,7 @@ bool ProcessControl::add(Regulator& regulator)
     return true;
 }
 
-bool ProcessControl::add(LimitAlarm& alarm)
+bool ProcessControl::add(Alarm& alarm)
 {
     if (alarmCount >= MAX_ALARMS)
         return false;
@@ -365,7 +365,7 @@ void ProcessControl::recordMaintenanceChanges(uint32_t now)
 
 ProcessControl::AlarmState ProcessControl::alarmState(uint8_t index) const
 {
-    const LimitAlarm& alarm = *alarms[index];
+    const Alarm& alarm = *alarms[index];
 
     if (alarm.isLatched())
         return AlarmState::Latched;

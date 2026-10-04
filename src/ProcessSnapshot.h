@@ -11,7 +11,7 @@
 
 class Measurement;
 class DigitalInput;
-class LimitAlarm;
+class Alarm;
 class Output;
 class ProcessControl;
 class ProcessSnapshot;
@@ -78,7 +78,7 @@ struct AlarmSample
 private:
     friend class ProcessSnapshot;
 
-    const LimitAlarm* source = nullptr;
+    const Alarm* source = nullptr;
 };
 
 class ProcessSnapshot
@@ -110,7 +110,7 @@ public:
 
     const AlarmSample* alarmAt(size_t index) const;
 
-    const AlarmSample* find(const LimitAlarm& alarm) const;
+    const AlarmSample* find(const Alarm& alarm) const;
 
     uint32_t capturedAt() const;
 
@@ -133,7 +133,7 @@ private:
     bool add(
         const Output& output);
 
-    bool add(const LimitAlarm& alarm);
+    bool add(const Alarm& alarm);
 
     MeasurementSample measurementSamples[MAX_MEASUREMENTS] = {};
     DigitalInputSample digitalInputSamples[MAX_DIGITAL_INPUTS] = {};

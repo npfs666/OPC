@@ -1,6 +1,5 @@
 #include <Regulator/LimitAlarm.h>
 
-#include <Inputs/DigitalInput.h>
 #include <Measurements/Measurement.h>
 #include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
@@ -34,13 +33,10 @@ void LimitAlarm::begin(
     Measurement& measurement)
 {
     Regulator::begin(key, name);
+    beginAlarm();
     this->measurement = &measurement;
     reference = nullptr;
-    acknowledgeInput = nullptr;
-    acknowledgeInputWasActive = false;
     started = false;
-    latched = false;
-    acknowledged = false;
     restart();
 }
 
@@ -49,25 +45,9 @@ void LimitAlarm::setReference(const Regulator& regulator)
     reference = &regulator;
 }
 
-void LimitAlarm::setAcknowledgeInput(const DigitalInput& input)
+bool LimitAlarm::isEnabled() const
 {
-    acknowledgeInput = &input;
-}
-
-bool LimitAlarm::isActive() const
-{
-    return active || latched;
-}
-
-bool LimitAlarm::isLatched() const
-{
-    return latched && !active;
-}
-
-void LimitAlarm::acknowledge()
-{
-    latched = false;
-    acknowledged = active;
+    return settings.enabled;
 }
 
 bool LimitAlarm::isRelative(Type type) const
@@ -82,7 +62,6 @@ void LimitAlarm::restart()
     beyond = false;
     masked = settings.startupMasking;
     pending = false;
-    active = false;
 }
 
 bool LimitAlarm::isBeyond(double_t value, double_t setpoint) const
@@ -126,10 +105,8 @@ void LimitAlarm::update(uint32_t now)
     {
         // Réarmée (masquage compris) à la prochaine activation.
         started = false;
-        latched = false;
-        acknowledged = false;
         restart();
-        writeCommand(0.0);
+        clearAlarm();
         return;
     }
 
@@ -137,17 +114,10 @@ void LimitAlarm::update(uint32_t now)
     {
         started = true;
         restart();
+        clearAlarm();
     }
 
-    if (acknowledgeInput != nullptr)
-    {
-        const bool inputActive = acknowledgeInput->isActive();
-
-        if (inputActive && !acknowledgeInputWasActive)
-            acknowledge();
-
-        acknowledgeInputWasActive = inputActive;
-    }
+    pollAcknowledgeInput();
 
     const MeasurementStatus status =
         measurement != nullptr
@@ -201,6 +171,8 @@ void LimitAlarm::update(uint32_t now)
         }
     }
 
+    bool confirmed = false;
+
     if (condition)
     {
         if (!pending)
@@ -209,29 +181,14 @@ void LimitAlarm::update(uint32_t now)
             pendingSince = now;
         }
 
-        active = now - pendingSince >= settings.delay * 1000UL;
+        confirmed = now - pendingSince >= settings.delay * 1000UL;
     }
     else
     {
         pending = false;
-        active = false;
     }
 
-    if (!active)
-        acknowledged = false;
-
-    if (active && settings.latching && !acknowledged)
-        latched = true;
-
-    if (!settings.latching)
-        latched = false;
-
-    writeCommand(isActive() ? 1.0 : 0.0);
-}
-
-void LimitAlarm::resume(uint32_t now)
-{
-    (void)now;
+    applyCondition(confirmed, settings.latching);
 }
 
 void LimitAlarm::registerParameters(ParameterList& list)
@@ -329,24 +286,4 @@ bool LimitAlarm::validateParameters(
     // Un type relatif exige un régulateur de référence.
     return reference != nullptr ||
            !isRelative(static_cast<Type>(type->selectionValue));
-}
-
-void LimitAlarm::print(Stream& stream) const
-{
-    stream.print(getName());
-
-    size_t length = std::strlen(getName());
-    while (length++ < 16)
-        stream.print(' ');
-
-    stream.print(": ");
-
-    if (!settings.enabled)
-        stream.println("Inactive");
-    else if (isLatched())
-        stream.println("ALARME memorisee");
-    else if (isActive())
-        stream.println("ALARME");
-    else
-        stream.println("OK");
 }

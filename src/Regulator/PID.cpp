@@ -499,6 +499,31 @@ bool PID::controlSettingsAreValid() const
             settings.outputMax;
 }
 
+void PID::readOutputLimits(
+    double_t& minimum,
+    double_t& maximum) const
+{
+    minimum = settings.outputMin;
+    maximum = settings.outputMax;
+}
+
+int8_t PID::actionDirection() const
+{
+    return settings.mode == Mode::Cooling ? -1 : 1;
+}
+
+bool PID::isAutomatic() const
+{
+    return settings.operation == Operation::Auto &&
+           settings.enabled &&
+           !autoTune.isActive();
+}
+
+double_t PID::integralTime() const
+{
+    return settings.ti;
+}
+
 bool PID::readSetpoint(double_t& setpoint) const
 {
     if (!settings.enabled ||
@@ -549,6 +574,17 @@ void PID::updateManual()
 
 void PID::updateControl(uint32_t now)
 {
+    /*
+     * Verrouillé par une alarme (boucle ouverte) : sorties en sécurité,
+     * intégrale figée jusqu'à l'acquittement.
+     */
+    if (isInterlocked())
+    {
+        setpointRamp.resume(now);
+        freezeController();
+        return;
+    }
+
     const bool measurementValid =
         measurement != nullptr &&
         measurement->isValid() &&

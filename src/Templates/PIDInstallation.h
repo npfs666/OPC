@@ -12,6 +12,7 @@
 #include <Outputs/TimeProportionalActuator.h>
 
 #include <Regulator/LimitAlarm.h>
+#include <Regulator/LoopBreakAlarm.h>
 #include <Regulator/PID.h>
 
 class Adafruit_BMP5xx;
@@ -69,6 +70,7 @@ private:
         bool autoTuneActive = false;
         bool fallback = false;              // maintien sur défaut capteur
         bool manual = false;                // sortie fixée par l'opérateur
+        bool interlocked = false;           // verrouillé par l'alarme de boucle
 
         // Commande du PID (0 à 1), invalide si la régulation est arrêtée.
         double_t output = 0.0;
@@ -96,8 +98,9 @@ private:
     TimeProportionalActuator actuator;
     RelayOutput controlRelay;
 
-    // Alarme (affichée seulement, désactivée par défaut)
+    // Alarmes (affichées seulement, désactivées par défaut)
     LimitAlarm alarm;
+    LoopBreakAlarm loopAlarm;
 
     HomeState homeState;
 

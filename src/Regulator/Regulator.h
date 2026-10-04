@@ -5,6 +5,8 @@
 #include <Configurable.h>
 #include <Measurements/MeasurementStatus.h>
 
+class Alarm;
+
 class Regulator : public Displayable, public Configurable
 {
 public:
@@ -61,6 +63,44 @@ public:
         return false;
     }
 
+    // ----- Lectures pour la surveillance de boucle (LoopBreakAlarm) -----
+
+    /** Butées de la commande (limites de sortie). */
+    virtual void readOutputLimits(
+        double_t& minimum,
+        double_t& maximum) const
+    {
+        minimum = 0.0;
+        maximum = 1.0;
+    }
+
+    /** +1 si la commande fait monter la mesure (chauffage), -1 sinon. */
+    virtual int8_t actionDirection() const
+    {
+        return 1;
+    }
+
+    /** Vrai en régulation automatique : ni manuel, ni autotune, ni arrêt. */
+    virtual bool isAutomatic() const
+    {
+        return true;
+    }
+
+    /** Temps intégral en secondes, 0 si le régulateur n'en a pas. */
+    virtual double_t integralTime() const
+    {
+        return 0.0;
+    }
+
+    /**
+     * Relie une alarme qui peut verrouiller ce régulateur : tant qu'elle le
+     * demande (Alarm::locksOutputs()), sa commande est invalide et ses
+     * sorties sont en état sûr. Sans alarme reliée, aucun effet.
+     */
+    void setInterlock(const Alarm& alarm);
+
+    bool isInterlocked() const;
+
     /**
      * Impose l'action en cas de défaut et la retire du menu, par exemple
      * l'état sûr pour un appoint électrique.
@@ -108,6 +148,8 @@ protected:
     bool commandValid = false;
 
 private:
+    const Alarm* interlock = nullptr;
+
     bool faultActionLocked = false;
 
     // Défaut en cours, et commande d'avant le défaut si elle était valide.

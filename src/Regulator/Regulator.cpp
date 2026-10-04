@@ -1,6 +1,7 @@
 #include <Regulator/Regulator.h>
 
 #include <Arduino.h>
+#include <Regulator/Alarm.h>
 #include <hmi/ParameterList.h>
 
 namespace
@@ -130,7 +131,17 @@ double_t Regulator::readCommand() const
 
 bool Regulator::isCommandValid() const
 {
-    return commandValid;
+    return commandValid && !isInterlocked();
+}
+
+void Regulator::setInterlock(const Alarm& alarm)
+{
+    interlock = &alarm;
+}
+
+bool Regulator::isInterlocked() const
+{
+    return interlock != nullptr && interlock->locksOutputs();
 }
 
 double_t Regulator::printValue() const {

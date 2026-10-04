@@ -3,7 +3,7 @@
 #include <Measurements/Measurement.h>
 #include <Inputs/DigitalInput.h>
 #include <Outputs/Output.h>
-#include <Regulator/LimitAlarm.h>
+#include <Regulator/Alarm.h>
 
 size_t ProcessSnapshot::inputCount() const
 {
@@ -180,7 +180,7 @@ const AlarmSample* ProcessSnapshot::alarmAt(size_t index) const
     return &alarmSamples[index];
 }
 
-const AlarmSample* ProcessSnapshot::find(const LimitAlarm& alarm) const
+const AlarmSample* ProcessSnapshot::find(const Alarm& alarm) const
 {
     for (size_t i = 0; i < alarmSampleCount; i++)
     {
@@ -191,7 +191,7 @@ const AlarmSample* ProcessSnapshot::find(const LimitAlarm& alarm) const
     return nullptr;
 }
 
-bool ProcessSnapshot::add(const LimitAlarm& alarm)
+bool ProcessSnapshot::add(const Alarm& alarm)
 {
     if (alarmSampleCount >= MAX_ALARMS)
         return false;
@@ -200,7 +200,7 @@ bool ProcessSnapshot::add(const LimitAlarm& alarm)
 
     sample.source = &alarm;
     sample.name = alarm.getName();
-    sample.enabled = alarm.settings.enabled;
+    sample.enabled = alarm.isEnabled();
     sample.active = alarm.isActive();
     sample.latched = alarm.isLatched();
     return true;

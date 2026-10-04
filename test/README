@@ -42,6 +42,8 @@ Ils couvrent actuellement :
   sauvegardés) et les réglages de conduite appliqués sans arrêt ;
 - les compteurs d'entretien (manœuvres, heures en marche, heures de la
   carte, seuil, remise à zéro, menu Divers > Compteurs, bandeau) ;
+- l'alarme de boucle ouverte (butées haute et basse, chaud et froid,
+  fenêtre de détection, surveillance suspendue, options, verrouillage du PID) ;
 - les alarmes de seuil (types absolus et relatifs, hystérésis, temporisation,
   masquage, mémorisation et acquittement, défaut de sonde, journal, bandeau) ;
 - les états de mesure : acquisition (saturations), classement des

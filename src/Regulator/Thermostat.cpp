@@ -151,6 +151,16 @@ void Thermostat::update(uint32_t now)
     }
 }
 
+int8_t Thermostat::actionDirection() const
+{
+    return settings.mode == Mode::Cooling ? -1 : 1;
+}
+
+bool Thermostat::isAutomatic() const
+{
+    return settings.operation == Operation::Auto;
+}
+
 bool Thermostat::readSetpoint(double_t& setpoint) const
 {
     if (!setpointRamp.hasActiveSetpoint())

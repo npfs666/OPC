@@ -65,6 +65,11 @@ public:
 
     bool readSetpoint(double_t& setpoint) const override;
 
+    int8_t actionDirection() const override;
+
+    /** Commande Auto (ni Marche ni Arrêt forcés). */
+    bool isAutomatic() const override;
+
     void print(Stream& stream) const override;
 
     void registerParameters(ParameterList& list) override;

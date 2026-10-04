@@ -3072,6 +3072,7 @@ void runHomeSetpointTests();
 void runLimitAlarmTests();
 void runManualModeTests();
 void runCounterTests();
+void runLoopBreakTests();
 
 int main()
 {
@@ -3262,6 +3263,7 @@ int main()
     runLimitAlarmTests();
     runManualModeTests();
     runCounterTests();
+    runLoopBreakTests();
 
     return TestHarness::finish();
 }
