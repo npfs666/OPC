@@ -21,7 +21,7 @@
 
 namespace
 {
-    PIDInstallation installation;
+    ThermostatInstallation installation;
     OPC opc(installation);
     SystemWatchdog systemWatchdog;
 

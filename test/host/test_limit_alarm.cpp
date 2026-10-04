@@ -431,9 +431,10 @@ namespace
         process.captureSnapshot(snapshot, 6000);
         CHECK_TRUE(AlarmDisplay::format(snapshot, text, sizeof(text), 18, color) == 0);
 
-        // Journal : active, mémorisée, basse active, basse finie, haute finie.
+        // Journal : haute active, mémorisée, basse active, basse finie,
+        // acquittement, haute finie.
         process.printStatusEvents(log);
-        CHECK_TRUE(log.printedLineCount == 5);
+        CHECK_TRUE(log.printedLineCount == 6);
     }
 }
 

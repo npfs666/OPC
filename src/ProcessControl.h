@@ -5,6 +5,7 @@
 
 #include <Hardware/pinout.h>
 #include <Hardware/RTC.h>
+#include <EventLog.h>
 #include <Measurements/MeasurementStatus.h>
 #include <hmi/MenuBuilder.h>
 
@@ -91,11 +92,23 @@ public:
     void printCSVPsychro(Stream& stream) const;
 
     /**
-     * Écrit une ligne par changement d'état de mesure ou d'alarme survenu
-     * depuis le dernier appel, puis les oublie. Le passage NotReady -> Ok du
-     * démarrage n'est pas journalisé.
+     * Écrit les événements ajoutés au journal depuis le dernier appel
+     * (changements d'état des mesures et des alarmes, entretien...). Le
+     * passage NotReady -> Ok du démarrage n'est pas journalisé.
      */
     void printStatusEvents(Stream& stream);
+
+    /** Journal des événements (sous processDataMutex). */
+    EventLog& eventLog();
+    const EventLog& eventLog() const;
+
+    /** Ajoute au journal un événement à l'heure courante (format printf). */
+    void logEvent(
+        uint32_t now,
+        EventKind kind,
+        bool important,
+        const char* format,
+        ...);
 
     // ----- Compteurs d'entretien -----
 
@@ -119,18 +132,6 @@ public:
 
 private:
 
-    struct StatusEvent
-    {
-        uint32_t time;
-        uint8_t measurement;
-        MeasurementStatus from;
-        MeasurementStatus to;
-    };
-
-    // Au-delà, les changements suivants sont seulement comptés : les premiers
-    // désignent en général la cause.
-    static constexpr uint8_t MAX_STATUS_EVENTS = 8;
-
     void recordStatusChanges(uint32_t now);
 
     // État d'une alarme pour le journal.
@@ -141,13 +142,6 @@ private:
         Latched
     };
 
-    struct AlarmEvent
-    {
-        uint32_t time;
-        uint8_t alarm;
-        AlarmState state;
-    };
-
     void recordAlarmChanges(uint32_t now);
     void recordMaintenanceChanges(uint32_t now);
     AlarmState alarmState(uint8_t index) const;
@@ -155,20 +149,11 @@ private:
     Alarm* alarms[MAX_ALARMS] = {};
     uint8_t alarmCount = 0;
     AlarmState loggedAlarmState[MAX_ALARMS] = {};
-    AlarmEvent alarmEvents[MAX_STATUS_EVENTS] = {};
-    uint8_t alarmEventCount = 0;
 
     // Seuils d'entretien atteints (journalisés une fois par sortie).
-    struct MaintenanceEvent
-    {
-        uint32_t time;
-        uint8_t output;
-        uint32_t switches;
-    };
-
     bool maintenanceLogged[MAX_REGISTERED_OUTPUTS] = {};
-    MaintenanceEvent maintenanceEvents[MAX_STATUS_EVENTS] = {};
-    uint8_t maintenanceEventCount = 0;
+
+    EventLog events;
 
     // Durée de fonctionnement de la carte, et copie affichée dans le menu.
     double_t operatingSecondsTotal = 0.0;
@@ -180,9 +165,6 @@ private:
     ClockSample clockSample;
 
     MeasurementStatus loggedStatus[MAX_MEASUREMENTS] = {};
-    StatusEvent statusEvents[MAX_STATUS_EVENTS] = {};
-    uint8_t statusEventCount = 0;
-    uint16_t lostStatusEvents = 0;
 
     DigitalInput* digitalInputs[MAX_DIGITAL_INPUTS] = {};
     uint8_t digitalInputCount = 0;

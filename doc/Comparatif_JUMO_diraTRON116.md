@@ -81,7 +81,7 @@ Les quatre premières sont du logiciel seul, réalisable sur la carte actuelle.
 | Fonction | Intérêt | Effort |
 | --- | --- | --- |
 | ✅ **Alarme de boucle ouverte** (loop break, LBA) : sortie en butée depuis T s sans variation de la mesure | Très forte valeur de sécurité : résistance grillée, contacteur collé ou ouvert, sonde sortie du process. Couvre les pannes que la surveillance de sonde ne voit pas | Fait : `LoopBreakAlarm`, mise en sécurité optionnelle |
-| **Événements horodatés et conservés** (les N derniers en flash, heure réelle) | Diagnostic après coup. L'horloge et le journal existent déjà | Faible |
+| ✅ **Événements horodatés et conservés** (les N derniers en flash, heure réelle) | Diagnostic après coup. L'horloge et le journal existent déjà | Fait : journal en RAM, écrit par lots dans `/events.csv`, menu `Divers > Journal` |
 | **Démarrage progressif** (sortie limitée pendant X min ou sous un seuil de mesure) | Résistances chauffantes à sécher, limitation des appels de courant | Faible |
 | **Verrouillage par code, niveau opérateur** | Indispensable dès qu'un tiers a accès à l'appareil | Faible à moyen |
 | **Enregistrement des courbes** (mesure, consigne, sortie en CSV, récupéré par la clé USB) | Un vrai avantage possible de l'OPC : le stockage USB existe | Moyen |
@@ -183,9 +183,14 @@ fixe, mesure en grand, jauge des seuils du thermostat.
   et froid, temps de détection automatique (2 × Ti), mise en sécurité du
   régulateur jusqu'à l'acquittement. Base commune `Alarm` pour les alarmes.
 
+- Journal des événements horodatés : 64 en RAM, rafales regroupées, écriture
+  par lots en flash (au plus toutes les 15 min), cause du redémarrage,
+  visionneuse `Divers > Journal`.
+
 ### Proposé
 
-1. Événements horodatés conservés, démarrage progressif.
+1. Démarrage progressif. Export du journal par la clé USB (le disque USB
+   n'expose aujourd'hui qu'un seul fichier, `config.json`).
 2. Verrouillage et niveau opérateur, fonctions des entrées numériques dans le
    menu.
 3. Enregistrement des courbes, Modbus sur l'USB série.

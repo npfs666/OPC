@@ -513,6 +513,36 @@ conduite (voir [Menu](#menu)).
 Le mode manuel n'est **pas sauvegardé** : au démarrage, la régulation repart
 toujours en Auto.
 
+### Journal des événements
+
+`Divers > Journal` affiche les derniers événements, du plus récent au plus
+ancien, sans ordinateur : l'heure en gris, puis le texte en couleur (défaut
+en rouge, alarme en orange, redémarrage en cyan). La molette fait défiler, un
+clic revient au menu.
+
+| Événement | Exemple | Conservé en flash |
+| --- | --- | --- |
+| Démarrage et sa cause | `Mise sous tension`, `Redémarrage (watchdog)`, `Redémarrage (baisse tension)` | oui |
+| Défaut de sonde et sa fin | `Temperature : RUPTURE`, `Temperature : OK` | oui |
+| Alarme | `Alarme Temp. haute : ACTIVE`, `MEMORISEE`, `FIN` | oui |
+| Acquittement, remise à zéro, actions du menu | `Alarmes acquittées`, `RAZ compteurs Relais 1`, `Action : Mesurer N0 E1` | oui |
+| Entretien, heure perdue ou retrouvée | `Entretien Relais 1 (150000 man.)`, `Heure perdue` | oui |
+| Réglages modifiés, consigne réglée à l'accueil | `Réglages modifiés`, `Consigne : 21.5 °C` | non |
+
+Chaque événement porte l'heure locale (`04/10 14:32:05`), ou le temps depuis
+le démarrage si l'heure est inconnue (`+42 s`). Le port série affiche les
+mêmes lignes au fil de l'eau.
+
+Le journal garde les **64 derniers événements en RAM**. Un événement qui se
+répète (sonde qui bagote) moins d'une minute après l'un des quatre derniers
+est regroupé : `x37` à côté de l'heure au lieu de 37 lignes.
+
+Pour ménager la flash, seuls les événements importants sont écrits dans
+`/events.csv`, **par lots** : au plus une écriture toutes les 15 minutes, et
+aucune pendant les 2 premières minutes après un démarrage (une boucle de
+redémarrages n'use pas la flash). Une coupure de courant perd au plus les
+15 dernières minutes d'événements. Le fichier est relu au démarrage.
+
 ### Compteurs d'entretien
 
 `Divers > Compteurs` affiche, en lecture seule :
@@ -525,7 +555,7 @@ toujours en Auto.
 Chaque relais a un **Seuil entret.** en manœuvres (0 = aucun, par pas de
 10 000 ; un relais standard tient environ 150 000 manœuvres à pleine charge).
 Une fois le seuil atteint, l'accueil affiche `ENTRETIEN <relais>` en orange
-(quand aucune alarme n'est signalée) et le port série l'indique une fois.
+(quand aucune alarme n'est signalée) et le journal l'indique une fois.
 Après l'entretien, l'action **RAZ compteurs** du relais remet ses compteurs à
 zéro, sans arrêter la régulation.
 
@@ -607,9 +637,10 @@ les régulateurs mettent leurs sorties en état sûr, comme avant.
 - Les mesures calculées reprennent l'état de leur source : une température
   RTD affiche la rupture de sa résistance, une humidité psychrométrique celle
   de la sonde sèche ou humide.
-- Le port série affiche l'état à la place de la valeur, et une ligne à chaque
-  changement d'état, par exemple `[12345 ms] Temperature : OK -> RUPTURE`.
-  Le passage `...` -> `OK` du démarrage n'est pas journalisé.
+- Le port série affiche l'état à la place de la valeur. Chaque changement
+  d'état est inscrit au [journal](#journal-des-événements), par exemple
+  `04/10 14:32:05 Temperature : RUPTURE`. Le passage `...` -> `OK` du
+  démarrage n'est pas journalisé.
 
 Pour une mesure personnalisée, appeler `setStatus()` avec la cause plutôt que
 `setValid(false)`, qui donne `Invalid`.
@@ -677,8 +708,8 @@ mais n'est pas mémorisée.
 
 **Affichage** : bandeau `ALARME <nom>` (ou `<n> ALARMES`) à l'accueil, rouge
 tant qu'une cause est présente, orange quand l'alarme est seulement mémorisée.
-Le port série journalise chaque changement : `[12345 ms] Alarme Temp. haute :
-ACTIVE`, puis `MEMORISEE` ou `FIN`.
+Chaque changement est inscrit au [journal](#journal-des-événements) :
+`Alarme Temp. haute : ACTIVE`, puis `MEMORISEE` ou `FIN`.
 
 ### Alarme de boucle ouverte
 

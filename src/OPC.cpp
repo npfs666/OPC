@@ -8,6 +8,7 @@
 
 #include <Outputs/Output.h>
 #include <hmi/DisplayTextCodec.h>
+#include <hmi/EventLogScreen.h>
 #include <hmi/HomeScreen.h>
 
 #include <cstring>
@@ -304,12 +305,25 @@ void OPC::refreshClock()
         return;
     }
 
+    const bool clockValid = readOk && oscillatorRunning;
+
     mutex_enter_blocking(&processDataMutex);
     sharedClockDateTime = dateTime;
     sharedClockValid = readOk;
     // Heure perdue (OSF, pile vide) : les programmations horaires s'arrêtent.
     controller.updateClock(
-        ClockSample{dateTime, readOk && oscillatorRunning});
+        ClockSample{dateTime, clockValid});
+
+    if (clockValid != clockValidLogged)
+    {
+        clockValidLogged = clockValid;
+        controller.logEvent(
+            millis(),
+            clockValid ? EventKind::Info : EventKind::Fault,
+            true,
+            clockValid ? "Heure retrouvée" : "Heure perdue");
+    }
+
     mutex_exit(&processDataMutex);
 }
 
@@ -326,6 +340,16 @@ void OPC::controlPoll()
         millis() - lastCountersSave >= COUNTERS_SAVE_PERIOD_MS)
     {
         saveCounters();
+    }
+
+    if (millis() - lastEventsSave >= EVENTS_SAVE_PERIOD_MS)
+    {
+        mutex_enter_blocking(&processDataMutex);
+        const bool unsaved = controller.eventLog().hasUnsavedImportant();
+        mutex_exit(&processDataMutex);
+
+        if (unsaved)
+            saveEvents();
     }
 
     storage.poll();
@@ -449,11 +473,13 @@ bool OPC::initMeasurements()
         return failStartup(StartupError::Outputs);
 
     restoreCounters();
+    restoreEvents();
 
     controlOutputsEnabled = false;
     lastMeasurementTime = millis();
 
     refreshClock();
+    logStartup();
 
     input.startContinuous();
     controlCycleStarted = true;
@@ -527,7 +553,14 @@ void OPC::initMenu()
         !input.addMenuActions(
             menuDefinition) ||
         !controller.addMenuActions(
-            menuDefinition))
+            menuDefinition) ||
+        !menuDefinition.addAction(
+            menuDefinition.findSubmenu(
+                menuDefinition.root(),
+                "miscellaneous"),
+            EVENT_LOG_ACTION,
+            "event_log",
+            "Journal"))
     {
         Serial.println("Menu generation failed");
         return;
@@ -763,6 +796,142 @@ void OPC::saveCounters()
         Serial.println("Counters save failed");
 }
 
+void OPC::restoreEvents()
+{
+    // Première écriture permise EVENTS_FIRST_SAVE_DELAY_MS après le démarrage.
+    lastEventsSave =
+        millis() - EVENTS_SAVE_PERIOD_MS + EVENTS_FIRST_SAVE_DELAY_MS;
+
+    mutex_enter_blocking(&processDataMutex);
+    const bool restored = storage.loadEvents(controller.eventLog());
+    mutex_exit(&processDataMutex);
+
+    Serial.println(restored ? "Events restored" : "No saved events");
+}
+
+void OPC::logStartup()
+{
+    const char* text = "Démarrage";
+
+    switch (rp2040.getResetReason())
+    {
+    case RP2040::PWRON_RESET:
+        text = "Mise sous tension";
+        break;
+
+    case RP2040::RUN_PIN_RESET:
+        text = "Redémarrage (bouton RUN)";
+        break;
+
+    case RP2040::SOFT_RESET:
+        text = "Redémarrage logiciel";
+        break;
+
+    case RP2040::WDT_RESET:
+        text = "Redémarrage (watchdog)";
+        break;
+
+    case RP2040::DEBUG_RESET:
+        text = "Redémarrage (débogueur)";
+        break;
+
+    case RP2040::GLITCH_RESET:
+        text = "Redémarrage (perturbation)";
+        break;
+
+    case RP2040::BROWNOUT_RESET:
+        text = "Redémarrage (baisse tension)";
+        break;
+
+    default:
+        break;
+    }
+
+    mutex_enter_blocking(&processDataMutex);
+    controller.logEvent(millis(), EventKind::Restart, true, "%s", text);
+    mutex_exit(&processDataMutex);
+}
+
+void OPC::saveEvents()
+{
+    lastEventsSave = millis();
+
+    mutex_enter_blocking(&processDataMutex);
+    const size_t count = controller.eventLog().copyImportant(
+        eventStaging,
+        EventLog::CAPACITY);
+    controller.eventLog().markSaved();
+    mutex_exit(&processDataMutex);
+
+    if (!storage.saveEvents(eventStaging, count))
+    {
+        // Nouvel essai à la période suivante.
+        mutex_enter_blocking(&processDataMutex);
+        controller.eventLog().markUnsaved();
+        mutex_exit(&processDataMutex);
+
+        Serial.println("Events save failed");
+    }
+}
+
+void OPC::openEventLog()
+{
+    mutex_enter_blocking(&processDataMutex);
+    uiEventLog = controller.eventLog();
+    mutex_exit(&processDataMutex);
+
+    eventLogFirst = 0;
+    lastMenuActivity = millis();
+    uiState = UIState::EventLog;
+
+    EventLogScreen::draw(tft, uiEventLog, eventLogFirst);
+}
+
+void OPC::eventLogPoll(int32_t movement, bool clicked)
+{
+    const uint32_t now = millis();
+
+    if (clicked)
+    {
+        closeEventLog();
+        return;
+    }
+
+    // Sans action : retour au menu, dont le délai d'inactivité referme la
+    // session et revient à l'accueil.
+    if (now - lastMenuActivity >= userInstall.menuTimeoutMs())
+    {
+        closeEventLog();
+        return;
+    }
+
+    if (movement == 0)
+        return;
+
+    lastMenuActivity = now;
+
+    // Même sens que le menu : un cran positif descend vers les plus anciens.
+    const size_t last = EventLogScreen::lastFirstIndex(uiEventLog);
+    int32_t first = static_cast<int32_t>(eventLogFirst) + movement;
+
+    if (first < 0)
+        first = 0;
+    else if (static_cast<size_t>(first) > last)
+        first = static_cast<int32_t>(last);
+
+    if (static_cast<size_t>(first) == eventLogFirst)
+        return;
+
+    eventLogFirst = static_cast<size_t>(first);
+    EventLogScreen::draw(tft, uiEventLog, eventLogFirst);
+}
+
+void OPC::closeEventLog()
+{
+    uiState = UIState::Menu;
+    menu.redraw();
+}
+
 void OPC::requestConfigurationSave(uint32_t delayMs)
 {
     const uint32_t now = millis();
@@ -876,6 +1045,12 @@ void OPC::uiPoll()
         return;
     }
 
+    if (uiState == UIState::EventLog)
+    {
+        eventLogPoll(movement, clicked);
+        return;
+    }
+
     if (uiState != UIState::Menu)
         return;
 
@@ -946,6 +1121,13 @@ void OPC::uiPoll()
         (now - lastMenuActivity) >= timeout;
 
     if (enterResult.type ==
+            ArduinoMenuUI::EnterResult::Type::Action &&
+        enterResult.actionId == EVENT_LOG_ACTION)
+    {
+        // Consultation locale : rien à appliquer sur le cœur contrôle.
+        openEventLog();
+    }
+    else if (enterResult.type ==
         ArduinoMenuUI::EnterResult::Type::Action)
     {
         requestParameterApply(
@@ -1004,6 +1186,24 @@ void OPC::handleControlMessage(
         {
             mutex_enter_blocking(&processDataMutex);
             applied = userInstall.applyHomeSetpoint(pendingHomeSetpoint);
+
+            const Parameter* setpoint = userInstall.homeSetpoint();
+
+            if (applied && setpoint != nullptr)
+            {
+                controller.logEvent(
+                    millis(),
+                    EventKind::Info,
+                    false,
+                    "%s : %.*f %s",
+                    setpoint->name,
+                    static_cast<int>(setpoint->data.number.decimals),
+                    *setpoint->value.number,
+                    setpoint->data.number.unit != nullptr
+                        ? setpoint->data.number.unit
+                        : "");
+            }
+
             mutex_exit(&processDataMutex);
         }
 
@@ -1123,7 +1323,11 @@ void OPC::handleControlMessage(
             const bool liveApplied = parameterEditor.apply();
 
             if (liveApplied)
+            {
                 userInstall.onParametersApplied();
+                controller.logEvent(
+                    millis(), EventKind::Info, false, "Réglages modifiés");
+            }
 
             mutex_exit(&processDataMutex);
 
@@ -1147,6 +1351,8 @@ void OPC::handleControlMessage(
         input.resetAcquisition();
         acquisitionPausedForMenu = true;
 
+        const bool settingsChanged = parameterEditor.hasChanges();
+
         mutex_enter_blocking(&processDataMutex);
         controller.forceSafeOutputs();
         controlOutputsEnabled = false;
@@ -1156,7 +1362,15 @@ void OPC::handleControlMessage(
             parameterEditor.apply() && controller.applyOutputSettings();
 
         if (outputsApplied)
+        {
             userInstall.onParametersApplied();
+
+            if (settingsChanged)
+            {
+                controller.logEvent(
+                    millis(), EventKind::Info, false, "Réglages modifiés");
+            }
+        }
 
         mutex_exit(&processDataMutex);
 
@@ -1194,6 +1408,18 @@ void OPC::handleControlMessage(
                               actionId)
                         : userInstall.executeMenuAction(
                               actionId);
+
+            // Acquittement et remise à zéro sont journalisés par
+            // ProcessControl ; les autres actions ici.
+            const MenuBuilder::Action* action =
+                menuDefinition.findAction(actionId);
+
+            if (!controllerAction && actionSucceeded && action != nullptr)
+            {
+                controller.logEvent(
+                    millis(), EventKind::Info, true,
+                    "Action : %s", action->name);
+            }
 
             controller.forceSafeOutputs();
 

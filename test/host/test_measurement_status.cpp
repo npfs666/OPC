@@ -394,7 +394,8 @@ namespace
         process.printStatusEvents(log);
         CHECK_TRUE(log.printedLineCount == 1);
 
-        // Au-delà de 8 changements non lus : une ligne de synthèse.
+        // Sonde qui bagote : les changements sont regroupés (une seule
+        // nouvelle ligne, des compteurs de répétitions).
         log.printedLineCount = 0;
         for (uint32_t i = 0; i < 10; i++)
         {
@@ -402,7 +403,14 @@ namespace
             process.updateMeasurementsAndRegulators(4000 + i);
         }
         process.printStatusEvents(log);
-        CHECK_TRUE(log.printedLineCount == 9);
+        CHECK_TRUE(log.printedLineCount == 1);
+
+        const EventLog& events = process.eventLog();
+        CHECK_TRUE(events.count() == 2);
+        CHECK_TRUE(events.at(0) != nullptr && events.at(0)->repeats == 5);
+        CHECK_TRUE(events.at(1) != nullptr && events.at(1)->repeats == 6);
+        CHECK_TRUE(events.at(1) != nullptr &&
+                   std::strcmp(events.at(1)->text, "TC : RUPTURE") == 0);
     }
 }
 

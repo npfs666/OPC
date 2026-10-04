@@ -44,6 +44,8 @@ Ils couvrent actuellement :
   carte, seuil, remise à zéro, menu Divers > Compteurs, bandeau) ;
 - l'alarme de boucle ouverte (butées haute et basse, chaud et froid,
   fenêtre de détection, surveillance suspendue, options, verrouillage du PID) ;
+- le journal des événements (ordre, capacité, regroupement des rafales,
+  port série, sauvegarde, CSV et relecture, visionneuse) ;
 - les alarmes de seuil (types absolus et relatifs, hystérésis, temporisation,
   masquage, mémorisation et acquittement, défaut de sonde, journal, bandeau) ;
 - les états de mesure : acquisition (saturations), classement des

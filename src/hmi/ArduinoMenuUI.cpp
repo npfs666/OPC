@@ -285,6 +285,22 @@ void ArduinoMenuUI::refresh()
         nav->refresh();
 }
 
+void ArduinoMenuUI::redraw()
+{
+    if (!initialized || nav == nullptr)
+        return;
+
+    display->setRotation(displayRotation);
+    display->setFont(nullptr);
+    display->cp437(true);
+    display->setTextSize(TEXT_SCALE);
+    display->setTextWrap(false);
+    display->fillScreen(ST77XX_BLACK);
+
+    nav->refresh();
+    nav->poll();
+}
+
 void ArduinoMenuUI::clockParametersApplied(bool saved)
 {
     if (nav == nullptr || clockGroup == MenuBuilder::INVALID_GROUP)

@@ -343,6 +343,90 @@ bool Storage::loadCounters(JsonDocument& document)
     return !error;
 }
 
+bool Storage::saveEvents(const EventEntry* entries, size_t count)
+{
+    if (!mounted || (entries == nullptr && count > 0))
+        return false;
+
+    InterruptGuard interruptGuard;
+
+    File temporary =
+        LittleFS.open(EVENTS_TEMP_PATH, "w");
+
+    if (!temporary)
+        return false;
+
+    char line[EventLog::LINE_SIZE];
+    bool written = true;
+
+    for (size_t i = 0; i < count && written; i++)
+    {
+        const size_t length =
+            EventLog::formatCsv(entries[i], line, sizeof(line));
+
+        written =
+            temporary.write(
+                reinterpret_cast<const uint8_t*>(line), length) == length &&
+            temporary.write('\n') == 1;
+    }
+
+    temporary.flush();
+    temporary.close();
+
+    // Une coupure laisse soit l'ancien fichier, soit le nouveau.
+    if (!written ||
+        !LittleFS.rename(EVENTS_TEMP_PATH, EVENTS_PATH))
+    {
+        LittleFS.remove(EVENTS_TEMP_PATH);
+        return false;
+    }
+
+    return true;
+}
+
+bool Storage::loadEvents(EventLog& log)
+{
+    if (!mounted || !LittleFS.exists(EVENTS_PATH))
+        return false;
+
+    File file = LittleFS.open(EVENTS_PATH, "r");
+
+    if (!file)
+        return false;
+
+    char line[EventLog::LINE_SIZE];
+    size_t length = 0;
+
+    while (file.available())
+    {
+        const int character = file.read();
+
+        if (character < 0)
+            break;
+
+        if (character != '\n' && length + 1 < sizeof(line))
+        {
+            line[length++] = static_cast<char>(character);
+            continue;
+        }
+
+        if (character == '\n')
+        {
+            line[length] = '\0';
+
+            EventEntry entry;
+
+            if (EventLog::parseCsv(line, entry))
+                log.restore(entry);
+
+            length = 0;
+        }
+    }
+
+    file.close();
+    return true;
+}
+
 bool Storage::erase()
 {
     if (!mounted)

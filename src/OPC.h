@@ -103,6 +103,15 @@ private:
 
     static constexpr uint32_t COUNTERS_SCHEMA_VERSION = 1;
 
+    // Journal (/events.csv) : au plus une écriture par période, et jamais
+    // avant ce délai après le démarrage (une boucle de redémarrages
+    // n'écrit rien). Une coupure perd au plus une période d'événements.
+    static constexpr uint32_t EVENTS_SAVE_PERIOD_MS = 900000;
+    static constexpr uint32_t EVENTS_FIRST_SAVE_DELAY_MS = 120000;
+
+    // Action du menu Divers > Journal, traitée par le cœur UI.
+    static constexpr MenuBuilder::ActionId EVENT_LOG_ACTION = 70;
+
     // Lectures du DS3231 ratées tolérées avant de déclarer l'heure inconnue.
     static constexpr uint8_t CLOCK_READ_FAILURES_TOLERATED =
         3;
@@ -117,7 +126,8 @@ private:
         ClockApplyRequested,
         Menu,
         ApplyRequested,
-        HomeSetpointApplyRequested
+        HomeSetpointApplyRequested,
+        EventLog
     };
 
     Installation& userInstall;
@@ -139,6 +149,11 @@ private:
     bool configurationSavePending = false;
     uint32_t configurationSaveDueAt = 0;
     uint32_t lastCountersSave = 0;
+    uint32_t lastEventsSave = 0;
+    bool clockValidLogged = true;
+
+    // Cœur contrôle : copie des événements importants pour l'écriture.
+    EventEntry eventStaging[EventLog::CAPACITY];
     bool controlCycleStarted = false;
     uint32_t lastMeasurementTime = 0;
 
@@ -162,6 +177,10 @@ private:
     // Cœur UI uniquement.
     bool clockAlertShown = false;
     HomeSetpointEditor setpointEditor;
+
+    // Copie du journal affichée par Divers > Journal.
+    EventLog uiEventLog;
+    size_t eventLogFirst = 0;
     uint8_t serialPrintBuffer[
         SERIAL_PRINT_BUFFER_SIZE] = {};
 
@@ -189,6 +208,16 @@ private:
     // sauvegardés périodiquement ou après une remise à zéro.
     void restoreCounters();
     void saveCounters();
+
+    // Cœur contrôle : journal relu au démarrage, écrit par lots.
+    void restoreEvents();
+    void logStartup();
+    void saveEvents();
+
+    // Cœur UI : visionneuse du journal.
+    void openEventLog();
+    void eventLogPoll(int32_t movement, bool clicked);
+    void closeEventLog();
 
     // Cœur contrôle : sauvegarde après delayMs (repoussée par une nouvelle
     // demande différée, immédiate si delayMs vaut 0).

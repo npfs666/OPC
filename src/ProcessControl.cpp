@@ -10,6 +10,7 @@
 #include <hmi/ParameterList.h>
 
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 
 ProcessControl::ProcessControl()
@@ -116,6 +117,9 @@ void ProcessControl::acknowledgeAlarms()
 {
     for (uint8_t i = 0; i < alarmCount; i++)
         alarms[i]->acknowledge();
+
+    if (alarmCount > 0)
+        logEvent(millis(), EventKind::Info, true, "Alarmes acquittées");
 }
 
 namespace
@@ -208,6 +212,12 @@ bool ProcessControl::executeMenuAction(
 
     const uint8_t index = actionId - RESET_COUNTERS_ACTION;
     outputs[index]->resetCounters();
+    logEvent(
+        millis(),
+        EventKind::Info,
+        true,
+        "RAZ compteurs %s",
+        outputs[index]->getName());
     maintenanceLogged[index] = false;
     countersChanged = true;
     return true;
@@ -351,15 +361,13 @@ void ProcessControl::recordMaintenanceChanges(uint32_t now)
         if (!due)
             continue;
 
-        if (maintenanceEventCount >= MAX_STATUS_EVENTS)
-        {
-            if (lostStatusEvents < UINT16_MAX)
-                lostStatusEvents++;
-            continue;
-        }
-
-        maintenanceEvents[maintenanceEventCount++] =
-            {now, i, counters->switches};
+        logEvent(
+            now,
+            EventKind::Info,
+            true,
+            "Entretien %s (%lu man.)",
+            outputs[i]->getName(),
+            static_cast<unsigned long>(counters->switches));
     }
 }
 
@@ -384,14 +392,17 @@ void ProcessControl::recordAlarmChanges(uint32_t now)
 
         loggedAlarmState[i] = state;
 
-        if (alarmEventCount >= MAX_STATUS_EVENTS)
-        {
-            if (lostStatusEvents < UINT16_MAX)
-                lostStatusEvents++;
-            continue;
-        }
-
-        alarmEvents[alarmEventCount++] = {now, i, state};
+        logEvent(
+            now,
+            state == AlarmState::Clear ? EventKind::Info : EventKind::Alarm,
+            true,
+            "Alarme %s : %s",
+            alarms[i]->getName(),
+            state == AlarmState::Active
+                ? "ACTIVE"
+                : state == AlarmState::Latched
+                    ? "MEMORISEE"
+                    : "FIN");
     }
 }
 
@@ -416,86 +427,48 @@ void ProcessControl::recordStatusChanges(uint32_t now)
             status == MeasurementStatus::Ok)
             continue;
 
-        if (statusEventCount >= MAX_STATUS_EVENTS)
-        {
-            if (lostStatusEvents < UINT16_MAX)
-                lostStatusEvents++;
-            continue;
-        }
-
-        statusEvents[statusEventCount++] = {now, i, previous, status};
+        logEvent(
+            now,
+            status == MeasurementStatus::Ok
+                ? EventKind::Info
+                : EventKind::Fault,
+            true,
+            "%s : %s",
+            measurements[i]->getName(),
+            measurementStatusLabel(status));
     }
 }
 
 void ProcessControl::printStatusEvents(Stream& stream)
 {
-    char line[96];
+    events.printNew(stream);
+}
 
-    for (uint8_t i = 0; i < statusEventCount; i++)
-    {
-        const StatusEvent& event = statusEvents[i];
+EventLog& ProcessControl::eventLog()
+{
+    return events;
+}
 
-        std::snprintf(
-            line,
-            sizeof(line),
-            "[%lu ms] %s : %s -> %s",
-            static_cast<unsigned long>(event.time),
-            measurements[event.measurement]->getName(),
-            measurementStatusLabel(event.from),
-            measurementStatusLabel(event.to));
+const EventLog& ProcessControl::eventLog() const
+{
+    return events;
+}
 
-        stream.println(line);
-    }
+void ProcessControl::logEvent(
+    uint32_t now,
+    EventKind kind,
+    bool important,
+    const char* format,
+    ...)
+{
+    char text[EventLog::TEXT_SIZE];
 
-    for (uint8_t i = 0; i < alarmEventCount; i++)
-    {
-        const AlarmEvent& event = alarmEvents[i];
+    va_list arguments;
+    va_start(arguments, format);
+    std::vsnprintf(text, sizeof(text), format, arguments);
+    va_end(arguments);
 
-        std::snprintf(
-            line,
-            sizeof(line),
-            "[%lu ms] Alarme %s : %s",
-            static_cast<unsigned long>(event.time),
-            alarms[event.alarm]->getName(),
-            event.state == AlarmState::Active
-                ? "ACTIVE"
-                : event.state == AlarmState::Latched
-                    ? "MEMORISEE"
-                    : "FIN");
-
-        stream.println(line);
-    }
-
-    for (uint8_t i = 0; i < maintenanceEventCount; i++)
-    {
-        const MaintenanceEvent& event = maintenanceEvents[i];
-
-        std::snprintf(
-            line,
-            sizeof(line),
-            "[%lu ms] Entretien %s : seuil atteint (%lu manoeuvres)",
-            static_cast<unsigned long>(event.time),
-            outputs[event.output]->getName(),
-            static_cast<unsigned long>(event.switches));
-
-        stream.println(line);
-    }
-
-    if (lostStatusEvents > 0)
-    {
-        std::snprintf(
-            line,
-            sizeof(line),
-            "(%u changement(s) d'etat non journalise(s))",
-            static_cast<unsigned>(lostStatusEvents));
-
-        stream.println(line);
-    }
-
-    statusEventCount = 0;
-    alarmEventCount = 0;
-    maintenanceEventCount = 0;
-    lostStatusEvents = 0;
+    events.add(now, clockSample, kind, important, text);
 }
 
 void ProcessControl::poll(uint32_t now)

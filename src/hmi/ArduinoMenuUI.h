@@ -45,6 +45,9 @@ public:
     void clockParametersApplied(bool saved);
     void refresh();
 
+    /** Redessine le menu là où il était (après un écran plein, ex. journal). */
+    void redraw();
+
     bool isInitialized() const;
 
 private:

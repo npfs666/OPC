@@ -43,6 +43,7 @@ fi
     "${project_dir}/test/host/test_manual_mode.cpp" \
     "${project_dir}/test/host/test_counters.cpp" \
     "${project_dir}/test/host/test_loop_break.cpp" \
+    "${project_dir}/test/host/test_event_log.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -51,6 +52,7 @@ fi
     "${project_dir}/src/hmi/Displayable.cpp" \
     "${project_dir}/src/hmi/DisplayTextCodec.cpp" \
     "${project_dir}/src/hmi/AlarmDisplay.cpp" \
+    "${project_dir}/src/hmi/EventLogScreen.cpp" \
     "${project_dir}/src/hmi/HomeSetpointEditor.cpp" \
     "${project_dir}/src/hmi/MeasurementDisplay.cpp" \
     "${project_dir}/src/hmi/MenuBuilder.cpp" \
@@ -74,6 +76,7 @@ fi
     "${project_dir}/src/Physics/PT100.cpp" \
     "${project_dir}/src/Physics/Thermocouple.cpp" \
     "${project_dir}/src/Physics/Psychrometrics.cpp" \
+    "${project_dir}/src/EventLog.cpp" \
     "${project_dir}/src/ProcessControl.cpp" \
     "${project_dir}/src/Regulator/PID.cpp" \
     "${project_dir}/src/Regulator/PIDAutoTune.cpp" \

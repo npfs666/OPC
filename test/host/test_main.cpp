@@ -3073,6 +3073,7 @@ void runLimitAlarmTests();
 void runManualModeTests();
 void runCounterTests();
 void runLoopBreakTests();
+void runEventLogTests();
 
 int main()
 {
@@ -3264,6 +3265,7 @@ int main()
     runManualModeTests();
     runCounterTests();
     runLoopBreakTests();
+    runEventLogTests();
 
     return TestHarness::finish();
 }

@@ -5,6 +5,7 @@
 #include <hmi/ParameterList.h>
 
 #include <ArduinoJson.h>
+#include <EventLog.h>
 
 class ParameterEditor;
 
@@ -52,6 +53,14 @@ public:
     bool saveCounters(const JsonDocument& document);
     bool loadCounters(JsonDocument& document);
 
+    /**
+     * Journal : événements importants, du plus ancien au plus récent, une
+     * ligne CSV chacun (EventLog::formatCsv). Écriture atomique ; les
+     * écritures sont espacées par OPC pour ménager la flash.
+     */
+    bool saveEvents(const EventEntry* entries, size_t count);
+    bool loadEvents(EventLog& log);
+
 private:
     static constexpr uint32_t SCHEMA_VERSION = 2;
 
@@ -64,6 +73,11 @@ private:
         "/counters.json";
     static constexpr const char* COUNTERS_TEMP_PATH =
         "/counters.tmp";
+
+    static constexpr const char* EVENTS_PATH =
+        "/events.csv";
+    static constexpr const char* EVENTS_TEMP_PATH =
+        "/events.tmp";
 
     /*
      * Le PC lit une copie stable de la configuration. CONFIG_PATH
