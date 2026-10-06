@@ -4,6 +4,7 @@
 #include <Hardware/pinout.h>
 #include <hmi/MenuBuilder.h>
 #include <hmi/ParameterList.h>
+#include <ProcessLogic.h>
 
 class SensorBoard;
 class Adafruit_BMP5xx;
@@ -12,7 +13,7 @@ class ProcessControl;
 class ParameterEditor;
 class OPC;
 
-class Installation
+class Installation : public ProcessLogic
 {
 public:
 
@@ -49,6 +50,22 @@ public:
 
     virtual void printHomeScreen(
         HomeScreenContext& context) = 0;
+
+    /**
+     * Glue facultative, pour ce que les liaisons de begin() ne savent pas
+     * exprimer : appelée à chaque cycle, après les régulateurs et les
+     * alarmes, avant les actionneurs. Elle écrit ses LogicCommand à chaque
+     * appel. Voir ProcessLogic.
+     */
+    void processLogic(uint32_t now) override
+    {
+        (void)now;
+    }
+
+    void resumeLogic(uint32_t now) override
+    {
+        (void)now;
+    }
 
     /**
      * Copie rapidement l'état propre à l'écran pendant que le contrôle est

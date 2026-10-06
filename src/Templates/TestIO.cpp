@@ -6,6 +6,9 @@
 #include <ProcessSnapshot.h>
 #include <hmi/HomeScreen.h>
 
+#include <cstdio>
+#include <cstring>
+
 namespace
 {
     constexpr uint16_t BLACK = 0x0000;
@@ -25,6 +28,23 @@ namespace
         display.setTextColor(valid && active ? GREEN : GREY, BLACK);
         display.print(!valid ? "--  " : active ? onText : "OFF ");
     }
+
+    constexpr const char* COMMAND_KEYS[] = {
+        "test_io_command_1", "test_io_command_2"
+    };
+
+    const char* operationLabel(LogicCommand::Operation operation)
+    {
+        switch (operation)
+        {
+        case LogicCommand::Operation::ForcedOn:
+            return "Marche";
+        case LogicCommand::Operation::ForcedOff:
+            return "Arret ";
+        default:
+            return "Auto  ";
+        }
+    }
 }
 
 const char* TestIO::name() const
@@ -37,18 +57,21 @@ const char* TestIO::configurationKey() const
     return "test_io";
 }
 
-void TestIO::InputCommand::update(uint32_t now)
+void TestIO::processLogic(uint32_t now)
 {
-    (void)now;
+    if (missingWrite && now - missingWriteStart >= MISSING_WRITE_DURATION_MS)
+        missingWrite = false;
 
-    if (input == nullptr || !input->isValid())
+    for (uint8_t i = 0; i < 2; i++)
     {
-        invalidateCommand();
-        return;
-    }
+        // Oubli simulé : la commande 1 n'est pas écrite.
+        if (i == 0 && missingWrite)
+            continue;
 
-    // 0,5 donne 50 % au PWM et ON au relais (seuil de ActuatorOnOff).
-    writeCommand(input->isActive() ? 0.5 : 0.0);
+        // 0,5 donne 50 % au PWM et ON au relais (seuil de ActuatorOnOff).
+        // Entrée invalide ou PT100 en défaut : état sûr par dependsOn().
+        commands[i].set(inputs[i].isActive() ? 0.5 : 0.0);
+    }
 }
 
 bool TestIO::begin(
@@ -84,14 +107,18 @@ bool TestIO::begin(
     const char* inputNames[] = {"Entree 1", "Entree 2"};
     const char* relayNames[] = {"Relais 1", "Relais 2"};
     const char* pwmNames[] = {"PWM 1", "PWM 2"};
+    const char* commandNames[] = {"Commande 1", "Commande 2"};
 
     PWMOutput::sharedSettings.frequency = 20000;
 
     for (uint8_t i = 0; i < 2; i++)
     {
         inputs[i].begin(inputNames[i], inputPins[i]);
-        commands[i].begin(inputNames[i]);
-        commands[i].input = &inputs[i];
+        commands[i].begin(COMMAND_KEYS[i], commandNames[i]);
+
+        if (!commands[i].dependsOn(inputs[i]))
+            return fail("Dependance commande impossible");
+
         relayActuators[i].begin(relayNames[i], commands[i]);
         pwmActuators[i].begin(pwmNames[i], commands[i]);
         relays[i].begin(relayNames[i], relayPins[i]);
@@ -106,17 +133,62 @@ bool TestIO::begin(
         }
     }
 
+    // Fonctions fictives de la glue : la commande 2 dépend aussi de la PT100
+    // et n'a pas de mode manuel.
+    if (!commands[1].dependsOn(pt100Temperature))
+        return fail("Dependance PT100 impossible");
+
+    commands[1].disableManualMode();
+
     process.registerParameters(parameterList);
 
     // Essai reproductible : brochage, polarités et fréquence restent fixes.
+    // Seul le mode manuel de la commande 1 reste réglable.
     for (size_t i = 0; i < parameterList.count(); i++)
     {
         Parameter* parameter = parameterList.get(i);
-        parameter->readOnly = true;
+        parameter->readOnly =
+            std::strcmp(parameter->ownerKey, COMMAND_KEYS[0]) != 0 ||
+            std::strcmp(parameter->key, "operation") != 0;
         parameter->persistent = false;
     }
 
     return !parameterList.hasError();
+}
+
+bool TestIO::addMenuActions(MenuBuilder& menu) const
+{
+    const MenuBuilder::GroupId group =
+        menu.findGroupForOwner(COMMAND_KEYS[0]);
+
+    return
+        group != MenuBuilder::INVALID_GROUP &&
+        menu.addAction(
+            group,
+            SIMULATE_MISSING_WRITE_ACTION,
+            "test_io_missing_write",
+            "Simuler oubli glue");
+}
+
+bool TestIO::executeMenuAction(MenuBuilder::ActionId actionId)
+{
+    if (actionId != SIMULATE_MISSING_WRITE_ACTION)
+        return false;
+
+    missingWrite = true;
+    missingWriteStart = millis();
+    return true;
+}
+
+void TestIO::onMenuActionSaveFailed(MenuBuilder::ActionId actionId)
+{
+    if (actionId == SIMULATE_MISSING_WRITE_ACTION)
+        missingWrite = false;
+}
+
+void TestIO::captureHomeScreenState()
+{
+    commandOneOperation = commands[0].settings.operation;
 }
 
 void TestIO::printHomeScreen(HomeScreenContext& context)
@@ -134,8 +206,43 @@ void TestIO::printHomeScreen(HomeScreenContext& context)
         display.setTextSize(1);
         display.setCursor(12, 38);
         display.print("PWM : 20 kHz / 50 %");
-        display.setCursor(12, 222);
+        display.setCursor(12, 212);
+        display.print("Sortie 2 : entree 2 + PT100 Ok");
+        display.setCursor(12, 224);
         display.print("Etats commandes, sans retour contact");
+        display.setTextSize(2);
+    }
+
+    // PT100 et mode de la commande 1, en petit sous l'en-tête.
+    {
+        const MeasurementSample* pt100 =
+            context.snapshot.find(pt100Temperature);
+
+        // Même longueur dans les deux cas : le texte précédent est effacé.
+        char text[40];
+
+        if (pt100 != nullptr && pt100->valid)
+        {
+            std::snprintf(
+                text, sizeof(text), "PT100 : %8.1f C  Cde 1 : %s",
+                pt100->value, operationLabel(commandOneOperation));
+        }
+        else
+        {
+            std::snprintf(
+                text, sizeof(text), "PT100 : %-10s  Cde 1 : %s",
+                measurementStatusLabel(
+                    pt100 != nullptr
+                        ? pt100->status
+                        : MeasurementStatus::NotReady,
+                    10),
+                operationLabel(commandOneOperation));
+        }
+
+        display.setTextSize(1);
+        display.setTextColor(WHITE, BLACK);
+        display.setCursor(12, 48);
+        display.print(text);
         display.setTextSize(2);
     }
 

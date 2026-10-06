@@ -4,8 +4,10 @@
 #include <Inputs/DigitalInput.h>
 #include <Outputs/Actuator.h>
 #include <Outputs/Output.h>
+#include <ProcessLogic.h>
 #include <ProcessSnapshot.h>
 #include <Regulator/Alarm.h>
+#include <Regulator/LogicCommand.h>
 #include <Regulator/Regulator.h>
 #include <hmi/ParameterList.h>
 
@@ -111,6 +113,23 @@ bool ProcessControl::add(Alarm& alarm)
 
     alarms[alarmCount++] = &alarm;
     return true;
+}
+
+bool ProcessControl::add(LogicCommand& command)
+{
+    if (logicCommandCount >= MAX_REGULATORS)
+        return false;
+
+    if (!add(static_cast<Regulator&>(command)))
+        return false;
+
+    logicCommands[logicCommandCount++] = &command;
+    return true;
+}
+
+void ProcessControl::setLogic(ProcessLogic& logic)
+{
+    this->logic = &logic;
 }
 
 void ProcessControl::acknowledgeAlarms()
@@ -340,6 +359,24 @@ void ProcessControl::updateMeasurementsAndRegulators(
     for (uint8_t i = 0; i < regulatorCount; i++)
         regulators[i]->update(now);
 
+    // Glue de l'installation : elle lit les régulateurs et les alarmes à
+    // jour, et écrit ses commandes avant que les actionneurs ne les lisent.
+    if (logic != nullptr)
+        logic->processLogic(now);
+
+    for (uint8_t i = 0; i < logicCommandCount; i++)
+    {
+        if (logicCommands[i]->applyLogic(now))
+        {
+            logEvent(
+                now,
+                EventKind::Fault,
+                true,
+                "%s : non écrite",
+                logicCommands[i]->getName());
+        }
+    }
+
     recordAlarmChanges(now);
     recordMaintenanceChanges(now);
 
@@ -487,6 +524,9 @@ void ProcessControl::resume(uint32_t now)
 
     for (uint8_t i = 0; i < actuatorCount; i++)
         actuators[i]->resume(now);
+
+    if (logic != nullptr)
+        logic->resumeLogic(now);
 }
 
 void ProcessControl::updateClock(const ClockSample& sample)

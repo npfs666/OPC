@@ -426,6 +426,8 @@ bool OPC::initMeasurements()
         return failStartup(StartupError::Installation);
     }
 
+    controller.setLogic(userInstall);
+
     clock.registerParameters(userInstall.getParameters());
 
     if (!userInstall.completeParameterRegistration() ||

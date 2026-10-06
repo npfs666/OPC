@@ -166,7 +166,80 @@ Points à retenir :
   Pendant le réglage, `HomeScreenContext::editingSetpoint` est vrai et
   `editedSetpoint` contient la valeur à afficher à la place de la consigne.
 
-### 3. Dessiner l'écran d'accueil
+### 3. Ajouter de la glue (facultatif)
+
+Les liaisons de `begin()` (mesure → régulateur → sortie, programme →
+consigne, alarme → verrouillage) suffisent pour un thermostat ou un PID. Pour
+ce qu'elles ne savent pas exprimer (conditions ET / OU entre équipements,
+priorités, action d'un équipement sur un autre), l'installation surcharge
+`processLogic()` : c'est sa **glue**, propre à l'application.
+
+Une sortie pilotée par la glue est une `LogicCommand`
+([Regulator/LogicCommand.h](src/Regulator/LogicCommand.h)), reliée à un
+actionneur comme un régulateur. Exemple : un circulateur qui tourne quand le
+thermostat chauffe, sauf pendant un délestage signalé sur l'entrée TOR 1.
+
+```cpp
+// Membres : DigitalInput delestage; LogicCommand circulateur;
+//           ActuatorOnOff commandeCirculateur; RelayOutput relais2;
+
+// Dans begin()
+delestage.begin("delestage", "Delestage", Board::Rp2040::DIGITAL_INPUT_1);
+circulateur.begin("circulateur", "Circulateur");
+circulateur.dependsOn(delestage);
+commandeCirculateur.begin("cde_circulateur", "Cde circulateur", circulateur);
+relais2.begin("relais_2", "Relais 2", Board::Rp2040::OUTPUT_2, true, false);
+
+if (!process.add(delestage) || !process.add(circulateur) ||
+    !process.add(commandeCirculateur) ||
+    !process.connect(commandeCirculateur, relais2))
+    return fail("Circulateur non relié");
+
+// Glue
+void MonInstallation::processLogic(uint32_t now)
+{
+    (void)now;
+
+    const bool chauffe =
+        thermostat.isCommandValid() && thermostat.readCommand() > 0.5;
+
+    circulateur.setOn(chauffe && !delestage.isActive());
+}
+```
+
+Règles de la glue :
+
+- Elle est appelée à chaque cycle de mesure, **après les régulateurs et les
+  alarmes, avant les actionneurs** : elle lit leur état à jour, et ses
+  commandes servent dès ce cycle. Elle n'est pas appelée pendant une pause du
+  menu ni après un timeout de mesure ; `resumeLogic()` est appelée à la
+  reprise, pour réarmer son état.
+- Elle tourne sur le cœur 0, sous `processDataMutex` : **non bloquante**, sans
+  `delay()`, écriture de fichier ni longues sorties série.
+- Elle ne pilote **jamais** une sortie directement : toujours une
+  `LogicCommand` reliée à un actionneur. Les sécurités des sorties restent
+  ainsi actives (état sûr, temps minimaux des relais, compteurs).
+- Elle écrit **chaque `LogicCommand` à chaque appel** (`setOn()`, `set()` de
+  0 à 1, ou `invalidate()`). Une commande non écrite passe en état sûr, et le
+  journal note `<nom> : non écrite`.
+- `dependsOn()` (mesure, entrée TOR ou régulateur, 4 au plus) : si une
+  dépendance est en défaut, la sortie passe en état sûr quoi que la glue
+  écrive, ou en maintien selon le réglage `Si défaut` (voir
+  [Repli sur défaut de sonde](#repli-sur-défaut-de-sonde)).
+  `lockFaultAction()` l'impose. Pendant un défaut, une glue qui n'écrit rien
+  n'est pas un oubli.
+- Une `LogicCommand` a le réglage `Commande` Auto / Marche / Arrêt (voir
+  [Mode manuel](#mode-manuel)). `disableManualMode()`, dans `begin()`, le
+  retire pour une sortie qui ne doit jamais être forcée (résistance
+  chauffante...).
+- Elle peut être verrouillée par une alarme (`setInterlock()`), comme un
+  régulateur.
+- Tout seuil ou délai qui peut varier d'un site à l'autre doit être un
+  paramètre du menu, pas une constante de la glue.
+
+Le template `TestIO` sert de banc d'essai de la glue.
+
+### 4. Dessiner l'écran d'accueil
 
 `printHomeScreen()` reçoit un `HomeScreenContext` contenant l'écran
 (`context.display`, API Adafruit GFX), un indicateur `fullRefresh` et le
@@ -195,7 +268,7 @@ texte et la couleur séparément, par exemple pour centrer le texte.
 Utilisez uniquement le snapshot pour lire les valeurs, jamais les objets
 directement (ils appartiennent à l'autre cœur).
 
-### 4. Sélectionner l'installation
+### 5. Sélectionner l'installation
 
 Dans [main.cpp](src/Templates/main.cpp), remplacer l'installation instanciée :
 
@@ -224,6 +297,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), régulateur solaire avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (relais 2) |
 | `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
+| `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
 
 ### PID et autotune
 
@@ -408,6 +482,7 @@ pompe, ainsi que l'état de l'appoint.
 | Entrée analogique | `Sensor` : PT100 / PT1000 (2, 3 ou 4 fils), thermocouple B, E, J, K, N, R, S, T |
 | Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
 | Régulateurs | `Thermostat`, `SolarRegulator`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
+| Glue | `LogicCommand` : sortie écrite par `processLogic()`, voir [Ajouter de la glue](#3-ajouter-de-la-glue-facultatif) |
 | Alarmes | `LimitAlarm` (seuil), `LoopBreakAlarm` (boucle ouverte), voir [Alarmes](#alarmes) |
 | Actionneurs | `ActuatorOnOff`, `ActuatorPWM`, `TimeProportionalActuator` |
 | Sorties | `RelayOutput`, `PWMOutput` — voir [src/Outputs/README.md](src/Outputs/README.md) |
@@ -491,8 +566,8 @@ courant dans ces 10 s perd le réglage.
 
 ### Mode manuel
 
-Le PID et le thermostat ont un réglage `Commande`, en tête de leur menu
-`Regulateur` :
+Le PID, le thermostat et les commandes de la glue ont un réglage `Commande`,
+en tête de leur menu `Regulateur` :
 
 - **PID** : `Auto` ou `Manuel`. En manuel, la sortie vaut `Sortie man.`
   (0 à 100 %). En Auto, `Sortie man.` suit la sortie calculée : un passage en
@@ -501,7 +576,10 @@ Le PID et le thermostat ont un réglage `Commande`, en tête de leur menu
   consigne repart de la mesure : pas d'à-coup. Un autotune en cours est
   abandonné, et ne peut pas être lancé en manuel ;
 - **Thermostat** : `Auto`, `Marche` ou `Arrêt`. Au retour en Auto, l'état
-  forcé est conservé tant que la mesure reste dans la bande d'hystérésis.
+  forcé est conservé tant que la mesure reste dans la bande d'hystérésis ;
+- **Commande de la glue** (`LogicCommand`) : `Auto`, `Marche` ou `Arrêt`. En
+  manuel, ni la glue ni les dépendances n'agissent. Le template peut retirer
+  ce réglage (`disableManualMode()`).
 
 En manuel, la sortie s'applique **sans tenir compte de la mesure** : ni défaut
 de sonde, ni repli, ni `Activé` du PID. Les sécurités des sorties restent
@@ -810,6 +888,7 @@ une sortie physiquement désactivée (paramètre `Actif à HIGH`).
 src/
 ├── Templates/     main.cpp et installations prêtes à l'emploi
 ├── Installation.* classe de base d'une installation
+├── ProcessLogic.h interface de la glue (processLogic())
 ├── OPC.*          cœur du framework (init, boucles, menu, stockage)
 ├── ProcessControl.*  orchestration mesures → régulation → sorties
 ├── Hardware/      carte de mesure, capteurs, brochage

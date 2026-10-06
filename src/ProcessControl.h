@@ -12,10 +12,12 @@
 class Actuator;
 class DigitalInput;
 class Alarm;
+class LogicCommand;
 class Measurement;
 class Output;
 class ParameterEditor;
 class ParameterList;
+class ProcessLogic;
 class ProcessSnapshot;
 class Regulator;
 
@@ -32,6 +34,18 @@ public:
 
     /** Une alarme est un régulateur, suivi en plus pour l'affichage. */
     bool add(Alarm& alarm);
+
+    /**
+     * Une commande de la glue est un régulateur, appliquée en plus après
+     * la glue (voir setLogic()).
+     */
+    bool add(LogicCommand& command);
+
+    /**
+     * Glue de l'installation, appelée à chaque cycle après les régulateurs et
+     * les alarmes, avant les actionneurs. Enregistrée par OPC.
+     */
+    void setLogic(ProcessLogic& logic);
 
     /** Efface la mémorisation de toutes les alarmes. */
     void acknowledgeAlarms();
@@ -148,6 +162,11 @@ private:
 
     Alarm* alarms[MAX_ALARMS] = {};
     uint8_t alarmCount = 0;
+
+    ProcessLogic* logic = nullptr;
+
+    LogicCommand* logicCommands[MAX_REGULATORS] = {};
+    uint8_t logicCommandCount = 0;
     AlarmState loggedAlarmState[MAX_ALARMS] = {};
 
     // Seuils d'entretien atteints (journalisés une fois par sortie).

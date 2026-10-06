@@ -3074,6 +3074,7 @@ void runManualModeTests();
 void runCounterTests();
 void runLoopBreakTests();
 void runEventLogTests();
+void runLogicTests();
 
 int main()
 {
@@ -3266,6 +3267,7 @@ int main()
     runCounterTests();
     runLoopBreakTests();
     runEventLogTests();
+    runLogicTests();
 
     return TestHarness::finish();
 }

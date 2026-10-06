@@ -44,6 +44,7 @@ fi
     "${project_dir}/test/host/test_counters.cpp" \
     "${project_dir}/test/host/test_loop_break.cpp" \
     "${project_dir}/test/host/test_event_log.cpp" \
+    "${project_dir}/test/host/test_logic.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -83,6 +84,7 @@ fi
     "${project_dir}/src/Regulator/Regulator.cpp" \
     "${project_dir}/src/Regulator/Alarm.cpp" \
     "${project_dir}/src/Regulator/LimitAlarm.cpp" \
+    "${project_dir}/src/Regulator/LogicCommand.cpp" \
     "${project_dir}/src/Regulator/LoopBreakAlarm.cpp" \
     "${project_dir}/src/Regulator/ScheduledSetpoint.cpp" \
     "${project_dir}/src/Regulator/SetpointRamp.cpp" \
