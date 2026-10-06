@@ -11,8 +11,9 @@
 #include <Outputs/ActuatorOnOff.h>
 #include <Outputs/RelayOutput.h>
 
+#include <Regulator/Comparator.h>
 #include <Regulator/LimitAlarm.h>
-#include <Regulator/SolarRegulator.h>
+#include <Regulator/LogicCommand.h>
 #include <Regulator/Thermostat.h>
 #include <Regulator/TimeSchedule.h>
 
@@ -23,7 +24,9 @@ class SensorBoard;
 /**
  * Exemple d'installation pour un chauffe-eau solaire.
  *
- * - Relais 1 : pompe solaire, avec décharge nocturne en mode vacances
+ * - Relais 1 : pompe solaire. Les comparateurs donnent les conditions, la
+ *   glue (processLogic()) les combine : charge quand le capteur est plus
+ *   chaud que le bas du ballon, décharge nocturne en mode vacances
  *   (programme « Décharge nuit ») ;
  * - Relais 2 : résistance d'appoint, thermostat sur le haut du ballon actif
  *   uniquement pendant le programme « Heures creuses ».
@@ -41,6 +44,10 @@ public:
         SensorBoard& board,
         Adafruit_BMP5xx& bmp580,
         ProcessControl& process) override;
+
+    void processLogic(uint32_t now) override;
+
+    void resumeLogic(uint32_t now) override;
 
     void captureHomeScreenState() override;
 
@@ -62,15 +69,24 @@ private:
     TemperatureRTD tankTopTemperature;
     TemperatureRTD tankBottomTemperature;
 
-    // Régulation
-    SolarRegulator solarRegulator;
+    // Conditions de la charge solaire
+    Comparator chargeDelta;         // capteur - bas du ballon
+    Comparator tankMaximum;         // haut du ballon trop chaud
+    Comparator collectorMinimum;    // capteur assez chaud
 
-    // Commande de la pompe
+    // Conditions de la décharge nocturne (mode vacances)
+    bool holidayMode = false;
+    TimeSchedule holidaySchedule;
+    Comparator dischargeTank;       // bas du ballon encore chaud
+    Comparator dischargeDelta;      // bas du ballon - capteur
+
+    // Commande de la pompe, écrite par la glue
+    LogicCommand pumpCommand;
     ActuatorOnOff pump;
     RelayOutput pumpRelay;
 
-    // Décharge nocturne (mode vacances)
-    TimeSchedule holidaySchedule;
+    // Décharge en cours (glue)
+    bool discharging = false;
 
     // Appoint électrique en heures creuses
     TimeSchedule offPeakSchedule;

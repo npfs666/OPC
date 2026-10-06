@@ -21,7 +21,7 @@
 
 namespace
 {
-    TestIO installation;
+    SolarInstallation installation;
     OPC opc(installation);
     SystemWatchdog systemWatchdog;
 

@@ -4,16 +4,20 @@
 #include <Hardware/pinout.h>
 #include <ProcessControl.h>
 
-#include <Adafruit_GFX.h>
-
 #include <hmi/HomeScreen.h>
-#include <hmi/AlarmDisplay.h>
-#include <hmi/MeasurementDisplay.h>
-#include <hmi/TextField.h>
 #include <ProcessSnapshot.h>
 
 #include <cmath>
 #include <cstdio>
+
+// Le dessin n'est compilé que pour la carte : les tests sur l'hôte
+// vérifient la logique du template, pas l'écran.
+#ifndef OPC_HOST_TEST
+#include <Adafruit_GFX.h>
+
+#include <hmi/AlarmDisplay.h>
+#include <hmi/MeasurementDisplay.h>
+#include <hmi/TextField.h>
 
 namespace
 {
@@ -99,6 +103,7 @@ namespace
             std::isfinite(sample->value);
     }
 }
+#endif
 
 const char* SolarInstallation::name() const
 {
@@ -185,23 +190,23 @@ bool SolarInstallation::begin(
         return fail("Mesures solaires non enregistrées");
     }
 
-    solarRegulator.begin(
-        "solar_regulator",
-        "Regulateur solaire",
-        collectorTemperature,
-        tankTopTemperature,
-        tankBottomTemperature);
+    // ----- Pompe solaire : commande écrite par la glue -----
 
-    if (!process.add(solarRegulator))
-        return fail("Régulateur solaire non enregistré");
+    // Enregistrée avant ses comparateurs : son menu « Pompe solaire »
+    // contient leurs réglages.
+    pumpCommand.begin("solar_pump_command", "Pompe solaire");
 
-    pump.begin(
-        "solar_pump",
-        "Pompe solaire",
-        solarRegulator);
+    // Une sonde en défaut arrête la pompe.
+    if (!pumpCommand.dependsOn(collectorTemperature) ||
+        !pumpCommand.dependsOn(tankTopTemperature) ||
+        !pumpCommand.dependsOn(tankBottomTemperature))
+    {
+        return fail("Dépendances pompe solaire");
+    }
 
-    if (!process.add(pump))
-        return fail("Pompe solaire non enregistrée");
+    pumpCommand.lockFaultAction(Regulator::FaultAction::SafeState);
+
+    pump.begin("solar_pump", "Commande pompe", pumpCommand);
 
     pumpRelay.begin(
         "solar_pump_relay",
@@ -210,11 +215,54 @@ bool SolarInstallation::begin(
         true,
         false);
 
-    if (!process.connect(
-            pump,
-            pumpRelay))
+    if (!process.add(pumpCommand) ||
+        !process.add(pump) ||
+        !process.connect(pump, pumpRelay))
     {
         return fail("Relais pompe non relié à la pompe");
+    }
+
+    // ----- Conditions de la charge solaire -----
+
+    chargeDelta.begin(
+        "solar_charge",
+        "Charge",
+        collectorTemperature,
+        tankBottomTemperature,
+        Comparator::Direction::Above,
+        8.0,
+        4.0);
+    chargeDelta.setRange(0.0, 30.0);
+    chargeDelta.setLabels("Delta démarrage", "Delta arrêt");
+
+    tankMaximum.begin(
+        "solar_tank_max",
+        "Ballon max",
+        tankTopTemperature,
+        Comparator::Direction::Above,
+        80.0,
+        80.0);
+    tankMaximum.useSingleThreshold();
+    tankMaximum.setRange(40.0, 95.0);
+    tankMaximum.setLabels("Temp. ballon max", nullptr);
+
+    collectorMinimum.begin(
+        "solar_collector_min",
+        "Capteur min",
+        collectorTemperature,
+        Comparator::Direction::Above,
+        20.0,
+        20.0);
+    collectorMinimum.useSingleThreshold();
+    collectorMinimum.setRange(0.0, 100.0);
+    collectorMinimum.setLabels("Temp. capteur min", nullptr);
+
+    for (Comparator* condition : {&chargeDelta, &tankMaximum, &collectorMinimum})
+    {
+        condition->setMenuParent("solar_pump_command");
+
+        if (!process.add(*condition))
+            return fail("Conditions de charge non enregistrées");
     }
 
     // ----- Mode vacances : décharge du ballon la nuit -----
@@ -228,11 +276,40 @@ bool SolarInstallation::begin(
         TimeSchedule::Days::Everyday, 23 * 60, 6 * 60
     };
 
-    solarRegulator.setHolidaySchedule(holidaySchedule);
+    // Décharge du bas du ballon dans le capteur froid, de 52 °C jusqu'à
+    // 50 °C, avec les mêmes deltas que la charge.
+    dischargeTank.begin(
+        "solar_discharge_tank",
+        "Ballon décharge",
+        tankBottomTemperature,
+        Comparator::Direction::Above,
+        52.0,
+        50.0);
+    dischargeTank.setRange(20.0, 80.0);
+    dischargeTank.setLabels("Décharge dès", "Décharge jusqu'à");
 
-    // Le programme ne pilote pas de sortie : il sert au régulateur.
+    dischargeDelta.begin(
+        "solar_discharge_delta",
+        "Delta décharge",
+        tankBottomTemperature,
+        collectorTemperature,
+        Comparator::Direction::Above,
+        8.0,
+        4.0);
+    dischargeDelta.setRange(0.0, 30.0);
+    dischargeDelta.setLabels("Delta démarrage", "Delta arrêt");
+
+    // Le programme ne pilote pas de sortie : il sert à la glue.
     if (!process.add(holidaySchedule))
         return fail("Programme vacances non enregistré");
+
+    for (Comparator* condition : {&dischargeTank, &dischargeDelta})
+    {
+        condition->setMenuParent("solar_holiday");
+
+        if (!process.add(*condition))
+            return fail("Conditions de décharge non enregistrées");
+    }
 
     // ----- Appoint électrique en heures creuses -----
 
@@ -292,6 +369,18 @@ bool SolarInstallation::begin(
         return fail("Alarme ballon non enregistrée");
 
     board.registerParameters(parameterList);
+
+    // Avant les régulateurs : son menu « Vacances » contient les réglages
+    // de la décharge.
+    auto holiday = parameterList.forOwner({
+        "regulators",
+        "Regulateur",
+        "solar_holiday",
+        "Vacances"
+    });
+
+    holiday.addBool("holiday_mode", "Mode vacances", holidayMode);
+
     process.registerParameters(parameterList);
 
     if (parameterList.hasError())
@@ -300,11 +389,48 @@ bool SolarInstallation::begin(
     return true;
 }
 
+/*
+ * Glue : la pompe charge le ballon quand le capteur est assez chaud et plus
+ * chaud que le bas du ballon, sauf ballon plein. En mode vacances, la nuit,
+ * elle décharge le bas du ballon dans le capteur froid. Une sonde en défaut
+ * arrête la pompe (dependsOn).
+ */
+void SolarInstallation::processLogic(uint32_t now)
+{
+    (void)now;
+
+    const bool charging =
+        chargeDelta.isOn() &&
+        !tankMaximum.isOn() &&
+        collectorMinimum.isOn();
+
+    // Heure inconnue : pas de plage de nuit, pas de décharge.
+    bool night = false;
+    const bool nightWindow =
+        holidaySchedule.isActive(night) && night;
+
+    discharging =
+        !charging &&
+        holidayMode &&
+        nightWindow &&
+        dischargeTank.isOn() &&
+        dischargeDelta.isOn();
+
+    pumpCommand.setOn(charging || discharging);
+}
+
+void SolarInstallation::resumeLogic(uint32_t now)
+{
+    (void)now;
+    discharging = false;
+}
+
 void SolarInstallation::captureHomeScreenState()
 {
-    homeState.discharging = solarRegulator.isDischarging();
-    homeState.holidayMode = solarRegulator.settings.holidayMode;
-    homeState.startDelta = solarRegulator.settings.startDelta;
+    homeState.discharging =
+        discharging && pumpCommand.isCommandValid();
+    homeState.holidayMode = holidayMode;
+    homeState.startDelta = chargeDelta.settings.onThreshold;
 
     bool offPeak = false;
     homeState.offPeakKnown = offPeakSchedule.isActive(offPeak);
@@ -314,6 +440,9 @@ void SolarInstallation::captureHomeScreenState()
 void SolarInstallation::printHomeScreen(
     HomeScreenContext& context)
 {
+#ifdef OPC_HOST_TEST
+    (void)context;
+#else
     Adafruit_GFX& display = context.display;
 
     display.cp437(true);
@@ -460,4 +589,5 @@ void SolarInstallation::printHomeScreen(
     // ----- Alarmes -----
 
     AlarmDisplay::printBanner(display, context.snapshot, ALARM_Y);
+#endif
 }

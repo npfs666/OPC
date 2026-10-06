@@ -7,7 +7,6 @@
 #include <ProcessSnapshot.h>
 #include <Regulator/PID.h>
 #include <Regulator/ScheduledSetpoint.h>
-#include <Regulator/SolarRegulator.h>
 #include <Regulator/Thermostat.h>
 #include <Regulator/TimeSchedule.h>
 #include <hmi/MenuBuilder.h>
@@ -615,109 +614,6 @@ namespace
         CHECK_TRUE(pid.isCommandValid());
     }
 
-    void testSolarHolidayDischarge()
-    {
-        FakeTemperature collector;
-        FakeTemperature tankTop;
-        FakeTemperature tankBottom;
-        ClockSample clock;
-        TimeSchedule night;
-        SolarRegulator solar;
-
-        night.begin("night", "Décharge nuit", clock);
-        night.settings.slots[0] = {
-            TimeSchedule::Days::Everyday, minutes(23), minutes(6)
-        };
-
-        solar.begin("solar", "Solaire", collector, tankTop, tankBottom);
-
-        // Sans programme : pas de réglages vacances.
-        {
-            Parameter storage[8];
-            ParameterList list;
-            list.begin(storage, 8);
-            solar.registerParameters(list);
-            CHECK_TRUE(list.find("solar", "holiday_mode") == nullptr);
-        }
-
-        solar.setHolidaySchedule(night);
-
-        {
-            Parameter storage[8];
-            ParameterList list;
-            list.begin(storage, 8);
-            solar.registerParameters(list);
-            CHECK_FALSE(list.hasError());
-            CHECK_TRUE(list.find("solar", "holiday_mode") != nullptr);
-            CHECK_TRUE(
-                list.find("solar", "holiday_tank_temperature") != nullptr);
-        }
-
-        // Nuit, ballon chaud, capteur froid, mode vacances désactivé.
-        setClock(clock, MONDAY, 2);
-        collector.setReading(20.0);
-        tankTop.setReading(75.0);
-        tankBottom.setReading(70.0);
-        solar.update(0);
-        CHECK_NEAR(solar.readCommand(), 0.0, 0.0);
-        CHECK_FALSE(solar.isDischarging());
-
-        // Mode vacances : décharge jusqu'à 50 °C en bas de ballon.
-        solar.settings.holidayMode = true;
-        solar.settings.holidayTankTemperature = 50.0;
-        solar.update(1000);
-        CHECK_NEAR(solar.readCommand(), 1.0, 0.0);
-        CHECK_TRUE(solar.isDischarging());
-
-        tankBottom.setReading(50.5);
-        solar.update(2000);
-        CHECK_NEAR(solar.readCommand(), 1.0, 0.0);
-
-        tankBottom.setReading(50.0);
-        solar.update(3000);
-        CHECK_NEAR(solar.readCommand(), 0.0, 0.0);
-        CHECK_FALSE(solar.isDischarging());
-
-        // Hystérésis de 2 K avant de reprendre.
-        tankBottom.setReading(51.5);
-        solar.update(4000);
-        CHECK_NEAR(solar.readCommand(), 0.0, 0.0);
-
-        tankBottom.setReading(52.0);
-        solar.update(5000);
-        CHECK_NEAR(solar.readCommand(), 1.0, 0.0);
-
-        // Capteur qui se réchauffe : arrêt sous le delta d'arrêt (4 K).
-        collector.setReading(48.5);
-        solar.update(6000);
-        CHECK_NEAR(solar.readCommand(), 0.0, 0.0);
-
-        // Le jour, hors plage : pas de décharge.
-        collector.setReading(20.0);
-        tankBottom.setReading(70.0);
-        setClock(clock, MONDAY, 12);
-        solar.update(7000);
-        CHECK_NEAR(solar.readCommand(), 0.0, 0.0);
-
-        // Heure inconnue : pas de décharge, mais la charge solaire continue.
-        setClock(clock, MONDAY, 2, 0, false);
-        solar.update(8000);
-        CHECK_NEAR(solar.readCommand(), 0.0, 0.0);
-
-        collector.setReading(60.0);
-        tankTop.setReading(45.0);
-        tankBottom.setReading(40.0);
-        solar.update(9000);
-        CHECK_NEAR(solar.readCommand(), 1.0, 0.0);
-        CHECK_FALSE(solar.isDischarging());
-
-        // Sonde invalide : tout s'arrête.
-        tankBottom.setReading(40.0, false);
-        solar.update(10000);
-        CHECK_FALSE(solar.isCommandValid());
-        CHECK_FALSE(solar.isDischarging());
-    }
-
     void testProcessClockRequirement()
     {
         ProcessControl process;
@@ -796,10 +692,6 @@ void runScheduleTests()
     TestHarness::run(
         "autotune PID ignore le programme",
         testPIDAutotuneIgnoresSchedule);
-
-    TestHarness::run(
-        "solaire : décharge nocturne vacances",
-        testSolarHolidayDischarge);
 
     TestHarness::run(
         "alerte horloge : heure requise",

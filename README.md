@@ -294,7 +294,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | Template | Contenu |
 | --- | --- |
 | `ThermostatInstallation` | 1 PT100, thermostat avec hystérésis et rampe de consigne, relais 1 |
-| `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), régulateur solaire avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (relais 2) |
+| `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), pompe solaire par comparateurs et glue avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (relais 2) |
 | `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
@@ -437,40 +437,51 @@ normale. Les modes `Marche forcée` / `Arrêt forcé` du programme servent de
 dérogation. Un autotune PID ignore le programme pendant l'essai. Sans heure
 valide, la régulation s'arrête et l'alerte horloge s'affiche.
 
-#### Régulateur solaire : mode vacances
-
-Sans puisage, un ballon solaire surchauffe en quelques jours. En mode
-vacances, le `SolarRegulator` le décharge la nuit : pendant les plages d'un
-programme, la pompe fait circuler l'eau du bas du ballon dans le capteur froid,
-qui rayonne la chaleur.
-
-```cpp
-nuit.begin("holiday_night", "Décharge nuit", process.clock());
-solaire.setHolidaySchedule(nuit);
-process.add(nuit);
-```
-
-Menu du régulateur solaire :
-
-- **Mode vacances** : `Oui` pour autoriser la décharge nocturne ;
-- **Temp. vacances** : température du bas du ballon à atteindre (50 °C par
-  défaut).
-
-La décharge démarre si le bas du ballon dépasse la température vacances de
-2 K et le capteur est plus froid que lui d'au moins `Delta démarrage`. Elle
-s'arrête à la température vacances ou sous `Delta arrêt`. En journée, la
-charge solaire reste normale, limitée par `Temp. ballon max`.
-
 #### Template solaire
 
-`SolarInstallation` combine les deux usages :
+`SolarInstallation` est l'exemple type d'un template **blocs + glue** : des
+comparateurs donnent les conditions, et quelques lignes de glue
+(`processLogic()`) les combinent pour piloter la pompe.
 
-- **Relais 1, pompe** : charge solaire, et décharge de 23:00 à 06:00 en mode
-  vacances (`Programmation > Décharge nuit`) ;
+- **Relais 1, pompe solaire** (`LogicCommand`, menu `Regulateur > Pompe
+  solaire`) :
+  - **charge** quand le capteur est plus chaud que le bas du ballon
+    (`Charge` : marche à 8 K, arrêt à 4 K), que le capteur atteint
+    `Temp. capteur min` (20 °C) et que le haut du ballon reste sous
+    `Temp. ballon max` (80 °C) ;
+  - **décharge nocturne en mode vacances** : sans puisage, un ballon solaire
+    surchauffe en quelques jours. Pendant les plages du programme
+    `Programmation > Décharge nuit` (23:00 à 06:00 par défaut), la pompe fait
+    circuler l'eau du bas du ballon dans le capteur froid, qui rayonne la
+    chaleur. Menu `Regulateur > Vacances` : `Mode vacances`, puis
+    `Ballon décharge` (dès 52 °C, jusqu'à 50 °C en bas de ballon) et
+    `Delta décharge` (bas du ballon plus chaud que le capteur : marche à 8 K,
+    arrêt à 4 K). Sans heure valide, pas de décharge ; la charge continue ;
+  - une sonde en défaut arrête la pompe (état sûr verrouillé). La pompe a le
+    réglage `Commande` Auto / Marche / Arrêt.
 - **Relais 2, appoint électrique** : thermostat sur le haut du ballon
   (55 °C, hystérésis 5 K), actif uniquement en heures creuses, de 22:00 à
   06:00 par défaut (`Programmation > Heures creuses`). Son état de sécurité
   est verrouillé sur arrêt.
+
+La glue du template :
+
+```cpp
+const bool charging =
+    chargeDelta.isOn() && !tankMaximum.isOn() && collectorMinimum.isOn();
+
+bool night = false;
+const bool nightWindow = holidaySchedule.isActive(night) && night;
+
+discharging = !charging && holidayMode && nightWindow &&
+              dischargeTank.isOn() && dischargeDelta.isOn();
+
+pumpCommand.setOn(charging || discharging);
+```
+
+Chaque comparateur garde sa propre hystérésis : quand `Temp. ballon max`
+interrompt la charge, elle reprend dès que le ballon redescend si l'écart
+est encore au-dessus de `Delta arrêt`.
 
 L'écran d'accueil affiche `DECHARGE` ou `VACANCES` à la place de l'état de la
 pompe, ainsi que l'état de l'appoint.
@@ -481,7 +492,9 @@ pompe, ainsi que l'état de l'appoint.
 | --- | --- |
 | Entrée analogique | `Sensor` : PT100 / PT1000 (2, 3 ou 4 fils), thermocouple B, E, J, K, N, R, S, T |
 | Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
-| Régulateurs | `Thermostat`, `SolarRegulator`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
+| Régulateurs | `Thermostat`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
+| Comparateur | `Comparator` : seuil ou différentiel à hystérésis, voir [Comparateur](#comparateur) |
+| Temporisation | `DelayTimer` : retard à la montée ou à la descente, voir [Temporisation](#temporisation) |
 | Glue | `LogicCommand` : sortie écrite par `processLogic()`, voir [Ajouter de la glue](#3-ajouter-de-la-glue-facultatif) |
 | Alarmes | `LimitAlarm` (seuil), `LoopBreakAlarm` (boucle ouverte), voir [Alarmes](#alarmes) |
 | Actionneurs | `ActuatorOnOff`, `ActuatorPWM`, `TimeProportionalActuator` |
@@ -521,6 +534,73 @@ Les tailles des listes internes sont fixes (pas d'allocation dynamique) et
 réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 16 régulateurs,
 16 actionneurs, 16 sorties, 2 entrées numériques, 8 alarmes, 192 paramètres
 (un `TimeSchedule` en utilise 19, une `LimitAlarm` 8).
+
+### Comparateur
+
+`Comparator` ([Regulator/Comparator.h](src/Regulator/Comparator.h)) compare
+une mesure (**seuil**) ou la différence de deux mesures (**différentiel**) à
+deux seuils, avec hystérésis. Sa commande vaut 1 en marche, 0 à l'arrêt :
+
+- **Au-dessus** : marche quand la valeur atteint le seuil de marche, arrêt
+  quand elle redescend au seuil d'arrêt, seuils compris ; entre les deux,
+  l'état est conservé. **En dessous** : l'inverse.
+- `useSingleThreshold()` : un seul réglage, sans hystérésis (marche au-delà
+  du seuil, seuil compris).
+- Une mesure en défaut rend la commande invalide. Au retour de la mesure, ou
+  après une reprise du menu, le comparateur repart de l'arrêt.
+- Réglages dans `Regulateur > <nom>` : `Seuil marche` et `Seuil arrêt`
+  (libellés avec `setLabels()`, bornes et pas avec `setRange()`). Un écart de
+  °C se règle en K. Un seuil d'arrêt du mauvais côté du seuil de marche est
+  refusé.
+
+On le relie directement à un actionneur, ou on le lit depuis la glue
+(`isOn()`, voir [Ajouter de la glue](#3-ajouter-de-la-glue-facultatif)) :
+
+```cpp
+// Hors-gel sans glue : relais en marche à 5 °C, à l'arrêt à 7 °C.
+horsGel.begin("hors_gel", "Hors-gel", temperature,
+              Comparator::Direction::Below, 5.0, 7.0);
+commandeHorsGel.begin("cde_hors_gel", "Cde hors-gel", horsGel);
+
+// Différentiel : capteur - bas du ballon, marche à 8 K, arrêt à 4 K.
+charge.begin("charge", "Charge", capteur, basBallon,
+             Comparator::Direction::Above, 8.0, 4.0);
+```
+
+### Temporisation
+
+`DelayTimer` ([Regulator/DelayTimer.h](src/Regulator/DelayTimer.h)) retarde
+un changement d'état. Sa commande vaut 1 quand la sortie est active :
+
+- **Retard à la montée** (`Mode::OnDelay`) : sortie active quand l'entrée est
+  vraie sans interruption depuis le délai. Une entrée fausse coupe la sortie
+  et remet le délai à zéro.
+- **Retard à la descente** (`Mode::OffDelay`) : sortie active dès que
+  l'entrée est vraie, et encore pendant le délai après sa retombée
+  (post-circulation).
+- Le délai se règle dans `Regulateur > <nom>`, en secondes, minutes ou heures
+  selon l'unité choisie par le template (`Unit`). Maximum par défaut :
+  3600 s, 1440 min ou 48 h (`setMaximum()`) ; libellé avec `setLabel()`.
+- Une pause (menu, timeout de mesure) **ne remet pas le délai à zéro** : le
+  temps continue de compter, et un réglage au menu ne repousse pas une
+  échéance de plusieurs heures. Le débordement de `millis()` est sans effet.
+
+Deux usages :
+
+```cpp
+// Relié à un régulateur dans begin(), sans glue : circulateur qui tourne
+// encore 3 min après l'arrêt du chauffage.
+postCirculation.begin("post_circ", "Post-circulation",
+                      DelayTimer::Mode::OffDelay, 3, DelayTimer::Unit::Minutes);
+postCirculation.setSource(thermostat);
+commandeCirculateur.begin("cde_circ", "Cde circulateur", postCirculation);
+
+// Piloté par la glue : dégivrage après 6 h de froid.
+const bool degivrer = intervalle.run(etat == Etat::Froid, now);
+```
+
+Avec une source, une commande invalide de la source rend la temporisation
+invalide (état sûr de ses sorties) et la remet à zéro.
 
 ## Utilisation
 
@@ -742,7 +822,7 @@ sans à-coup au retour de la mesure.
 Il n'existe volontairement pas de sortie forcée : sans mesure, l'état sûr
 reste la règle. `lockFaultAction(Regulator::FaultAction::SafeState)` retire le
 choix du menu (l'appoint électrique du template solaire est verrouillé
-ainsi). Le régulateur solaire est toujours en sécurité sur défaut.
+ainsi, comme la pompe du template solaire).
 
 ## Alarmes
 

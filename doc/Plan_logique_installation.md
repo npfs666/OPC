@@ -85,6 +85,22 @@ lisible, modifiable et partageable (source + `.uf2`).
 
 ## 4. Phases
 
+### Ordre de réalisation
+
+Chaque bloc est écrit juste avant le démonstrateur qui s'en sert.
+L'inhibition, la partie la plus délicate, est conçue pour son utilisateur
+réel, la chambre froide.
+
+1. ✅ Étape 1a : point d'appel, `LogicCommand`, `TestIO` (commit « Glue 1a »).
+2. ✅ 2.1 Comparateur.
+3. ✅ 3.1 Solaire réorganisé (comparateurs + glue, `SolarRegulator`
+   supprimé).
+4. ✅ 2.2 Temporisation.
+5. ⬜ Étapes 1b et 1c (inhibition des régulateurs et des alarmes), puis 2.3
+   (alarme sur condition).
+6. ⬜ 3.2 Chambre froide.
+7. ⬜ 3.3, puis phase 4.
+
 ### Phase 1 : le noyau de la glue
 
 La phase 1 se fait en trois étapes. Chacune se termine par les tests sur
@@ -94,8 +110,8 @@ vérifie) et par un commit.
 | Étape | Contenu | Premier utilisateur |
 |---|---|---|
 | **1a** | 1.1, 1.2 et 1.6, avec leurs tests et le README | le template `TestIO` (1.6) |
-| **1b** | 1.3, l'inhibition des régulateurs | le démonstrateur solaire ou le brasseur |
-| **1c** | 1.3, l'inhibition des alarmes ; elle peut attendre la veille de 3.2 | la chambre froide |
+| **1b** | 1.3, l'inhibition des régulateurs | la chambre froide (3.2) |
+| **1c** | 1.3, l'inhibition des alarmes | la chambre froide (3.2) |
 
 1.1 ✅ **Point d'appel** : `processLogic(now)` et `resumeLogic(now)` dans
 `Installation`, vides par défaut.
@@ -186,18 +202,23 @@ C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour
 
 ### Phase 2 : les nouveaux blocs
 
-2.1 ⬜ **Comparateur** :
+2.1 ✅ **Comparateur** (`Regulator/Comparator.h`, tests dans
+`test/host/test_comparator.cpp`) :
 - un **seuil** (une mesure) ou un **différentiel** (deux mesures) ;
 - seuils de marche et d'arrêt réglables au menu ;
 - invalide si une de ses mesures est en défaut ;
 - c'est un `Regulator` : on peut le relier directement à une sortie dans
   `begin()` (un hors-gel sans glue), ou le lire depuis la glue.
 
-2.2 ⬜ **Temporisation** :
+2.2 ✅ **Temporisation** (`Regulator/DelayTimer.h`, tests dans
+`test/host/test_delay_timer.cpp`) :
 - retard à la montée ou à la descente, réglable au menu ;
 - durées de quelques secondes à plusieurs heures (intervalle de dégivrage) ;
 - reprise propre après une pause, et calcul de durée sûr au débordement de
-  `millis()`.
+  `millis()` ;
+- réalisé : unité au choix du template (s, min, h) ; une pause ne remet pas
+  le délai à zéro ; pilotée par la glue (`run()`) ou reliée à un régulateur
+  dans `begin()` (`setSource()`, post-circulation sans glue).
 
 2.3 ⬜ **Alarme sur condition** :
 - réglages `Activée`, `Retard` et `Mémorisation` ;
@@ -213,7 +234,8 @@ C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour
 
 ### Phase 3 : les démonstrateurs
 
-3.1 ⬜ **Le solaire réorganisé.** `SolarRegulator` est supprimé.
+3.1 ✅ **Le solaire réorganisé.** `SolarRegulator` est supprimé. Tests :
+`test/host/test_solar.cpp`, sur le template complet.
 - **Blocs** :
   - comparateur différentiel « charge » (capteur − bas du ballon, marche 8 K,
     arrêt 4 K) ;
@@ -234,16 +256,24 @@ C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour
 
 - L'appoint électrique (Thermostat + programme « Heures creuses ») ne change
   pas.
-- On garde **la même régulation qu'avant, prouvée par les tests**. On porte
-  les tests de décharge de `test_schedule.cpp`. La pompe gagne le mode manuel.
-  La décharge a maintenant ses propres seuils, avec les mêmes valeurs par
-  défaut que la charge.
-- **Point d'attention.** Dans `SolarRegulator`, une limite (ballon max,
-  capteur min) remet la charge à l'arrêt : il faut ensuite de nouveau le delta
-  de démarrage pour repartir. En blocs, le comparateur différentiel garde son
-  propre état, et la pompe pourrait repartir dès que la limite disparaît, sur
-  un simple delta d'arrêt. Il faut soit l'accepter, soit inhiber le
-  différentiel pendant une limite. Les tests portés trancheront.
+- **Même régulation qu'avant** : les tests de `SolarRegulator` (charge et
+  décharge vacances) sont repris sur le template complet et passent. La pompe
+  gagne le mode manuel ; son action sur défaut est verrouillée en état sûr,
+  comme avant.
+- **Menu** : les seuils de charge sont rangés sous `Pompe solaire`, ceux de la
+  décharge sous `Vacances` (`Comparator::setMenuParent()`). La température
+  vacances (50 °C, reprise à +2 K fixe) devient deux réglages,
+  `Décharge dès` (52 °C) et `Décharge jusqu'à` (50 °C). La décharge a ses
+  propres deltas, avec les mêmes valeurs par défaut que la charge.
+- **Écarts acceptés**, chaque comparateur gardant sa propre hystérésis :
+  - quand une limite (ballon max, capteur min) interrompt la charge, elle
+    reprend à la levée de la limite si l'écart est encore au-dessus du delta
+    d'arrêt. `SolarRegulator` attendait de nouveau le delta de démarrage.
+    Test : « solaire : charge après une limite » ;
+  - la décharge démarre quand ses deux comparateurs sont en marche, chacun
+    avec son hystérésis ; `SolarRegulator` exigeait les deux seuils de
+    démarrage au même instant. L'écart ne joue que si le bas du ballon est
+    entre 50 et 52 °C au début de la plage.
 
 3.2 ⬜ **La chambre froide positive** (fromagerie, 2 à 4 °C), démonstrateur
 principal.
@@ -287,7 +317,10 @@ principal.
   (arrêt) et l'alarme de défaut de sonde se déclenche : c'est à l'utilisateur
   d'intervenir.
 
-3.3 ⬜ **Des templates compilables dans les tests sur l'hôte**, pour tester la
+3.3 ⬜ **Des templates compilables dans les tests sur l'hôte** (fait pour le
+solaire : dessin sous `#ifndef OPC_HOST_TEST`, `InstallationTestAccess`,
+résistance par sonde dans le fake `SensorBoard` ; reste la chambre froide),
+pour tester la
 glue des deux démonstrateurs. Il faudra probablement un fake `Adafruit_GFX`
 pour `printHomeScreen()`.
 

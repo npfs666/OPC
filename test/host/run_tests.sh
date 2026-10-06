@@ -45,6 +45,9 @@ fi
     "${project_dir}/test/host/test_loop_break.cpp" \
     "${project_dir}/test/host/test_event_log.cpp" \
     "${project_dir}/test/host/test_logic.cpp" \
+    "${project_dir}/test/host/test_comparator.cpp" \
+    "${project_dir}/test/host/test_solar.cpp" \
+    "${project_dir}/test/host/test_delay_timer.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -83,15 +86,17 @@ fi
     "${project_dir}/src/Regulator/PIDAutoTune.cpp" \
     "${project_dir}/src/Regulator/Regulator.cpp" \
     "${project_dir}/src/Regulator/Alarm.cpp" \
+    "${project_dir}/src/Regulator/Comparator.cpp" \
+    "${project_dir}/src/Regulator/DelayTimer.cpp" \
     "${project_dir}/src/Regulator/LimitAlarm.cpp" \
     "${project_dir}/src/Regulator/LogicCommand.cpp" \
     "${project_dir}/src/Regulator/LoopBreakAlarm.cpp" \
     "${project_dir}/src/Regulator/ScheduledSetpoint.cpp" \
     "${project_dir}/src/Regulator/SetpointRamp.cpp" \
-    "${project_dir}/src/Regulator/SolarRegulator.cpp" \
     "${project_dir}/src/Regulator/Thermostat.cpp" \
     "${project_dir}/src/Regulator/TimeSchedule.cpp" \
     "${project_dir}/src/SystemWatchdog.cpp" \
+    "${project_dir}/src/Templates/SolarInstallation.cpp" \
     -o "${binary}"
 
 "${binary}"

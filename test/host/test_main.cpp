@@ -21,7 +21,6 @@
 #include <ProcessControl.h>
 #include <Regulator/PID.h>
 #include <Regulator/SetpointRamp.h>
-#include <Regulator/SolarRegulator.h>
 #include <Regulator/Thermostat.h>
 #include <StartupStatus.h>
 #include <SystemWatchdog.h>
@@ -883,56 +882,6 @@ namespace
         thermostat.update(3000);
         CHECK_TRUE(thermostat.isCommandValid());
         CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
-    }
-
-    void testSolarRegulator()
-    {
-        FakeTemperature collector;
-        FakeTemperature tankTop;
-        FakeTemperature tankBottom;
-        SolarRegulator solar;
-
-        solar.begin(
-            "solar",
-            collector,
-            tankTop,
-            tankBottom);
-
-        collector.setReading(50.0);
-        tankTop.setReading(40.0);
-        tankBottom.setReading(40.0);
-        solar.update(0);
-        CHECK_NEAR(
-            solar.readCommand(),
-            1.0,
-            0.0);
-
-        collector.setReading(45.0);
-        solar.update(1000);
-        CHECK_NEAR(
-            solar.readCommand(),
-            1.0,
-            0.0);
-
-        collector.setReading(44.0);
-        solar.update(2000);
-        CHECK_NEAR(
-            solar.readCommand(),
-            0.0,
-            0.0);
-
-        collector.setReading(60.0);
-        tankTop.setReading(80.0);
-        solar.update(3000);
-        CHECK_NEAR(
-            solar.readCommand(),
-            0.0,
-            0.0);
-
-        collector.setReading(60.0, false);
-        solar.update(4000);
-        CHECK_FALSE(
-            solar.isCommandValid());
     }
 
     void testPID()
@@ -3075,6 +3024,9 @@ void runCounterTests();
 void runLoopBreakTests();
 void runEventLogTests();
 void runLogicTests();
+void runComparatorTests();
+void runSolarTests();
+void runDelayTimerTests();
 
 int main()
 {
@@ -3121,10 +3073,6 @@ int main()
     TestHarness::run(
         "thermostat refroidissement",
         testCoolingThermostat);
-
-    TestHarness::run(
-        "régulateur solaire",
-        testSolarRegulator);
 
     TestHarness::run(
         "PID",
@@ -3268,6 +3216,9 @@ int main()
     runLoopBreakTests();
     runEventLogTests();
     runLogicTests();
+    runComparatorTests();
+    runSolarTests();
+    runDelayTimerTests();
 
     return TestHarness::finish();
 }

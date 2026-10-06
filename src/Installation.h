@@ -194,6 +194,11 @@ protected:
 private:
     friend class OPC;
 
+#ifdef OPC_HOST_TEST
+    // Tests sur l'hôte : démarre une installation comme OPC.
+    friend class InstallationTestAccess;
+#endif
+
     bool prepareParameterRegistration();
     bool completeParameterRegistration();
 
