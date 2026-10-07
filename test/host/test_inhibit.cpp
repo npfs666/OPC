@@ -37,6 +37,12 @@ namespace
             setValue(value);
             setStatus(Status::Ok);
         }
+
+        void fail(Status status)
+        {
+            setValue(NAN);
+            setStatus(status);
+        }
     };
 
     // Thermostat de chauffage 20 °C ± 1 °C, en marche à 18 °C.
@@ -340,6 +346,144 @@ namespace
         CHECK_TRUE(timer.run(true, 16000));
     }
 
+    // Alarme de température haute à 30 °C, retard 10 s.
+    void prepareHighAlarm(LimitAlarm& alarm, ControlledTemperature& temperature)
+    {
+        alarm.begin("haute", "Haute", temperature);
+        alarm.settings.enabled = true;
+        alarm.settings.type = LimitAlarm::Type::Max;
+        alarm.settings.limit = 30.0;
+        alarm.settings.delay = 10;
+        alarm.settings.latching = false;
+    }
+
+    void testAlarmNotInhibitable()
+    {
+        ControlledTemperature temperature;
+        LimitAlarm alarm;
+        prepareHighAlarm(alarm, temperature);
+
+        // Sans allowInhibit() : inhibit() est sans effet.
+        alarm.inhibit(true);
+        CHECK_FALSE(alarm.isInhibitable());
+        CHECK_FALSE(alarm.isInhibited());
+
+        temperature.set(35.0);
+        alarm.update(0);
+        alarm.update(10000);
+        CHECK_TRUE(alarm.isActive());
+    }
+
+    void testAlarmInhibited()
+    {
+        ControlledTemperature temperature;
+        LimitAlarm alarm;
+        prepareHighAlarm(alarm, temperature);
+        alarm.allowInhibit();
+
+        // Inhibée (dégivrage) pendant 20 s au-dessus du seuil : rien.
+        Regulator& asRegulator = alarm;
+        asRegulator.inhibit(true);
+        CHECK_TRUE(alarm.isInhibited());
+
+        temperature.set(35.0);
+        alarm.update(0);
+        alarm.update(20000);
+        CHECK_FALSE(alarm.isActive());
+
+        // La commande d'une alarme n'est pas forcée par l'inhibition.
+        CHECK_TRUE(alarm.isCommandValid());
+
+        // Levée : le retard repart de zéro.
+        alarm.inhibit(false);
+        alarm.update(21000);
+        CHECK_FALSE(alarm.isActive());
+        alarm.update(30999);
+        CHECK_FALSE(alarm.isActive());
+        alarm.update(31000);
+        CHECK_TRUE(alarm.isActive());
+
+        // Inhibée pendant l'alarme (non mémorisée) : elle cesse.
+        alarm.inhibit(true);
+        alarm.update(32000);
+        CHECK_FALSE(alarm.isActive());
+    }
+
+    void testAlarmFaultNotMasked()
+    {
+        ControlledTemperature temperature;
+        LimitAlarm alarm;
+        prepareHighAlarm(alarm, temperature);
+        alarm.settings.delay = 0;
+        alarm.allowInhibit();
+        alarm.inhibit(true);
+
+        // Un défaut de sonde n'est jamais masqué.
+        temperature.set(20.0);
+        alarm.update(0);
+        temperature.fail(Status::Open);
+        alarm.update(1000);
+        CHECK_TRUE(alarm.isActive());
+    }
+
+    void testAlarmLatchedStays()
+    {
+        ControlledTemperature temperature;
+        LimitAlarm alarm;
+        prepareHighAlarm(alarm, temperature);
+        alarm.settings.delay = 0;
+        alarm.settings.latching = true;
+        alarm.allowInhibit();
+
+        temperature.set(35.0);
+        alarm.update(0);
+        CHECK_TRUE(alarm.isActive());
+
+        // Inhibée après coup : la mémorisation reste, son relais aussi.
+        alarm.inhibit(true);
+        alarm.update(1000);
+        CHECK_TRUE(alarm.isLatched());
+        CHECK_NEAR(alarm.readCommand(), 1.0, 0.0);
+
+        // L'inhibition survit à une reprise (menu).
+        alarm.resume(2000);
+        CHECK_TRUE(alarm.isInhibited());
+
+        // Acquittée : plus d'alarme tant que l'inhibition dure.
+        alarm.acknowledge();
+        alarm.update(3000);
+        CHECK_FALSE(alarm.isActive());
+    }
+
+    void testLoopBreakInhibited()
+    {
+        ControlledTemperature temperature;
+        Thermostat thermostat;
+        startHeating(thermostat, temperature);
+
+        LoopBreakAlarm alarm;
+        alarm.begin("boucle", "Boucle", temperature, thermostat);
+        alarm.settings.enabled = true;
+        alarm.settings.detectionTime = 10;
+        alarm.allowInhibit();
+
+        // Boucle ouverte pendant l'inhibition de l'alarme : rien.
+        temperature.set(15.0);
+        thermostat.update(0);
+        alarm.inhibit(true);
+        alarm.update(0);
+        alarm.update(20000);
+        CHECK_FALSE(alarm.isActive());
+
+        // Levée : nouvelle fenêtre complète.
+        alarm.inhibit(false);
+        alarm.update(21000);
+        alarm.update(30999);
+        CHECK_FALSE(alarm.isActive());
+        alarm.update(31000);
+        CHECK_TRUE(alarm.isActive());
+    }
+
     // Glue qui inhibe un thermostat ; l'actionneur lit sa commande.
     class InhibitLogic final : public ProcessLogic
     {
@@ -424,4 +568,9 @@ void runInhibitTests()
     TestHarness::run("inhibition : programme horaire", testSchedule);
     TestHarness::run("inhibition : comparateur et temporisation", testComparatorAndTimer);
     TestHarness::run("inhibition : effet immédiat et reprise", testImmediateEffect);
+    TestHarness::run("inhibition : alarme non inhibable", testAlarmNotInhibitable);
+    TestHarness::run("inhibition : alarme inhibée", testAlarmInhibited);
+    TestHarness::run("inhibition : défaut de sonde jamais masqué", testAlarmFaultNotMasked);
+    TestHarness::run("inhibition : alarme mémorisée conservée", testAlarmLatchedStays);
+    TestHarness::run("inhibition : boucle ouverte inhibée", testLoopBreakInhibited);
 }

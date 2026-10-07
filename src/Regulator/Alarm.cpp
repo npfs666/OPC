@@ -30,10 +30,32 @@ void Alarm::resume(uint32_t now)
     (void)now;
 }
 
+void Alarm::allowInhibit()
+{
+    inhibitable = true;
+}
+
+bool Alarm::isInhibitable() const
+{
+    return inhibitable;
+}
+
+void Alarm::inhibit(bool inhibited)
+{
+    alarmInhibited = inhibitable && inhibited;
+}
+
+bool Alarm::isInhibited() const
+{
+    return alarmInhibited;
+}
+
 void Alarm::beginAlarm()
 {
     acknowledgeInput = nullptr;
     acknowledgeInputWasActive = false;
+    inhibitable = false;
+    alarmInhibited = false;
     active = false;
     latched = false;
     acknowledged = false;

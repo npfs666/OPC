@@ -169,7 +169,9 @@ void LimitAlarm::update(uint32_t now)
                 settings.type == Type::DeviationLow ||
                 (settings.type == Type::Band && value < setpoint);
 
-            condition = beyond && !(masked && lowSide);
+            // Inhibée par la glue : le seuil ne déclenche pas. Le défaut
+            // de sonde, plus haut, reste signalé.
+            condition = beyond && !(masked && lowSide) && !isInhibited();
         }
     }
 

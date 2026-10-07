@@ -127,12 +127,14 @@ void Regulator::registerFaultParameters(ParameterList& list)
 
 double_t Regulator::readCommand() const
 {
-    return isInhibited() ? 0.0 : command;
+    // Inhibition d'un régulateur seulement : une alarme inhibée garde sa
+    // commande (mémorisation), voir Alarm::inhibit().
+    return Regulator::isInhibited() ? 0.0 : command;
 }
 
 bool Regulator::isCommandValid() const
 {
-    return (isInhibited() || commandValid) && !isInterlocked();
+    return (Regulator::isInhibited() || commandValid) && !isInterlocked();
 }
 
 void Regulator::inhibit(bool inhibited)

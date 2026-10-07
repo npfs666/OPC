@@ -57,11 +57,12 @@ public:
      * vaut alors 0 et reste valide (ce n'est pas un défaut), dès le cycle en
      * cours. Le mode manuel reste prioritaire ; un verrouillage par alarme
      * aussi. À la levée, le régulateur repart comme après une réactivation.
+     * Une alarme suit ses propres règles (voir Alarm::inhibit()).
      */
-    void inhibit(bool inhibited);
+    virtual void inhibit(bool inhibited);
 
     /** Inhibition en vigueur : demandée, et régulateur pas en manuel. */
-    bool isInhibited() const;
+    virtual bool isInhibited() const;
 
     /** Sortie forcée par l'opérateur : prioritaire sur l'inhibition. */
     virtual bool isManual() const

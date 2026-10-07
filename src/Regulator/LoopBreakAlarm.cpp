@@ -113,7 +113,9 @@ void LoopBreakAlarm::update(uint32_t now)
     // Boucle en régulation automatique normale uniquement. Un régulateur
     // verrouillé par cette alarme n'est plus surveillé : l'alarme mémorisée
     // reste signalée jusqu'à l'acquittement.
+    // Inhibée par la glue : pas de surveillance, la fenêtre repart à zéro.
     const bool monitored =
+        !isInhibited() &&
         regulator != nullptr &&
         measurement != nullptr &&
         regulator->isAutomatic() &&

@@ -20,12 +20,26 @@ public:
     /** Alarme activée dans ses réglages. */
     virtual bool isEnabled() const = 0;
 
-    /*
-     * L'inhibition d'une alarme suit d'autres règles (alarme déclarée
-     * inhibable, défaut de sonde jamais masqué, mémorisation conservée) :
-     * étape 1c du plan, doc/Plan_logique_installation.md.
+    /**
+     * Déclare l'alarme inhibable par la glue. À appeler dans begin() : sans
+     * cela, inhibit() est sans effet, pour qu'une glue ne puisse pas faire
+     * taire n'importe quelle alarme (une alarme de verrouillage, par exemple).
      */
-    void inhibit(bool inhibited) = delete;
+    void allowInhibit();
+
+    bool isInhibitable() const;
+
+    /**
+     * Glue : inhibe une alarme déclarée inhibable (dégivrage...). Non
+     * sauvegardé, conservé jusqu'au prochain appel. Une alarme inhibée ne peut
+     * pas se déclencher sur sa condition, et son retard repart de zéro à la
+     * levée. Un défaut de sonde n'est jamais masqué, et une alarme mémorisée
+     * le reste jusqu'à l'acquittement (sa commande n'est pas forcée à 0).
+     * Une classe dérivée lit isInhibited() pour écarter sa condition.
+     */
+    void inhibit(bool inhibited) override;
+
+    bool isInhibited() const override;
 
     /**
      * Vrai si l'alarme doit mettre en sécurité les sorties du régulateur
@@ -75,6 +89,9 @@ protected:
 private:
     const DigitalInput* acknowledgeInput = nullptr;
     bool acknowledgeInputWasActive = false;
+
+    bool inhibitable = false;
+    bool alarmInhibited = false;
 
     bool active = false;        // condition confirmée
     bool latched = false;

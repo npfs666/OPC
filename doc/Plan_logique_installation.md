@@ -99,8 +99,8 @@ réel, la chambre froide.
 3. ✅ 3.1 Solaire réorganisé (comparateurs + glue, `SolarRegulator`
    supprimé).
 4. ✅ 2.2 Temporisation.
-5. ✅ Étape 1b (inhibition des régulateurs).
-   ⬜ Étape 1c (inhibition des alarmes), puis 2.3 (alarme sur condition).
+5. ✅ Étapes 1b et 1c (inhibition des régulateurs et des alarmes).
+   ⬜ 2.3 (alarme sur condition).
 6. ⬜ 3.2 Chambre froide.
 7. ⬜ 3.3, puis phase 4.
 
@@ -142,9 +142,9 @@ qu'on relie à un actionneur comme les autres.
   Thermostat : en manuel, la mesure est ignorée. Il est marqué live et le
   template peut le retirer.
 
-1.3 ⬜ **L'inhibition** (régulateurs faits à l'étape 1b : `Regulator::inhibit()`,
-tests dans `test/host/test_inhibit.cpp` ; reste les alarmes, étape 1c), un
-levier non persistant de la glue. Il est distinct
+1.3 ✅ **L'inhibition** (étapes 1b et 1c : `Regulator::inhibit()`,
+`Alarm::allowInhibit()`, tests dans `test/host/test_inhibit.cpp`), un levier
+non persistant de la glue. Il est distinct
 du réglage `Activée` des alarmes : il faudra un autre nom que `setEnabled()`,
 car `Alarm::isEnabled()` existe déjà.
 - **Un régulateur inhibé** a sa sortie arrêtée sur ordre (ce n'est pas un
@@ -171,12 +171,12 @@ car `Alarm::isEnabled()` existe déjà.
   - **programme horaire** et **comparateur** : définir l'état de sortie
     pendant l'inhibition et à sa levée.
 
-1.4 ⬜ **Tests sur l'hôte** (faits pour l'étape 1a, `test/host/test_logic.cpp` ; reste l'inhibition) : ordre d'appel, commande non écrite, `dependsOn`,
+1.4 ✅ **Tests sur l'hôte** (`test/host/test_logic.cpp`, `test_inhibit.cpp`) : ordre d'appel, commande non écrite, `dependsOn`,
 reprise, mode manuel et son retrait, verrouillage par alarme, inhibition des
 régulateurs et des alarmes.
 
-1.5 ⬜ **README** (fait pour l'étape 1a : « Créer une installation > 3. Ajouter
-de la glue » et « Mode manuel » ; reste l'inhibition).
+1.5 ✅ **README** : « Créer une installation > 3. Ajouter de la glue »,
+« Inhibition par la glue » et « Mode manuel ».
 
 1.6 ✅ **Premier utilisateur de la glue (étape 1a) : le template `TestIO`.**
 C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour

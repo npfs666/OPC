@@ -267,8 +267,19 @@ chaque cycle. Rien n'est journalisé.
   fenêtre repart à zéro à la levée.
 
 L'écran d'accueil d'un template affiche lui-même l'état qui a causé
-l'inhibition (`DEGIVRAGE`...). L'inhibition d'une alarme suivra d'autres
-règles (à venir).
+l'inhibition (`DEGIVRAGE`...).
+
+**Alarmes.** Une alarme ne peut être inhibée que si le template l'a déclarée
+inhibable dans `begin()` (`alarme.allowInhibit()`) : sans cela, `inhibit()`
+est sans effet, et une glue ne peut pas faire taire une alarme de
+verrouillage. Une alarme inhibée (température haute pendant un dégivrage, par
+exemple) :
+
+- ne se déclenche pas sur son seuil ou sa boucle ouverte ; son retard repart
+  de zéro à la levée ;
+- signale toujours un **défaut de sonde** (réglage `Sur défaut`) ;
+- reste **mémorisée** si elle l'était, relais compris, jusqu'à
+  l'acquittement.
 
 ### 4. Dessiner l'écran d'accueil
 
