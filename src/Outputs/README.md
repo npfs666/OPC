@@ -198,6 +198,18 @@ par exemple), verrouiller cet état dans `begin()` :
 relais.lockSafeState(false);   // état sûr forcé à OFF, non modifiable dans le menu
 ```
 
+De même pour une sortie PWM (une résistance par relais statique, par
+exemple) :
+
+```cpp
+sortie.lockSafeCommand(0.0);   // commande de sécurité forcée à 0 %
+```
+
+**Sortie PWM en tout-ou-rien.** Reliée à un `ActuatorOnOff`, une sortie PWM
+reçoit 0 ou 100 % : la broche quitte alors la PWM pour un niveau constant. Elle
+pilote ainsi un relais statique comme un relais (sans temps minimaux ni
+compteurs).
+
 ## Afficher l'état (écran d'accueil)
 
 Dans `printHomeScreen()`, lire la sortie via le snapshot, jamais directement

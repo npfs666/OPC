@@ -1,5 +1,5 @@
 /*
- * Extrait à reporter dans src/Templates/main.cpp.
+ * Extrait à reporter dans src/main.cpp.
  * Le watchdog, setup/loop et les ISR restent ceux du firmware principal.
  */
 

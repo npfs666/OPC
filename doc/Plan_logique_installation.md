@@ -101,8 +101,9 @@ réel, la chambre froide.
 4. ✅ 2.2 Temporisation.
 5. ✅ Étapes 1b et 1c (inhibition des régulateurs et des alarmes).
    ✅ 2.3 (alarme sur condition).
-6. ⬜ 3.2 Chambre froide.
-7. ⬜ 3.3, puis phase 4.
+6. ✅ 3.2 Chambre froide.
+7. ✅ 3.3. Phase 4 : ✅ 4.3 guide d'auteur, ✅ 4.5 doc ; ⬜ 4.1, 4.2,
+   4.4 (distribution), à faire quand tout le reste sera fini.
 
 ### Phase 1 : le noyau de la glue
 
@@ -281,7 +282,8 @@ C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour
     démarrage au même instant. L'écart ne joue que si le bas du ballon est
     entre 50 et 52 °C au début de la plage.
 
-3.2 ⬜ **La chambre froide positive** (fromagerie, 2 à 4 °C), démonstrateur
+3.2 ✅ **La chambre froide positive** (`Templates/ColdRoomInstallation`, tests
+dans `test/host/test_cold_room.cpp`) (fromagerie, 2 à 4 °C), démonstrateur
 principal.
 - **Matériel** :
   - Pt100 d'ambiance (régulation) et Pt100 d'évaporateur (fin de dégivrage) ;
@@ -322,22 +324,28 @@ principal.
 - En cas de défaut de la sonde d'ambiance, le compresseur passe en état sûr
   (arrêt) et l'alarme de défaut de sonde se déclenche : c'est à l'utilisateur
   d'intervenir.
+- **Réalisé**, avec en plus : `Dégivrage auto` (supprime le dégivrage
+  périodique), anti-court-cycle de 3 min sur le compresseur,
+  `PWMOutput::lockSafeCommand()` pour la résistance.
+- **Constat** : les alarmes sont évaluées avant la glue, une inhibition
+  d'alarme agit donc au cycle suivant. Sans effet en marche (les alarmes ont
+  une tempo), mais au démarrage l'alarme haute doit être inhibée dès
+  `begin()`. Documenté dans les règles de la glue (README).
 
-3.3 ⬜ **Des templates compilables dans les tests sur l'hôte** (fait pour le
-solaire : dessin sous `#ifndef OPC_HOST_TEST`, `InstallationTestAccess`,
-résistance par sonde dans le fake `SensorBoard` ; reste la chambre froide),
-pour tester la
-glue des deux démonstrateurs. Il faudra probablement un fake `Adafruit_GFX`
-pour `printHomeScreen()`.
+3.3 ✅ **Des templates compilables dans les tests sur l'hôte** : dessin sous
+`#ifndef OPC_HOST_TEST` (pas de fake `Adafruit_GFX`), `InstallationTestAccess`,
+résistance par sonde dans le fake `SensorBoard`, et banc générique
+`test/host/TemplateBench.h` (cycles de 1 s, `millis()` compris, réglages
+modifiés comme au menu). Solaire et chambre froide l'utilisent.
 
 ### Phase 4 : distribution et partage
 
-4.1 ⬜ Un environnement PlatformIO par template, donc un `.uf2` par template,
+4.1 ⬜ *(reporté à la fin du projet)* Un environnement PlatformIO par template, donc un `.uf2` par template,
 et une sélection de template sans éditer `src/main.cpp`.
 
 4.2 ⬜ L'identité du firmware dans le menu : template, version, auteur.
 
-4.3 ⬜ **Un guide d'auteur de template**, court et normatif, utile autant aux
+4.3 ✅ **Un guide d'auteur de template** (`src/Templates/README.md`), court et normatif, utile autant aux
 humains qu'à une IA :
 - les principes du § 2 ;
 - les règles : code non bloquant (pas de `delay()`, d'écriture de fichier ni
@@ -353,7 +361,7 @@ humains qu'à une IA :
 4.4 ⬜ Une version d'API (`OPC_API_VERSION` + `static_assert` dans le
 template). Priorité faible.
 
-4.5 ⬜ **Corriger la documentation** :
+4.5 ✅ **Corriger la documentation** :
 - le fichier est `src/main.cpp`, mais `README.md` (lien du § choix de
   l'installation et arborescence) et `examples/MinimalInstallation/README.md`
   citent `src/Templates/main.cpp` ;
@@ -363,8 +371,9 @@ template). Priorité faible.
 
 ## 5. Points techniques à vérifier
 
-- ⬜ Une sortie PWM peut-elle être pilotée en tout ou rien (résistance de
-  dégivrage par relais statique) ?
+- ✅ Une sortie PWM peut-elle être pilotée en tout ou rien (résistance de
+  dégivrage par relais statique) ? Oui : à 0 et 100 %, `PWMOutput` passe la
+  broche à un niveau constant.
 - ⬜ Un changement de template par `.uf2` ne doit pas charger les réglages de
   l'ancien. `Storage::restore()` reçoit `configurationKey()`, donc c'est
   probablement déjà le cas.

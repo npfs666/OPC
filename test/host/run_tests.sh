@@ -50,6 +50,8 @@ fi
     "${project_dir}/test/host/test_delay_timer.cpp" \
     "${project_dir}/test/host/test_inhibit.cpp" \
     "${project_dir}/test/host/test_condition_alarm.cpp" \
+    "${project_dir}/test/host/test_cold_room.cpp" \
+    "${project_dir}/test/host/test_minimal_installation.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -100,6 +102,8 @@ fi
     "${project_dir}/src/Regulator/TimeSchedule.cpp" \
     "${project_dir}/src/SystemWatchdog.cpp" \
     "${project_dir}/src/Templates/SolarInstallation.cpp" \
+    "${project_dir}/src/Templates/ColdRoomInstallation.cpp" \
+    "${project_dir}/examples/MinimalInstallation/MinimalInstallation.cpp" \
     -o "${binary}"
 
 "${binary}"

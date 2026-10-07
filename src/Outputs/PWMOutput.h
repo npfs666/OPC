@@ -41,6 +41,13 @@ public:
     bool applySettings() override;
     bool isHealthy() const override;
 
+    /**
+     * Impose la commande de sécurité et la rend non modifiable dans le menu,
+     * par exemple 0 pour une résistance chauffante (voir
+     * RelayOutput::lockSafeState()).
+     */
+    void lockSafeCommand(double_t safeCommand);
+
     void registerParameters(ParameterList& list) override;
     bool validateParameters(const ParameterEditor& editor) const override;
 
@@ -55,6 +62,9 @@ private:
     uint8_t configuredPin = 0;
     bool configuredActiveHigh = true;
     double_t configuredSafeCommand = 0.0;
+
+    bool safeCommandLocked = false;
+    double_t lockedSafeCommand = 0.0;
 };
 
 #endif

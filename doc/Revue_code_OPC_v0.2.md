@@ -112,7 +112,7 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 22. ⬜ Gain 3 fils : `setGain(16)` mais `measurementGain()` renvoie 8. C'est **correct**, car Vref vaut 2·I·Rref avec les deux IDAC, mais il faut le commenter.
 23. ⬜ `src/.garbo` gagnerait à sortir de `src/`, car IntelliSense voit des `main.cpp` en double.
 24. ⬜ Le README est désynchronisé du code :
-    - il cite `src/main.cpp`, alors que le fichier est `src/Templates/main.cpp` ;
+    - ✅ chemin de `main.cpp` : le fichier est `src/main.cpp` ; le README et l'exemple minimal citaient `src/Templates/main.cpp` (corrigé) ;
     - il décrit l'ancienne TestInstallation ;
     - il dit « PWM prévu », alors que PWMOutput existe ;
     - il dit « PT1000 désactivée », alors qu'elle est convertie ;

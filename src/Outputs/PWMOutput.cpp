@@ -51,12 +51,16 @@ void PWMOutput::begin(
     settings.pin = pin;
     settings.activeHigh = activeHigh;
     settings.safeCommand = safeCommand;
+    safeCommandLocked = false;
 }
 
 bool PWMOutput::begin()
 {
     if (initialized)
         forceSafe();
+
+    if (safeCommandLocked)
+        settings.safeCommand = lockedSafeCommand;
 
     initialized = false;
 
@@ -121,6 +125,19 @@ bool PWMOutput::isHealthy() const
     return initialized;
 }
 
+void PWMOutput::lockSafeCommand(double_t safeCommand)
+{
+    safeCommandLocked = true;
+    lockedSafeCommand = safeCommand;
+    settings.safeCommand = safeCommand;
+
+    if (initialized)
+    {
+        configuredSafeCommand = safeCommand;
+        forceSafe();
+    }
+}
+
 void PWMOutput::applyCommand(double_t command)
 {
     writePhysicalCommand(configuredPin, command, configuredActiveHigh);
@@ -159,7 +176,7 @@ void PWMOutput::registerParameters(ParameterList& list)
     parameters.addBool("active_high", "Actif à HIGH", settings.activeHigh);
     parameters.addDouble(
         "safe_command", "Commande de sécurité", settings.safeCommand,
-        0.0, 1.0, 0.01, 2);
+        0.0, 1.0, 0.01, 2, nullptr, safeCommandLocked);
 
     // Une seule entrée persistante pour la fréquence des deux canaux.
     if (list.find("pwm", "frequency") == nullptr)
@@ -175,5 +192,18 @@ void PWMOutput::registerParameters(ParameterList& list)
 
 bool PWMOutput::validateParameters(const ParameterEditor& editor) const
 {
-    return pinIsUnique(editor, getConfigurationKey());
+    if (!pinIsUnique(editor, getConfigurationKey()))
+        return false;
+
+    if (!safeCommandLocked)
+        return true;
+
+    const ParameterDraft* safeCommand =
+        editor.find(getConfigurationKey(), "safe_command");
+
+    return
+        safeCommand != nullptr &&
+        safeCommand->parameter != nullptr &&
+        safeCommand->parameter->type == Parameter::Type::Double &&
+        safeCommand->numberValue == lockedSafeCommand;
 }

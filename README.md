@@ -64,6 +64,10 @@ Elle déclare ses composants en membres, les initialise dans `begin()` et
 dessine son écran dans `printHomeScreen()`. Un exemple complet et minimal est
 disponible dans [examples/MinimalInstallation](examples/MinimalInstallation).
 
+Le [guide d'écriture d'un template](src/Templates/README.md) rassemble les
+principes (blocs et glue), les règles de sécurité, les pièges connus et la
+façon de tester un template sur l'hôte.
+
 ### 1. Déclarer les composants
 
 ```cpp
@@ -237,6 +241,10 @@ Règles de la glue :
 - Elle peut **inhiber** un régulateur (`regulateur.inhibit(true)`) : arrêt
   commandé pour un dégivrage, un délestage, l'été... Voir
   [Inhibition par la glue](#inhibition-par-la-glue).
+- Les alarmes (sauf `ConditionAlarm` écrite par la glue) sont évaluées
+  **avant** la glue : une alarme qu'elle inhibe l'est au cycle suivant. Pour
+  qu'elle le soit dès le premier cycle, poser l'inhibition initiale dans
+  `begin()` (voir le template chambre froide).
 - Tout seuil ou délai qui peut varier d'un site à l'autre doit être un
   paramètre du menu, pas une constante de la glue.
 
@@ -312,7 +320,7 @@ directement (ils appartiennent à l'autre cœur).
 
 ### 5. Sélectionner l'installation
 
-Dans [main.cpp](src/Templates/main.cpp), remplacer l'installation instanciée :
+Dans [main.cpp](src/main.cpp), remplacer l'installation instanciée :
 
 ```cpp
 #include <MonInstallation.h>
@@ -339,6 +347,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), pompe solaire par comparateurs et glue avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (relais 2) |
 | `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
+| `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
 
 ### PID et autotune
@@ -527,6 +536,42 @@ est encore au-dessus de `Delta arrêt`.
 
 L'écran d'accueil affiche `DECHARGE` ou `VACANCES` à la place de l'état de la
 pompe, ainsi que l'état de l'appoint.
+
+#### Template chambre froide
+
+`ColdRoomInstallation` régule une chambre froide positive (fromagerie, cave,
+2 à 4 °C) :
+
+- **Relais 1, compresseur** : thermostat en froid sur la sonde d'ambiance
+  (consigne 3 °C, hystérésis 2 K, réglable à l'accueil), arrêt mini de 3 min
+  contre les cycles courts ;
+- **Relais 2, ventilateurs** de l'évaporateur ;
+- **PWM 1, résistance de dégivrage** par un relais statique (commande de
+  sécurité verrouillée à 0, sans mode manuel) ;
+- **Entrée TOR 1, porte** (active quand elle est ouverte).
+
+La glue enchaîne le cycle de dégivrage, sans horloge :
+
+| Étape | Compresseur | Ventilateurs | Résistance | Fin |
+|---|---|---|---|---|
+| `FROID` | thermostat | marche, sauf porte ouverte | arrêt | après `Intervalle` (6 h) de froid |
+| `DEGIVRAGE` | arrêt (thermostat inhibé) | arrêt | marche | évaporateur à `Temp. évapo.` (8 °C), ou `Durée max` (30 min) |
+| `EGOUTTAGE` | arrêt | arrêt | arrêt | `Égouttage` (2 min) |
+| `REPRISE` | thermostat | arrêt (l'évaporateur refroidit) | arrêt | `Retard ventil.` (3 min) |
+
+Les durées se règlent dans `Regulateur > Dégivrage`, avec `Dégivrage auto`
+pour supprimer le dégivrage périodique. Sans sonde d'évaporateur, la
+résistance ne chauffe jamais : le dégivrage se fait compresseur arrêté et se
+termine par sa durée max. Le mode manuel du compresseur passe avant le
+dégivrage.
+
+Alarmes, à activer dans `Alarmes` : `Porte ouverte` (5 min) et `Temp. haute`
+(consigne + 4 K pendant 15 min), masquée hors `FROID` et pendant
+`Masquage alarme` (30 min) après le retour en froid, comme au démarrage.
+
+L'écran d'accueil affiche l'étape, l'ambiance, la consigne, l'évaporateur,
+le compresseur, les ventilateurs (`PORTE` porte ouverte) et le temps restant
+avant le prochain dégivrage ou la fin de l'étape en cours.
 
 ## Composants disponibles
 
@@ -1038,7 +1083,8 @@ une sortie physiquement désactivée (paramètre `Actif à HIGH`).
 
 ```
 src/
-├── Templates/     main.cpp et installations prêtes à l'emploi
+├── main.cpp       instanciation de l'installation, boucles des deux cœurs
+├── Templates/     installations prêtes à l'emploi, guide d'écriture (README)
 ├── Installation.* classe de base d'une installation
 ├── ProcessLogic.h interface de la glue (processLogic())
 ├── OPC.*          cœur du framework (init, boucles, menu, stockage)

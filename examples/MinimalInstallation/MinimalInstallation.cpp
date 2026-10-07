@@ -3,10 +3,14 @@
 #include <Hardware/SensorBoard.h>
 #include <ProcessControl.h>
 
-#include <Adafruit_GFX.h>
-
 #include <ProcessSnapshot.h>
 #include <hmi/HomeScreen.h>
+
+// Le dessin n'est compilé que pour la carte : les tests sur l'hôte
+// vérifient le reste de l'installation.
+#ifndef OPC_HOST_TEST
+#include <Adafruit_GFX.h>
+
 #include <hmi/MeasurementDisplay.h>
 
 namespace
@@ -15,6 +19,7 @@ namespace
     constexpr uint16_t COLOR_WHITE = 0xFFFF;
     constexpr uint16_t COLOR_CYAN = 0x07FF;
 }
+#endif
 
 const char* MinimalInstallation::name() const
 {
@@ -72,6 +77,9 @@ bool MinimalInstallation::begin(
 void MinimalInstallation::printHomeScreen(
     HomeScreenContext& context)
 {
+#ifdef OPC_HOST_TEST
+    (void)context;
+#else
     Adafruit_GFX& display = context.display;
 
     display.cp437(true);
@@ -104,4 +112,5 @@ void MinimalInstallation::printHomeScreen(
         context.snapshot.find(temperature),
         COLOR_WHITE,
         COLOR_BLACK);
+#endif
 }

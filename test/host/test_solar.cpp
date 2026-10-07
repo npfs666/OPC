@@ -1,11 +1,6 @@
-#include "TestHarness.h"
-#include "InstallationTestAccess.h"
+#include "TemplateBench.h"
 
-#include <Adafruit_BMP5xx.h>
-#include <Hardware/SensorBoard.h>
 #include <Hardware/pinout.h>
-#include <Physics/PT100.h>
-#include <ProcessControl.h>
 #include <Templates/SolarInstallation.h>
 #include <hmi/MenuBuilder.h>
 
@@ -26,38 +21,8 @@ namespace
     constexpr size_t TANK_TOP = 1;
     constexpr size_t TANK_BOTTOM = 2;
 
-    struct SolarBench
+    struct SolarBench : TemplateBench<SolarInstallation>
     {
-        SensorBoard board;
-        Adafruit_BMP5xx bmp580;
-        ProcessControl process;
-        SolarInstallation solar;
-        ClockSample clock;
-        uint32_t now = 0;
-        bool started = false;
-
-        SolarBench()
-        {
-            started = InstallationTestAccess::start(
-                solar, board, bmp580, process);
-            setClock(MONDAY, 12);
-        }
-
-        void setClock(uint8_t dayOfWeek, uint8_t hour, bool valid = true)
-        {
-            clock.dateTime.dayOfWeek = dayOfWeek;
-            clock.dateTime.hour = hour;
-            clock.dateTime.minute = 0;
-            clock.dateTime.second = 0;
-            clock.valid = valid;
-        }
-
-        void setTemperature(size_t sensor, double_t celsius)
-        {
-            board.sensorResistances[sensor] =
-                PT100::getTemperatureToResistance(celsius);
-        }
-
         void setTemperatures(
             double_t collector,
             double_t tankTop,
@@ -68,51 +33,11 @@ namespace
             setTemperature(TANK_BOTTOM, tankBottom);
         }
 
-        // Sonde en court-circuit.
-        void shortSensor(size_t sensor)
-        {
-            board.sensorResistances[sensor] = 5.0;
-        }
-
         // Un cycle de mesure, puis l'état de la pompe (relais 1).
         bool pump()
         {
-            now += 1000;
-            process.updateClock(clock);
-            process.updateMeasurementsAndRegulators(now);
+            cycle();
             return FakeDigitalIO::levels[Board::Rp2040::OUTPUT_1] == HIGH;
-        }
-
-        const Parameter* parameter(const char* owner, const char* key)
-        {
-            return solar.getParameters().find(owner, key);
-        }
-
-        void setNumber(const char* owner, const char* key, double_t value)
-        {
-            const Parameter* found = parameter(owner, key);
-            CHECK_TRUE(found != nullptr);
-
-            if (found != nullptr)
-                *found->value.number = value;
-        }
-
-        void setBool(const char* owner, const char* key, bool value)
-        {
-            const Parameter* found = parameter(owner, key);
-            CHECK_TRUE(found != nullptr);
-
-            if (found != nullptr)
-                *found->value.boolean = value;
-        }
-
-        void setSelection(const char* owner, const char* key, int32_t value)
-        {
-            const Parameter* found = parameter(owner, key);
-            CHECK_TRUE(found != nullptr);
-
-            if (found != nullptr)
-                found->discrete.write(found->discrete.target, value);
         }
     };
 
@@ -238,13 +163,13 @@ namespace
         CHECK_FALSE(bench.pump());
 
         // Commande « Marche » de la pompe : forcée, sans condition.
-        bench.setSelection(
+        bench.setDiscrete(
             "solar_pump_command",
             "operation",
             static_cast<int32_t>(LogicCommand::Operation::ForcedOn));
         CHECK_TRUE(bench.pump());
 
-        bench.setSelection(
+        bench.setDiscrete(
             "solar_pump_command",
             "operation",
             static_cast<int32_t>(LogicCommand::Operation::Auto));
@@ -266,7 +191,7 @@ namespace
 
         // Conditions rangées sous « Pompe solaire » et « Vacances ».
         MenuBuilder menu;
-        CHECK_TRUE(bench.solar.buildMenu(menu));
+        CHECK_TRUE(bench.installation.buildMenu(menu));
 
         const MenuBuilder::GroupId pumpGroup =
             menu.findGroupForOwner("solar_pump_command");
