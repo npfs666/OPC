@@ -145,6 +145,7 @@ void LoopBreakAlarm::update(uint32_t now)
             armedSaturation = current;
             windowStart = now;
             windowValue = value;
+            windowElapsed = false;
         }
 
         // Rapprochement de la consigne depuis le début de la fenêtre.
@@ -155,9 +156,16 @@ void LoopBreakAlarm::update(uint32_t now)
         {
             windowStart = now;
             windowValue = value;
+            windowElapsed = false;
         }
 
-        confirmed = now - windowStart >= detectionTimeMs();
+        if (!windowElapsed &&
+            now - windowStart >= detectionTimeMs())
+        {
+            windowElapsed = true;
+        }
+
+        confirmed = windowElapsed;
     }
 
     applyCondition(confirmed, settings.latching);

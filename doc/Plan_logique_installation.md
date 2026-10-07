@@ -100,7 +100,7 @@ réel, la chambre froide.
    supprimé).
 4. ✅ 2.2 Temporisation.
 5. ✅ Étapes 1b et 1c (inhibition des régulateurs et des alarmes).
-   ⬜ 2.3 (alarme sur condition).
+   ✅ 2.3 (alarme sur condition).
 6. ⬜ 3.2 Chambre froide.
 7. ⬜ 3.3, puis phase 4.
 
@@ -225,7 +225,8 @@ C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour
   le délai à zéro ; pilotée par la glue (`run()`) ou reliée à un régulateur
   dans `begin()` (`setSource()`, post-circulation sans glue).
 
-2.3 ⬜ **Alarme sur condition** :
+2.3 ✅ **Alarme sur condition** (`Regulator/ConditionAlarm.h`, tests dans
+`test/host/test_condition_alarm.cpp`) :
 - réglages `Activée`, `Retard` et `Mémorisation` ;
 - source : une **entrée TOR liée dans `begin()`** (une porte, sans glue) ou une
   **condition écrite par la glue** ;

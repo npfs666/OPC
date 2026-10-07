@@ -538,7 +538,7 @@ pompe, ainsi que l'état de l'appoint.
 | Comparateur | `Comparator` : seuil ou différentiel à hystérésis, voir [Comparateur](#comparateur) |
 | Temporisation | `DelayTimer` : retard à la montée ou à la descente, voir [Temporisation](#temporisation) |
 | Glue | `LogicCommand` : sortie écrite par `processLogic()`, voir [Ajouter de la glue](#3-ajouter-de-la-glue-facultatif) |
-| Alarmes | `LimitAlarm` (seuil), `LoopBreakAlarm` (boucle ouverte), voir [Alarmes](#alarmes) |
+| Alarmes | `LimitAlarm` (seuil), `LoopBreakAlarm` (boucle ouverte), `ConditionAlarm` (entrée TOR ou glue), voir [Alarmes](#alarmes) |
 | Actionneurs | `ActuatorOnOff`, `ActuatorPWM`, `TimeProportionalActuator` |
 | Sorties | `RelayOutput`, `PWMOutput` — voir [src/Outputs/README.md](src/Outputs/README.md) |
 | Entrées numériques | `DigitalInput` — voir [src/Inputs/readme.md](src/Inputs/readme.md) |
@@ -575,7 +575,7 @@ Notes sur les mesures :
 Les tailles des listes internes sont fixes (pas d'allocation dynamique) et
 réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 16 régulateurs,
 16 actionneurs, 16 sorties, 2 entrées numériques, 8 alarmes, 192 paramètres
-(un `TimeSchedule` en utilise 19, une `LimitAlarm` 8).
+(un `TimeSchedule` en utilise 19, une `LimitAlarm` 8, une `ConditionAlarm` 3).
 
 ### Comparateur
 
@@ -961,6 +961,36 @@ if (!process.add(boucle))
 Un régulateur personnalisé peut être surveillé s'il fournit `readSetpoint()`,
 `readOutputLimits()`, `actionDirection()`, `isAutomatic()` et, pour le temps
 de détection automatique, `integralTime()`.
+
+### Alarme sur condition
+
+`ConditionAlarm` ([Regulator/ConditionAlarm.h](src/Regulator/ConditionAlarm.h))
+signale une condition qui n'est pas un seuil de mesure. Réglages dans
+`Alarmes > <nom>` : `Active`, `Tempo` (durée minimale de la condition, 0 à
+3600 s) et `Mémorisation`.
+
+- **Sur une entrée TOR**, liée dans `begin()`, sans glue : alarme quand
+  l'entrée est active (la polarité se règle sur l'entrée, qui doit être
+  enregistrée avec `process.add()`). Une entrée invalide est un défaut,
+  signalé comme une alarme, mais pas avant sa première lecture valide
+  (démarrage, retour du menu, anti-rebond).
+- **Sur une condition de la glue** : `alarme.set(condition)` à chaque cycle,
+  évaluée juste après la glue. Une condition non écrite est un défaut :
+  alarme, et `<nom> : non écrite` dans le journal.
+- Un défaut passe par la tempo, mais n'est jamais masqué par une
+  [inhibition](#inhibition-par-la-glue).
+
+```cpp
+// Porte de chambre froide ouverte plus de 5 min.
+porte.begin("porte", "Porte", Board::Rp2040::DIGITAL_INPUT_1);
+alarmePorte.begin("alarme_porte", "Porte ouverte", porte);
+alarmePorte.settings.delay = 300;
+if (!process.add(porte) || !process.add(alarmePorte))
+    return fail("Alarme porte non enregistrée");
+```
+
+Comme les autres alarmes, elle est **désactivée par défaut**, s'affiche dans
+le bandeau d'accueil, se journalise et peut piloter un relais.
 
 ### Câbler une alarme sur un relais
 

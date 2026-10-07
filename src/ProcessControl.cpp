@@ -7,6 +7,7 @@
 #include <ProcessLogic.h>
 #include <ProcessSnapshot.h>
 #include <Regulator/Alarm.h>
+#include <Regulator/ConditionAlarm.h>
 #include <Regulator/LogicCommand.h>
 #include <Regulator/Regulator.h>
 #include <hmi/ParameterList.h>
@@ -124,6 +125,18 @@ bool ProcessControl::add(LogicCommand& command)
         return false;
 
     logicCommands[logicCommandCount++] = &command;
+    return true;
+}
+
+bool ProcessControl::add(ConditionAlarm& alarm)
+{
+    if (conditionAlarmCount >= MAX_ALARMS)
+        return false;
+
+    if (!add(static_cast<Alarm&>(alarm)))
+        return false;
+
+    conditionAlarms[conditionAlarmCount++] = &alarm;
     return true;
 }
 
@@ -374,6 +387,19 @@ void ProcessControl::updateMeasurementsAndRegulators(
                 true,
                 "%s : non écrite",
                 logicCommands[i]->getName());
+        }
+    }
+
+    for (uint8_t i = 0; i < conditionAlarmCount; i++)
+    {
+        if (conditionAlarms[i]->applyLogic(now))
+        {
+            logEvent(
+                now,
+                EventKind::Fault,
+                true,
+                "%s : non écrite",
+                conditionAlarms[i]->getName());
         }
     }
 

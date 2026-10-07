@@ -62,6 +62,7 @@ void LimitAlarm::restart()
     beyond = false;
     masked = settings.startupMasking;
     pending = false;
+    delayElapsed = false;
 }
 
 bool LimitAlarm::isBeyond(double_t value, double_t setpoint) const
@@ -183,13 +184,21 @@ void LimitAlarm::update(uint32_t now)
         {
             pending = true;
             pendingSince = now;
+            delayElapsed = false;
         }
 
-        confirmed = now - pendingSince >= settings.delay * 1000UL;
+        if (!delayElapsed &&
+            now - pendingSince >= settings.delay * 1000UL)
+        {
+            delayElapsed = true;
+        }
+
+        confirmed = delayElapsed;
     }
     else
     {
         pending = false;
+        delayElapsed = false;
     }
 
     applyCondition(confirmed, settings.latching);

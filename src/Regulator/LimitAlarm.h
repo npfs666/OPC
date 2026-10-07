@@ -90,6 +90,10 @@ private:
     bool pending = false;       // condition présente, temporisation en cours
     uint32_t pendingSince = 0;
 
+    // Tempo écoulée : acquise tant que la condition dure (now - pendingSince
+    // reboucle après 49 jours et n'est plus consulté).
+    bool delayElapsed = false;
+
     bool isRelative(Type type) const;
 
     // Seuil franchi, avec hystérésis à partir de l'état précédent.

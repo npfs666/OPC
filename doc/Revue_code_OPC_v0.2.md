@@ -95,6 +95,9 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 16. ⬜ **Glitch possible au démarrage d'une sortie** (`RelayOutput::begin`).
     - `pinMode(OUTPUT)` force le niveau bas avant `forceSafe()`. Un SSR actif à LOW peut réagir.
     - Avant `beginOutputs()`, les broches sont en haute impédance : il faut une résistance de tirage matérielle.
+17. ✅ **Tempo des alarmes après 49 jours** (`LimitAlarm`, `LoopBreakAlarm`).
+    - La tempo était recalculée à chaque cycle (`now - début >= délai`). Une alarme non mémorisée en cours depuis plus de 49,7 jours retombait pendant sa tempo au rebouclage de `millis()`.
+    - La tempo écoulée est maintenant acquise tant que la condition dure, comme dans `ConditionAlarm` et `DelayTimer`. Tests de non-régression dans `test_limit_alarm.cpp` et `test_loop_break.cpp`.
 
 ### C. Mineur / nettoyage
 

@@ -12,6 +12,7 @@
 class Actuator;
 class DigitalInput;
 class Alarm;
+class ConditionAlarm;
 class LogicCommand;
 class Measurement;
 class Output;
@@ -40,6 +41,12 @@ public:
      * la glue (voir setLogic()).
      */
     bool add(LogicCommand& command);
+
+    /**
+     * Une alarme sur condition est une alarme ; écrite par la glue, elle est
+     * évaluée en plus après la glue.
+     */
+    bool add(ConditionAlarm& alarm);
 
     /**
      * Glue de l'installation, appelée à chaque cycle après les régulateurs et
@@ -167,6 +174,9 @@ private:
 
     LogicCommand* logicCommands[MAX_REGULATORS] = {};
     uint8_t logicCommandCount = 0;
+
+    ConditionAlarm* conditionAlarms[MAX_ALARMS] = {};
+    uint8_t conditionAlarmCount = 0;
     AlarmState loggedAlarmState[MAX_ALARMS] = {};
 
     // Seuils d'entretien atteints (journalisés une fois par sortie).

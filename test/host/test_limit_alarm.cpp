@@ -436,6 +436,28 @@ namespace
         process.printStatusEvents(log);
         CHECK_TRUE(log.printedLineCount == 6);
     }
+
+    void testLongCondition()
+    {
+        ControlledTemperature temperature;
+        LimitAlarm alarm;
+        prepare(alarm, temperature, Type::Max, 80.0, 1.0);
+        alarm.settings.delay = 10;
+
+        CHECK_FALSE(activeAt(alarm, temperature, 90.0, 1000));
+        CHECK_TRUE(activeAt(alarm, temperature, 90.0, 11000));
+
+        // Condition présente plus de 49 jours : millis() reboucle, l'alarme
+        // reste signalée.
+        CHECK_TRUE(activeAt(alarm, temperature, 90.0, 3000000000UL));
+        CHECK_TRUE(activeAt(alarm, temperature, 90.0, 5000));
+
+        // Fin puis retour de la condition : la tempo repart.
+        CHECK_FALSE(activeAt(alarm, temperature, 70.0, 6000));
+        CHECK_FALSE(activeAt(alarm, temperature, 90.0, 7000));
+        CHECK_FALSE(activeAt(alarm, temperature, 90.0, 16999));
+        CHECK_TRUE(activeAt(alarm, temperature, 90.0, 17000));
+    }
 }
 
 void runLimitAlarmTests()
@@ -449,4 +471,5 @@ void runLimitAlarmTests()
     TestHarness::run("alarmes : defaut de sonde", testSensorFault);
     TestHarness::run("alarmes : parametres", testParameters);
     TestHarness::run("alarmes : processus, journal et bandeau", testProcessIntegration);
+    TestHarness::run("alarmes : condition de plus de 49 jours", testLongCondition);
 }

@@ -49,6 +49,7 @@ fi
     "${project_dir}/test/host/test_solar.cpp" \
     "${project_dir}/test/host/test_delay_timer.cpp" \
     "${project_dir}/test/host/test_inhibit.cpp" \
+    "${project_dir}/test/host/test_condition_alarm.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -88,6 +89,7 @@ fi
     "${project_dir}/src/Regulator/Regulator.cpp" \
     "${project_dir}/src/Regulator/Alarm.cpp" \
     "${project_dir}/src/Regulator/Comparator.cpp" \
+    "${project_dir}/src/Regulator/ConditionAlarm.cpp" \
     "${project_dir}/src/Regulator/DelayTimer.cpp" \
     "${project_dir}/src/Regulator/LimitAlarm.cpp" \
     "${project_dir}/src/Regulator/LogicCommand.cpp" \

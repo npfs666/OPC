@@ -84,6 +84,10 @@ private:
     uint32_t windowStart = 0;
     double_t windowValue = 0.0;
 
+    // Fenêtre écoulée : acquise jusqu'à la prochaine fenêtre (now -
+    // windowStart reboucle après 49 jours et n'est plus consulté).
+    bool windowElapsed = false;
+
     // Butée à surveiller dans l'état actuel, 0 si aucune.
     int8_t saturation(double_t value, double_t setpoint) const;
 };

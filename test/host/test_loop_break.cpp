@@ -345,6 +345,24 @@ namespace
         CHECK_TRUE(pid.isCommandValid());
         CHECK_FALSE(alarm.isActive());
     }
+
+    void testLongSaturation()
+    {
+        ControlledTemperature temperature;
+        LoopRegulator regulator;
+        LoopBreakAlarm alarm;
+        prepare(alarm, temperature, regulator);
+        alarm.settings.safeState = false;
+        alarm.settings.latching = false;
+
+        regulator.set(1.0);
+        CHECK_FALSE(activeAt(alarm, temperature, 30.0, 0));
+        CHECK_TRUE(activeAt(alarm, temperature, 30.0, 100000));
+
+        // Saturation de plus de 49 jours : millis() reboucle, l'alarme reste.
+        CHECK_TRUE(activeAt(alarm, temperature, 30.0, 3000000000UL));
+        CHECK_TRUE(activeAt(alarm, temperature, 30.0, 5000));
+    }
 }
 
 void runLoopBreakTests()
@@ -356,4 +374,5 @@ void runLoopBreakTests()
     TestHarness::run("boucle ouverte : butee basse et froid", testLowSaturationAndCooling);
     TestHarness::run("boucle ouverte : options", testOptions);
     TestHarness::run("boucle ouverte : verrouillage du PID", testPIDInterlock);
+    TestHarness::run("boucle ouverte : saturation de plus de 49 jours", testLongSaturation);
 }

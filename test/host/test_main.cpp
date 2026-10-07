@@ -3028,6 +3028,7 @@ void runComparatorTests();
 void runSolarTests();
 void runDelayTimerTests();
 void runInhibitTests();
+void runConditionAlarmTests();
 
 int main()
 {
@@ -3221,6 +3222,7 @@ int main()
     runSolarTests();
     runDelayTimerTests();
     runInhibitTests();
+    runConditionAlarmTests();
 
     return TestHarness::finish();
 }
