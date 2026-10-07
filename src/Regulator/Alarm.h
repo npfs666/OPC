@@ -20,6 +20,13 @@ public:
     /** Alarme activée dans ses réglages. */
     virtual bool isEnabled() const = 0;
 
+    /*
+     * L'inhibition d'une alarme suit d'autres règles (alarme déclarée
+     * inhibable, défaut de sonde jamais masqué, mémorisation conservée) :
+     * étape 1c du plan, doc/Plan_logique_installation.md.
+     */
+    void inhibit(bool inhibited) = delete;
+
     /**
      * Vrai si l'alarme doit mettre en sécurité les sorties du régulateur
      * relié (voir Regulator::setInterlock()).

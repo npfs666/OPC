@@ -37,6 +37,7 @@ void Regulator::begin(
     Displayable::begin(name);
     command = 0.0;
     commandValid = false;
+    inhibitRequested = false;
 }
 
 void Regulator::resume(uint32_t now)
@@ -126,12 +127,22 @@ void Regulator::registerFaultParameters(ParameterList& list)
 
 double_t Regulator::readCommand() const
 {
-    return command;
+    return isInhibited() ? 0.0 : command;
 }
 
 bool Regulator::isCommandValid() const
 {
-    return commandValid && !isInterlocked();
+    return (isInhibited() || commandValid) && !isInterlocked();
+}
+
+void Regulator::inhibit(bool inhibited)
+{
+    inhibitRequested = inhibited;
+}
+
+bool Regulator::isInhibited() const
+{
+    return inhibitRequested && !isManual();
 }
 
 void Regulator::setInterlock(const Alarm& alarm)
@@ -145,7 +156,7 @@ bool Regulator::isInterlocked() const
 }
 
 double_t Regulator::printValue() const {
-    return command;
+    return readCommand();
 }
 
 const char* Regulator::getUnit() const {

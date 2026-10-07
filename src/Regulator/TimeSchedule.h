@@ -99,6 +99,9 @@ public:
     /** L'heure n'est indispensable qu'en mode Auto. */
     bool requiresClock() const override;
 
+    /** Marche ou Arrêt forcés (dérogation) : prioritaires sur l'inhibition. */
+    bool isManual() const override;
+
     void print(Stream& stream) const override;
 
     void registerParameters(ParameterList& list) override;

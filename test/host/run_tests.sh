@@ -48,6 +48,7 @@ fi
     "${project_dir}/test/host/test_comparator.cpp" \
     "${project_dir}/test/host/test_solar.cpp" \
     "${project_dir}/test/host/test_delay_timer.cpp" \
+    "${project_dir}/test/host/test_inhibit.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \

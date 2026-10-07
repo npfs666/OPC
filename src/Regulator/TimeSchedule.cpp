@@ -151,6 +151,11 @@ void TimeSchedule::update(uint32_t now)
         invalidateCommand();
 }
 
+bool TimeSchedule::isManual() const
+{
+    return settings.mode != Mode::Auto;
+}
+
 bool TimeSchedule::isActive(bool& active) const
 {
     switch (settings.mode)

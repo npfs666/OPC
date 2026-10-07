@@ -45,9 +45,29 @@ public:
 
     virtual void resume(uint32_t now);
 
+    /** Commande de 0 à 1 ; 0 pendant une inhibition. */
     double_t readCommand() const;
 
+    /** Commande utilisable ; vrai (arrêt commandé) pendant une inhibition. */
     bool isCommandValid() const;
+
+    /**
+     * Inhibition par la glue : arrêt commandé, non sauvegardé, conservé
+     * jusqu'au prochain appel (même après une pause du menu). La commande
+     * vaut alors 0 et reste valide (ce n'est pas un défaut), dès le cycle en
+     * cours. Le mode manuel reste prioritaire ; un verrouillage par alarme
+     * aussi. À la levée, le régulateur repart comme après une réactivation.
+     */
+    void inhibit(bool inhibited);
+
+    /** Inhibition en vigueur : demandée, et régulateur pas en manuel. */
+    bool isInhibited() const;
+
+    /** Sortie forcée par l'opérateur : prioritaire sur l'inhibition. */
+    virtual bool isManual() const
+    {
+        return false;
+    }
 
     /** Vrai pendant un maintien : la commande est celle d'avant le défaut. */
     bool isInFallback() const;
@@ -149,6 +169,8 @@ protected:
 
 private:
     const Alarm* interlock = nullptr;
+
+    bool inhibitRequested = false;
 
     bool faultActionLocked = false;
 

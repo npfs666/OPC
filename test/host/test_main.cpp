@@ -3027,6 +3027,7 @@ void runLogicTests();
 void runComparatorTests();
 void runSolarTests();
 void runDelayTimerTests();
+void runInhibitTests();
 
 int main()
 {
@@ -3219,6 +3220,7 @@ int main()
     runComparatorTests();
     runSolarTests();
     runDelayTimerTests();
+    runInhibitTests();
 
     return TestHarness::finish();
 }

@@ -80,6 +80,9 @@ lisible, modifiable et partageable (source + `.uf2`).
 | 10 | Témoin ou voyant | libre au template, rien dans OPC ni dans les démonstrateurs | rarement utile en pratique ; le témoin le plus courant est une présence tension, sans logique |
 | 11 | Masquage d'alarme | inhibition par la glue | évite les fausses alarmes de dégivrage sans allonger le retard des vraies |
 | 12 | Phase 1 | en trois étapes (1a, 1b, 1c), chacune testée et commitée | l'inhibition touche chaque régulateur et chaque alarme ; son API doit être validée par un utilisateur réel |
+| 13 | Inhibition et mode manuel | le manuel (et la dérogation d'un programme) passe toujours avant | l'opérateur garde le dernier mot, comme pour les défauts de sonde |
+| 14 | Levée de l'inhibition d'un PID | comme une réactivation : intégrale nulle, rampe repartie de la mesure | une intégrale figée après un long arrêt provoque un dépassement |
+| 15 | Affichage d'une inhibition | géré par chaque template | seule la chambre froide en a besoin, avec ses propres états |
 
 ---
 
@@ -96,8 +99,8 @@ réel, la chambre froide.
 3. ✅ 3.1 Solaire réorganisé (comparateurs + glue, `SolarRegulator`
    supprimé).
 4. ✅ 2.2 Temporisation.
-5. ⬜ Étapes 1b et 1c (inhibition des régulateurs et des alarmes), puis 2.3
-   (alarme sur condition).
+5. ✅ Étape 1b (inhibition des régulateurs).
+   ⬜ Étape 1c (inhibition des alarmes), puis 2.3 (alarme sur condition).
 6. ⬜ 3.2 Chambre froide.
 7. ⬜ 3.3, puis phase 4.
 
@@ -139,7 +142,9 @@ qu'on relie à un actionneur comme les autres.
   Thermostat : en manuel, la mesure est ignorée. Il est marqué live et le
   template peut le retirer.
 
-1.3 ⬜ **L'inhibition**, un levier non persistant de la glue. Il est distinct
+1.3 ⬜ **L'inhibition** (régulateurs faits à l'étape 1b : `Regulator::inhibit()`,
+tests dans `test/host/test_inhibit.cpp` ; reste les alarmes, étape 1c), un
+levier non persistant de la glue. Il est distinct
 du réglage `Activée` des alarmes : il faudra un autre nom que `setEnabled()`,
 car `Alarm::isEnabled()` existe déjà.
 - **Un régulateur inhibé** a sa sortie arrêtée sur ordre (ce n'est pas un

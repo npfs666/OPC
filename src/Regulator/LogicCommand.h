@@ -79,6 +79,9 @@ public:
     /** Commande Auto (ni Marche ni Arrêt forcés). */
     bool isAutomatic() const override;
 
+    /** Marche ou Arrêt forcés : prioritaires sur l'inhibition. */
+    bool isManual() const override;
+
     void registerParameters(ParameterList& list) override;
 
 private:

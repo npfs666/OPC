@@ -143,7 +143,9 @@ void LimitAlarm::update(uint32_t now)
 
         const bool hasSetpoint =
             !isRelative(settings.type) ||
-            (reference != nullptr && reference->readSetpoint(setpoint));
+            (reference != nullptr &&
+             !reference->isInhibited() &&
+             reference->readSetpoint(setpoint));
 
         if (!hasSetpoint)
         {

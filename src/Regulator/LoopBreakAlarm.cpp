@@ -117,6 +117,7 @@ void LoopBreakAlarm::update(uint32_t now)
         regulator != nullptr &&
         measurement != nullptr &&
         regulator->isAutomatic() &&
+        !regulator->isInhibited() &&
         regulator->isCommandValid() &&
         measurement->isValid() &&
         std::isfinite(measurement->getValue()) &&

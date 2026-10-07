@@ -116,6 +116,14 @@ void DelayTimer::reset()
 
 bool DelayTimer::run(bool input, uint32_t now)
 {
+    // Inhibée : arrêt commandé ; à la levée, la temporisation repart de zéro.
+    if (isInhibited())
+    {
+        reset();
+        invalidateCommand();
+        return false;
+    }
+
     if (!started || input != this->input)
     {
         started = true;
@@ -178,7 +186,7 @@ void DelayTimer::update(uint32_t now)
     if (source == nullptr)
         return;
 
-    if (!source->isCommandValid())
+    if (isInhibited() || !source->isCommandValid())
     {
         reset();
         invalidateCommand();

@@ -234,10 +234,41 @@ Règles de la glue :
   chauffante...).
 - Elle peut être verrouillée par une alarme (`setInterlock()`), comme un
   régulateur.
+- Elle peut **inhiber** un régulateur (`regulateur.inhibit(true)`) : arrêt
+  commandé pour un dégivrage, un délestage, l'été... Voir
+  [Inhibition par la glue](#inhibition-par-la-glue).
 - Tout seuil ou délai qui peut varier d'un site à l'autre doit être un
   paramètre du menu, pas une constante de la glue.
 
 Le template `TestIO` sert de banc d'essai de la glue.
+
+#### Inhibition par la glue
+
+`inhibit(true)` arrête un régulateur sans toucher à ses réglages : sa commande
+vaut 0 et reste **valide** (arrêt commandé, pas un défaut), dès le cycle en
+cours. L'inhibition n'est pas sauvegardée ; elle reste en place jusqu'au
+prochain appel, **même après une pause du menu**, et la glue la réécrit à
+chaque cycle. Rien n'est journalisé.
+
+- Le **mode manuel** (et la dérogation d'un programme horaire) passe avant :
+  l'opérateur garde le dernier mot. Un **verrouillage par alarme** aussi
+  (état sûr).
+- **Thermostat** : plus de consigne active, ce qui suspend les alarmes
+  relatives à sa consigne. À la levée, départ à l'arrêt et rampe repartie de
+  la mesure, comme après le menu.
+- **PID** : sortie 0, autotune en cours abandonné (et refusé tant qu'il est
+  inhibé). À la levée, il repart comme une réactivation : intégrale nulle,
+  rampe repartie de la mesure.
+- **Programme horaire** : sortie 0 quelle que soit la plage.
+  `isActive()`, lu par la glue, n'est pas modifié.
+- **Comparateur, temporisation** : à l'arrêt ; à la levée, ils repartent de
+  zéro.
+- Une **alarme de boucle ouverte** ne surveille pas un régulateur inhibé ; sa
+  fenêtre repart à zéro à la levée.
+
+L'écran d'accueil d'un template affiche lui-même l'état qui a causé
+l'inhibition (`DEGIVRAGE`...). L'inhibition d'une alarme suivra d'autres
+règles (à venir).
 
 ### 4. Dessiner l'écran d'accueil
 
@@ -662,7 +693,7 @@ en tête de leur menu `Regulateur` :
   ce réglage (`disableManualMode()`).
 
 En manuel, la sortie s'applique **sans tenir compte de la mesure** : ni défaut
-de sonde, ni repli, ni `Activé` du PID. Les sécurités des sorties restent
+de sonde, ni repli, ni `Activé` du PID, ni inhibition par la glue. Les sécurités des sorties restent
 actives (timeout d'acquisition, temps minimaux des relais). L'écran d'accueil
 affiche `MANUEL` en orange. Passer d'Auto à Manuel, revenir, ou changer la
 sortie manuelle n'interrompt pas les sorties : ce sont des réglages de

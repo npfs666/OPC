@@ -111,6 +111,11 @@ bool LogicCommand::isAutomatic() const
            settings.operation == Operation::Auto;
 }
 
+bool LogicCommand::isManual() const
+{
+    return !isAutomatic();
+}
+
 MeasurementStatus LogicCommand::dependencyStatus() const
 {
     for (uint8_t i = 0; i < dependencyCount; i++)

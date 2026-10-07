@@ -393,9 +393,13 @@ bool PID::setOutputLimits(
 
 bool PID::startAutoTune(uint32_t now)
 {
-    // L'opérateur a la main : pas d'essai en manuel.
-    if (settings.operation == Operation::Manual)
+    // L'opérateur a la main : pas d'essai en manuel. Ni pendant une
+    // inhibition : la glue a arrêté le régulateur.
+    if (settings.operation == Operation::Manual ||
+        isInhibited())
+    {
         return false;
+    }
 
     /* L'essai ne doit jamais réactiver le PID automatique au redémarrage. */
     settings.enabled = false;
@@ -512,6 +516,11 @@ int8_t PID::actionDirection() const
     return settings.mode == Mode::Cooling ? -1 : 1;
 }
 
+bool PID::isManual() const
+{
+    return settings.operation == Operation::Manual;
+}
+
 bool PID::isAutomatic() const
 {
     return settings.operation == Operation::Auto &&
@@ -526,7 +535,8 @@ double_t PID::integralTime() const
 
 bool PID::readSetpoint(double_t& setpoint) const
 {
-    if (!settings.enabled ||
+    if (isInhibited() ||
+        !settings.enabled ||
         autoTune.isActive() ||
         !setpointRamp.hasActiveSetpoint())
     {
@@ -542,6 +552,24 @@ void PID::update(uint32_t now)
     if (settings.operation == Operation::Manual)
     {
         updateManual();
+        return;
+    }
+
+    /*
+     * Inhibé par la glue : arrêt commandé (commande 0, voir Regulator). Un
+     * essai en cours est abandonné ; la levée repart comme une réactivation,
+     * d'une intégrale nulle, rampe repartie de la mesure.
+     */
+    if (isInhibited())
+    {
+        if (autoTune.isActive())
+        {
+            autoTune.cancel();
+            settings.enabled = false;
+        }
+
+        setpointRamp.restart();
+        resetController();
         return;
     }
 

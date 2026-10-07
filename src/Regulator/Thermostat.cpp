@@ -76,6 +76,18 @@ void Thermostat::update(uint32_t now)
         return;
     }
 
+    /*
+     * Inhibé par la glue : arrêt commandé (commande 0, voir Regulator). À la
+     * levée, départ à l'arrêt comme après le menu, rampe repartie de la
+     * mesure.
+     */
+    if (isInhibited())
+    {
+        setpointRamp.restart();
+        invalidateCommand();
+        return;
+    }
+
     if (temperature == nullptr ||
         !temperature->isValid() ||
         !std::isfinite(
@@ -161,9 +173,16 @@ bool Thermostat::isAutomatic() const
     return settings.operation == Operation::Auto;
 }
 
+bool Thermostat::isManual() const
+{
+    return settings.operation != Operation::Auto;
+}
+
 bool Thermostat::readSetpoint(double_t& setpoint) const
 {
-    if (!setpointRamp.hasActiveSetpoint())
+    // Inhibé : pas de consigne active, les alarmes relatives sont suspendues.
+    if (isInhibited() ||
+        !setpointRamp.hasActiveSetpoint())
         return false;
 
     setpoint = setpointRamp.activeSetpoint();

@@ -173,6 +173,9 @@ public:
     /** Auto, activé, sans autotune en cours. */
     bool isAutomatic() const override;
 
+    /** Commande Manuel : prioritaire sur l'inhibition. */
+    bool isManual() const override;
+
     double_t integralTime() const override;
 
     /** Enregistre uniquement les réglages du PID automatique. */

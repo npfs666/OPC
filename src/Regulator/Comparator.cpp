@@ -145,6 +145,14 @@ void Comparator::update(uint32_t now)
 
     lastValue = value;
 
+    // Inhibé : arrêt commandé ; à la levée, le comparateur repart de l'arrêt.
+    if (isInhibited())
+    {
+        on = false;
+        invalidateCommand();
+        return;
+    }
+
     if (singleThreshold)
         settings.offThreshold = settings.onThreshold;
 
