@@ -17,7 +17,7 @@ Regulator ──► Actuator ──► Output
 
 | Actionneur | Commande envoyée aux sorties |
 | --- | --- |
-| `ActuatorOnOff` | 1 si la commande du régulateur ≥ 0,5, sinon 0. Pour un thermostat ou un régulateur solaire. |
+| `ActuatorOnOff` | 1 si la commande du régulateur ≥ 0,5, sinon 0. Pour un thermostat, un comparateur, une temporisation, une alarme ou une commande de la glue. |
 | `TimeProportionalActuator` | Allume la sortie pendant `commande × période` à chaque période. Pour un PID sur relais. |
 | `ActuatorPWM` | Transmet la commande telle quelle (0 à 1). Pour un PID sur sortie PWM. |
 
@@ -180,12 +180,20 @@ Chaque sortie a un état de repli : `safeState` pour un relais, `safeCommand`
 pour une sortie PWM. Il est appliqué automatiquement :
 
 - au démarrage, avant la première régulation ;
-- quand le régulateur n'a pas de commande valide (mesure invalide, régulation
-  désactivée, etc.) ;
+- quand le régulateur n'a pas de commande valide : mesure en défaut (sauf
+  maintien sur défaut), heure inconnue d'une régulation programmée,
+  verrouillage par une alarme de boucle ouverte, commande de la glue non
+  écrite ;
 - quand aucune nouvelle mesure n'arrive avant le timeout
   (`Input > Timeout mesures`) ;
 - pendant l'application de réglages modifiés dans le menu ;
 - si une sortie n'est pas correctement initialisée (`isHealthy()`).
+
+Un **arrêt commandé** n'est pas un défaut : PID non `Activé`, régulateur
+inhibé par la glue, programme hors plage réglé sur `Arrêt` donnent une
+commande 0 valide. La sortie est alors à l'arrêt (0 %), pas dans son état
+sûr, ce qui compte pour un relais à état sûr `ON` ou une sortie PWM à
+commande de sécurité non nulle.
 
 L'état sûr est **logique** : avec `Actif à HIGH` mal réglé, un relais « OFF »
 peut être physiquement fermé. Vérifier le câblage réel avant toute mise en

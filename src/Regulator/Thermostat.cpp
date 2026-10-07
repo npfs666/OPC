@@ -9,6 +9,9 @@
 
 namespace
 {
+    constexpr double_t DEFAULT_SETPOINT_MIN = 0.0;
+    constexpr double_t DEFAULT_SETPOINT_MAX = 200.0;
+
     constexpr ParameterOption THERMOSTAT_OPERATION_OPTIONS[] = {
         {static_cast<int32_t>(Thermostat::Operation::Auto), "Auto"},
         {static_cast<int32_t>(Thermostat::Operation::ForcedOn), "Marche"},
@@ -52,6 +55,8 @@ void Thermostat::begin(
     settings.hysteresis = 1.0;
     setpointRamp.begin();
     scheduledSetpoint.begin();
+    setpointMinimum = DEFAULT_SETPOINT_MIN;
+    setpointMaximum = DEFAULT_SETPOINT_MAX;
 }
 
 void Thermostat::setSchedule(
@@ -59,6 +64,23 @@ void Thermostat::setSchedule(
     double_t reducedSetpoint)
 {
     scheduledSetpoint.attach(schedule, reducedSetpoint);
+}
+
+bool Thermostat::setSetpointLimits(
+    double_t minimum,
+    double_t maximum)
+{
+    if (!std::isfinite(minimum) ||
+        !std::isfinite(maximum) ||
+        minimum >= maximum)
+    {
+        return false;
+    }
+
+    setpointMinimum = minimum;
+    setpointMaximum = maximum;
+
+    return true;
 }
 
 void Thermostat::update(uint32_t now)
@@ -88,6 +110,26 @@ void Thermostat::update(uint32_t now)
         return;
     }
 
+    double_t target = settings.setpoint;
+
+    const bool scheduled =
+        scheduledSetpoint.update(
+            settings.setpoint,
+            target);
+
+    /*
+     * Hors plage en « Arrêt » : arrêt programmé, pas un défaut. Commande 0
+     * valide, quelle que soit la mesure, comme une inhibition : les blocs
+     * qui en dépendent (post-circulation...) ne le prennent pas pour une
+     * panne. Départ à l'arrêt à la plage suivante.
+     */
+    if (scheduledSetpoint.state() == ScheduledSetpoint::State::Off)
+    {
+        setpointRamp.restart();
+        writeCommand(0.0);
+        return;
+    }
+
     if (temperature == nullptr ||
         !temperature->isValid() ||
         !std::isfinite(
@@ -105,11 +147,8 @@ void Thermostat::update(uint32_t now)
     const double_t value =
         temperature->getValue();
 
-    double_t target = settings.setpoint;
-
-    if (!scheduledSetpoint.update(
-            settings.setpoint,
-            target))
+    // Heure inconnue : consigne indéterminée, sorties en état sûr.
+    if (!scheduled)
     {
         setpointRamp.restart();
         invalidateCommand();
@@ -180,6 +219,11 @@ bool Thermostat::isManual() const
 
 bool Thermostat::readSetpoint(double_t& setpoint) const
 {
+    // Manuel : la consigne réglée (programme compris, sans rampe) reste la
+    // référence des alarmes relatives, qui surveillent le forçage.
+    if (isManual())
+        return scheduledSetpoint.readTarget(settings.setpoint, setpoint);
+
     // Inhibé : pas de consigne active, les alarmes relatives sont suspendues.
     if (isInhibited() ||
         !setpointRamp.hasActiveSetpoint())
@@ -266,16 +310,16 @@ void Thermostat::registerParameters(ParameterList& list) {
         "setpoint",
         "Consigne",
         settings.setpoint,
-        0.0,
-        200.0,
+        setpointMinimum,
+        setpointMaximum,
         0.1,
         1,
         "°C");
 
     scheduledSetpoint.registerParameters(
         parameters,
-        0.0,
-        200.0,
+        setpointMinimum,
+        setpointMaximum,
         0.1,
         1,
         "°C");

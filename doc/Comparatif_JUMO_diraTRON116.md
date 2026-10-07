@@ -6,9 +6,11 @@ industriels. Il sert de feuille de route pour rapprocher l'OPC d'un produit
 industriel.
 
 - Référence JUMO : fiche technique 702110, V8.00 (2024-10-30)
-- État OPC : commit `6af35df` (compteurs d'usure des relais)
+- État OPC : commit `d6e2ace` (template chambre froide et guide d'écriture)
 - Première version : 2026-10-01 (commit `55ce064`)
-- Mise à jour : 2026-10-03
+- Mise à jour : 2026-10-07 (logique d'installation : glue, comparateur,
+  temporisation, inhibition, alarme sur condition ; voir
+  `Plan_logique_installation.md`)
 
 Légende : ✅ fait · 🟡 partiel · ⬜ à faire · ➖ volontairement non retenu.
 
@@ -24,7 +26,7 @@ Légende : ✅ fait · 🟡 partiel · ⬜ à faire · ➖ volontairement non re
 | Filtre d'entrée | Numérique du 2ᵉ ordre, 0 à 100 s | Identique, appliqué à la température calculée | ✅ |
 | Surveillance de la sonde | Rupture, court-circuit, hors étendue, polarité, NAMUR NE43 | Rupture, court-circuit, hors étendue (haut et bas), câblage inversé. Thermocouple ouvert détecté par la polarisation 1 MΩ | ✅ (NE43 avec l'entrée 4–20 mA) |
 | Entrées numériques | 2 pour contact sec | 2 isolées (ISO1212) | ✅ |
-| Sorties | 2 relais 3 A / 230 V, sortie logique 0/14 V pour SSR. Options : relais, analogique 0–10 V / 4–20 mA, PhotoMOS | 2 relais, 2 PWM | 🟡 pas de sortie analogique ni de sortie SSR caractérisée |
+| Sorties | 2 relais 3 A / 230 V, sortie logique 0/14 V pour SSR. Options : relais, analogique 0–10 V / 4–20 mA, PhotoMOS | 2 relais, 2 PWM, utilisables en tout-ou-rien pour un SSR (niveau constant à 0 et 100 %) | 🟡 pas de sortie analogique ; niveau électrique pour SSR à caractériser |
 | Communication | RS485 Modbus-RTU, micro-USB de configuration | USB série, disque USB `config.json` en lecture seule | ⬜ Modbus |
 | Logiciel PC | Configuration, éditeur de programmes, enregistrement de mise en service | Aucun | ⬜ |
 | IHM | 2 LCD 18 segments, 4 touches | TFT couleur 240 × 240, encodeur | ✅ plus riche |
@@ -35,23 +37,23 @@ Légende : ✅ fait · 🟡 partiel · ⬜ à faire · ➖ volontairement non re
 
 | Fonction | JUMO | OPC | État |
 | --- | --- | --- | --- |
-| Types de régulateur | 2 états, 3 états (chaud / froid), pas à pas, continu | Thermostat, PID chauffage ou refroidissement, solaire, programmation horaire | 🟡 pas de 3 états ni de pas à pas |
+| Types de régulateur | 2 états, 3 états (chaud / froid), pas à pas, continu | Thermostat, PID chauffage ou refroidissement, comparateur (seuil ou différentiel), programmation horaire ; solaire et chambre froide en templates | 🟡 pas de 3 états ni de pas à pas |
 | Comportement sur défaut de sonde | Configurable, dont sortie forcée | `Sécurité` (défaut) ou `Maintien` limité dans le temps. Pas de sortie forcée : sans mesure, l'état sûr reste la règle | ✅ choix volontaire |
 | Temps mini du relais (Tk) | Oui | `Marche mini`, `Arrêt mini` par relais, `Impulsion mini` de l'actionneur temporel | ✅ |
 | Autotune | Oscillation ou réponse indicielle | Oscillation, 4 règles de calcul | 🟡 pas de réponse indicielle |
 | Rampe de consigne | Montée et descente, commandée par signaux | Montée et descente | 🟡 pas de commande externe |
-| Mode manuel | Oui | PID (sortie en %) et thermostat (Marche / Arrêt), sans à-coup dans les deux sens, non conservé au redémarrage | ✅ |
+| Mode manuel | Oui | PID (sortie en %), thermostat et sorties de la glue (Marche / Arrêt), sans à-coup dans les deux sens, non conservé au redémarrage, prioritaire sur l'inhibition | ✅ |
 | Réglage de la consigne en façade | ▲ / ▼ | Encodeur à l'accueil, accélération, validé par un clic | ✅ |
-| Surveillance de seuils (alarmes) | 4 fonctions × 8 types | 8 alarmes × 5 types (Max, Min, Écart haut, Écart bas, Hors bande), temporisation, masquage au démarrage, mémorisation, acquittement par menu ou entrée | ✅ |
+| Surveillance de seuils (alarmes) | 4 fonctions × 8 types | 8 alarmes × 5 types (Max, Min, Écart haut, Écart bas, Hors bande), temporisation, masquage au démarrage, mémorisation, acquittement par menu ou entrée ; alarme sur entrée TOR ou condition (`ConditionAlarm`) ; masquage par la glue (dégivrage) | ✅ |
 | Compteur de service | Manœuvres ou durée, heures de l'appareil | Manœuvres et heures en marche par relais, heures de la carte, seuil d'entretien | ✅ |
 | Jeux de paramètres | 2 | 1 | ⬜ |
 | Consignes commutables | 4, par entrées numériques | 1, plus consigne réduite par programme horaire | ⬜ |
 | Programmateur de consigne | 24 segments, 4 contacts | Non (programmation hebdomadaire à la place) | ⬜ |
-| Minuterie | Oui | Non | ⬜ |
-| Logique et calcul | 4 signaux AND / OR / XOR, retard, impulsion, front ; 4 formules | Non (en C++ dans l'installation) | ⬜ |
+| Minuterie | Oui | Temporisations (`DelayTimer`, retard à la montée ou à la descente, s / min / h) pour la logique ; pas de minuterie lancée par l'opérateur | 🟡 |
+| Logique et calcul | 4 signaux AND / OR / XOR, retard, impulsion, front ; 4 formules | Glue en C++ dans le template (`processLogic()`), avec des blocs sûrs réglables au menu : `LogicCommand` (sortie en état sûr si non écrite, dépendances), `Comparator`, `DelayTimer`, inhibition des régulateurs et des alarmes | ✅ choix : en C++, pas configurée en façade |
 | Affectation des signaux sans programmer | Sélecteurs | Câblage dans `Installation::begin()` | ⬜ voir § 4 |
 | Linéarisation personnalisée | 40 points ou polynôme d'ordre 4 | Non | ⬜ |
-| Niveau utilisateur, verrouillage | Oui | Non | ⬜ |
+| Niveau utilisateur, verrouillage | Oui | Menu ouvert à tous | ➖ choix : l'utilisateur est responsable, l'installateur règle sur place |
 | Programmation ST | Option | C++ natif | ➖ |
 
 ### Points forts de l'OPC
@@ -59,10 +61,15 @@ Légende : ✅ fait · 🟡 partiel · ⬜ à faire · ➖ volontairement non re
 - Mesure RTD 4 fils sur 3 voies (le JUMO s'arrête au 3 fils, sur 1 voie).
 - Plusieurs boucles de régulation sur une même carte.
 - Horloge, programmation hebdomadaire, changement d'heure automatique.
-- Régulateurs spécialisés : solaire avec mode vacances, psychrométrie,
-  pression.
+- Régulateurs spécialisés : solaire avec mode vacances, chambre froide
+  avec dégivrage, psychrométrie, pression.
+- Logique propre à l'application écrite dans le template (glue C++), sur
+  des blocs sûrs : une sortie non écrite ou dont une mesure est en défaut
+  passe en état sûr. Guide d'écriture (`src/Templates/README.md`).
+- Templates testables complets sur PC (banc d'essai des tests sur l'hôte).
 - Écran graphique couleur, états en couleur, bandeau d'alarme.
-- Journal série des changements d'état (mesures, alarmes, entretien).
+- Journal des événements horodatés (mesures, alarmes, entretien,
+  redémarrages), conservé en flash et consultable à l'écran.
 - Heures en marche par relais.
 - Réglages de conduite (consignes, mode manuel) appliqués sans arrêter la
   régulation.
@@ -83,13 +90,12 @@ Les quatre premières sont du logiciel seul, réalisable sur la carte actuelle.
 | ✅ **Alarme de boucle ouverte** (loop break, LBA) : sortie en butée depuis T s sans variation de la mesure | Très forte valeur de sécurité : résistance grillée, contacteur collé ou ouvert, sonde sortie du process. Couvre les pannes que la surveillance de sonde ne voit pas | Fait : `LoopBreakAlarm`, mise en sécurité optionnelle |
 | ✅ **Événements horodatés et conservés** (les N derniers en flash, heure réelle) | Diagnostic après coup. L'horloge et le journal existent déjà | Fait : journal en RAM, écrit par lots dans `/events.csv`, menu `Divers > Journal` |
 | **Démarrage progressif** (sortie limitée pendant X min ou sous un seuil de mesure) | Résistances chauffantes à sécher, limitation des appels de courant | Faible |
-| **Verrouillage par code, niveau opérateur** | Indispensable dès qu'un tiers a accès à l'appareil | Faible à moyen |
 | **Enregistrement des courbes** (mesure, consigne, sortie en CSV, récupéré par la clé USB) | Un vrai avantage possible de l'OPC : le stockage USB existe | Moyen |
 | **Modbus RTU** : d'abord sur l'USB série (sans matériel), puis sur RS485 | Supervision, automate. Le standard attendu | Moyen |
 | **Programmateur de consigne avec attente de maintien** (holdback : le palier commence quand la mesure a rejoint la consigne) | Fours, étuvage, séchage | Moyen |
 | **PID chaud / froid** avec zone morte | Chambres climatiques, bains | Moyen |
 | **Import et sauvegarde de la configuration par USB** | Mise en service en série, sauvegarde avant intervention | Moyen |
-| **Fonctions des entrées numériques choisies dans le menu** : marche / arrêt à distance, deuxième consigne, manuel, acquittement, défaut externe (verrouillage) | Câbler un thermostat d'ambiance, un contact de porte, un défaut de pompe… sans programmer | Moyen |
+| **Fonctions des entrées numériques choisies dans le menu** : marche / arrêt à distance, deuxième consigne, manuel, acquittement, défaut externe (verrouillage) | Câbler un thermostat d'ambiance, un contact de porte, un défaut de pompe… sans programmer. Déjà possible en C++ : glue (inhibition), `ConditionAlarm` sur entrée TOR, acquittement par entrée | Moyen |
 | **Vanne 3 points** (pas à pas, deux relais, temps de course) | Chauffage hydraulique | Moyen |
 
 ### Plus tard
@@ -98,8 +104,8 @@ Les quatre premières sont du logiciel seul, réalisable sur la carte actuelle.
   linéaire).
 - Autotune automatique au changement de consigne : complexe, l'autotune
   manuel suffit souvent.
-- Cascade, régulation de rapport, anticipation : faisable en C++ dans une
-  installation dédiée le jour où le besoin existe.
+- Cascade, régulation de rapport, anticipation : faisable en C++ dans la
+  glue d'un template le jour où le besoin existe.
 - Consigne déportée 4–20 mA, recopie de la mesure en sortie analogique,
   alarme de rupture de résistance par transformateur de courant : attendent
   les entrées et sorties analogiques.
@@ -122,6 +128,12 @@ Les quatre premières sont du logiciel seul, réalisable sur la carte actuelle.
 - **Ethernet** : un Pico 2 W (Wi-Fi) serait plus cohérent pour une interface
   réseau.
 - **Afficheur 18 segments** : le TFT est un avantage.
+- **Verrouillage par code, niveau opérateur** : le menu reste ouvert.
+  L'utilisateur est responsable de ses réglages, et l'installateur peut
+  régler finement sur place.
+- **Programmation de la logique depuis le menu** : beaucoup de code lourd
+  pour une IHM qui n'est pas faite pour ; la logique s'écrit en C++ dans le
+  template.
 
 ## 3. Évolutions matérielles (prochaine révision du PCB)
 
@@ -129,7 +141,7 @@ Les quatre premières sont du logiciel seul, réalisable sur la carte actuelle.
 | --- | --- | --- |
 | Entrée 0–10 V / 4–20 mA sur au moins une voie | Capteurs de pression, d'humidité, transmetteurs | Shunt de 100 Ω, pont diviseur, protection ; NAMUR NE43 en logiciel |
 | Sortie analogique 0–10 V / 4–20 mA | Variateurs, vannes proportionnelles, recopie | PWM filtré et amplificateur opérationnel, ou XTR111 pour le courant |
-| Sortie logique 12–14 V | Relais statique (SSR) | Vérifier si les sorties PWM actuelles conviennent |
+| Sortie logique 12–14 V | Relais statique (SSR) | Logiciel prêt (PWM en tout-ou-rien, état sûr verrouillable) ; vérifier le niveau électrique des sorties PWM actuelles |
 | RS485 isolé | Modbus RTU | ADM2587E ou ISO1410 sur un UART du RP2350 |
 | Alimentation 230 V AC ou 24 V AC/DC | Installation en armoire | Module encapsulé (IRM-05, HLK) ou convertisseur 24 V |
 | Isolation zone 230 V / basse tension | EN 61010-1 | Lignes de fuite ≥ 6 mm, fentes, RC ou varistance sur les contacts |
@@ -143,12 +155,18 @@ Un régulateur industriel se **configure entièrement depuis sa façade**, sans
 programmer. L'OPC demande encore d'écrire une installation en C++ et de la
 compiler.
 
-L'étape qui rapprocherait le plus l'OPC d'un produit est un **template
+C'est en partie un choix : l'OPC vise les petites entreprises, où un
+installateur adapte un template à l'application (et le partage), et où la
+logique propre à l'application s'écrit en C++ dans le template. Les blocs
+(régulateurs, comparateurs, temporisations, alarmes) restent réglables au
+menu ; seules leur liaison et la glue demandent de recompiler. La
+programmation de la logique en façade est volontairement non retenue.
+
+L'étape qui rapprocherait encore l'OPC d'un produit est un **template
 universel** configurable par le menu : type d'entrée, type de régulateur,
-affectation des sorties, alarmes, fonctions des entrées numériques. Les
-briques nécessaires existent maintenant (diagnostic des sondes, alarmes, mode
-manuel, réglages de conduite, compteurs) ; il en regrouperait plusieurs
-points du § 2.
+affectation des sorties, alarmes, fonctions des entrées numériques. C'est de
+la configuration, pas de la logique : un sujet distinct, qui regrouperait
+plusieurs points du § 2.
 
 ## 5. Feuille de route
 
@@ -187,17 +205,32 @@ fixe, mesure en grand, jauge des seuils du thermostat.
   par lots en flash (au plus toutes les 15 min), cause du redémarrage,
   visionneuse `Divers > Journal`.
 
+**Point 4 — logique d'installation** (`Plan_logique_installation.md`)
+
+- Glue du template (`processLogic()`), sorties de la glue (`LogicCommand` :
+  écrite à chaque cycle sinon état sûr, dépendances, mode manuel).
+- Blocs `Comparator` (seuil, différentiel) et `DelayTimer` (retard à la
+  montée ou à la descente).
+- Inhibition des régulateurs et des alarmes par la glue (dégivrage,
+  délestage), mode manuel prioritaire.
+- Alarme sur entrée TOR ou sur condition (`ConditionAlarm`).
+- Template solaire réécrit en blocs et glue ; template chambre froide
+  (dégivrage, porte, masquage d'alarme) ; verrou d'état sûr des sorties PWM.
+- Guide d'écriture d'un template, templates testés complets sur PC.
+
 ### Proposé
 
 1. Démarrage progressif. Export du journal par la clé USB (le disque USB
    n'expose aujourd'hui qu'un seul fichier, `config.json`).
-2. Verrouillage et niveau opérateur, fonctions des entrées numériques dans le
-   menu.
+2. Fonctions des entrées numériques dans le menu (le verrouillage et le
+   niveau opérateur ne sont plus retenus).
 3. Enregistrement des courbes, Modbus sur l'USB série.
 4. Template universel configurable par le menu.
 5. Selon les applications : programmateur de consigne, PID chaud / froid,
    vanne 3 points.
 6. Révision matérielle (§ 3).
+7. Distribution : un `.uf2` par template, identité du firmware dans le menu
+   (phase 4 du plan de la logique d'installation, en fin de projet).
 
 ## Sources
 

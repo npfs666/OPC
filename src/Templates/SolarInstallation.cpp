@@ -235,16 +235,18 @@ bool SolarInstallation::begin(
     chargeDelta.setRange(0.0, 30.0);
     chargeDelta.setLabels("Delta démarrage", "Delta arrêt");
 
+    // Limites avec hystérésis : un seuil unique ferait battre la pompe tant
+    // que la mesure frôle la limite (ballon plein qui refroidit lentement,
+    // capteur tiède le matin).
     tankMaximum.begin(
         "solar_tank_max",
         "Ballon max",
         tankTopTemperature,
         Comparator::Direction::Above,
         80.0,
-        80.0);
-    tankMaximum.useSingleThreshold();
+        77.0);
     tankMaximum.setRange(40.0, 95.0);
-    tankMaximum.setLabels("Temp. ballon max", nullptr);
+    tankMaximum.setLabels("Temp. ballon max", "Reprise ballon");
 
     collectorMinimum.begin(
         "solar_collector_min",
@@ -252,10 +254,9 @@ bool SolarInstallation::begin(
         collectorTemperature,
         Comparator::Direction::Above,
         20.0,
-        20.0);
-    collectorMinimum.useSingleThreshold();
+        17.0);
     collectorMinimum.setRange(0.0, 100.0);
-    collectorMinimum.setLabels("Temp. capteur min", nullptr);
+    collectorMinimum.setLabels("Temp. capteur min", "Arrêt capteur");
 
     for (Comparator* condition : {&chargeDelta, &tankMaximum, &collectorMinimum})
     {

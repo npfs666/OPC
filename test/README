@@ -14,18 +14,21 @@ Ils couvrent actuellement :
   le fuseau horaire et l'heure d'été européenne (DS3231 en UTC) ;
 - l'interpolation PT100 et la conversion en température PT100/PT1000 ;
 - les calculs psychrométriques ;
-- les régulateurs thermostat, solaire et PID en chauffage/refroidissement,
-  dont l'autotune par relais dans les deux sens ;
+- les régulateurs thermostat et PID en chauffage/refroidissement, dont
+  l'autotune par relais dans les deux sens, sa plage d'essai vérifiée au
+  lancement, et la plage de consigne du thermostat ;
 - le timeout, la stabilité des oscillations et le verrouillage sûr des relais ;
 - les sorties PWM : rapport cyclique, polarité, fréquence commune, menu et repli ;
 - l'éditeur de paramètres et la séparation des menus PID/autotune ;
 - les actions de menu non persistantes et l'événement de nouveaux gains ;
-- l'ordre régulateur, actionneur, sortie et snapshot.
+- l'ordre régulateur, actionneur, sortie et snapshot ;
+- la restauration tolérante de la configuration (réglage hors plage,
+  propriétaire refusé par la validation croisée) ;
 - la programmation horaire : plages, jours, passage de minuit, modes forcés,
   heure inconnue, paramètres HH:MM et sous-menus imbriqués ;
-- le thermostat et le PID programmés (consigne réduite, arrêt, autotune
-  prioritaire) et la décharge nocturne solaire en mode vacances ;
-- la détection de l'alerte horloge dans le snapshot.
+- le thermostat et le PID programmés (consigne réduite, arrêt programmé à
+  commande 0 valide, autotune prioritaire) ;
+- la détection de l'alerte horloge dans le snapshot ;
 - les plages RTD : gains ADC selon le câblage et la plage, diagnostic de
   saturation (rupture ou dépassement) ;
 - les temps minimaux de marche et d'arrêt des relais (démarrage, état sûr
@@ -39,18 +42,29 @@ Ils couvrent actuellement :
   abandon sur inactivité, désignation par l'installation) ;
 - le mode manuel du PID et du thermostat (suivi, sortie fixe, défaut de
   sonde ignoré, retour sans à-coup même après le menu, réglages non
-  sauvegardés) et les réglages de conduite appliqués sans arrêt ;
+  sauvegardés, alarmes relatives toujours actives) et les réglages de
+  conduite appliqués sans arrêt ;
 - les compteurs d'entretien (manœuvres, heures en marche, heures de la
   carte, seuil, remise à zéro, menu Divers > Compteurs, bandeau) ;
 - l'alarme de boucle ouverte (butées haute et basse, chaud et froid,
-  fenêtre de détection, surveillance suspendue, options, verrouillage du PID) ;
+  fenêtre de détection, surveillance suspendue, options, verrouillage du PID,
+  mise en sécurité toujours mémorisée) ;
 - le journal des événements (ordre, capacité, regroupement des rafales,
   port série, sauvegarde, CSV et relecture, visionneuse) ;
 - les alarmes de seuil (types absolus et relatifs, hystérésis, temporisation,
   masquage, mémorisation et acquittement, défaut de sonde, journal, bandeau) ;
 - les états de mesure : acquisition (saturations), classement des
   résistances RTD, thermocouple ouvert ou hors domaine, propagation,
-  affichage (libellés, couleurs), journal des changements et snapshot.
+  affichage (libellés, couleurs), journal des changements et snapshot ;
+- les thermocouples (tables NIST, domaines, jonction froide) et les entrées
+  numériques (polarité, rebonds, paramètres) ;
+- la glue : ordre d'appel, `LogicCommand` (commande non écrite, dépendances,
+  mode manuel, verrouillage), inhibition des régulateurs et des alarmes ;
+- les blocs comparateur, temporisation (dont la post-circulation après un
+  arrêt programmé) et alarme sur condition (entrée TOR ou glue) ;
+- des templates complets sur le banc `TemplateBench.h` : solaire (charge,
+  hystérésis des limites, décharge vacances), chambre froide (dégivrage,
+  porte, alarme haute, manuel) et l'exemple minimal.
 
 Les tests qui dépendent réellement de l'ADS1120, des multiplexeurs, de
 LittleFS ou de l'USB devront être ajoutés comme tests d'intégration sur Pico.

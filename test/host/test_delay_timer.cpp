@@ -1,6 +1,11 @@
 #include "TestHarness.h"
 
+#include <Hardware/RTC.h>
+#include <Measurements/Temperature/Temperature.h>
 #include <Regulator/DelayTimer.h>
+#include <Regulator/PID.h>
+#include <Regulator/Thermostat.h>
+#include <Regulator/TimeSchedule.h>
 #include <hmi/ParameterList.h>
 
 #include <cstdint>
@@ -184,6 +189,92 @@ namespace
         CHECK_TRUE(glue.isOn());
     }
 
+    class ControlledTemperature final : public Temperature
+    {
+    public:
+        ControlledTemperature()
+        {
+            begin("temperature");
+        }
+
+        void update() override
+        {
+        }
+
+        void set(double_t value)
+        {
+            setValue(value);
+            setStatus(MeasurementStatus::Ok);
+        }
+    };
+
+    void testPostCirculationAfterScheduledStop()
+    {
+        // Chauffe programmée 06:00-08:00, arrêt hors plage, post-circulation
+        // de 3 min reliée au thermostat.
+        ControlledTemperature temperature;
+        ClockSample clock;
+        clock.valid = true;
+        clock.dateTime.dayOfWeek = 1;
+        clock.dateTime.hour = 7;
+
+        TimeSchedule schedule;
+        schedule.begin("prog", "Chauffe", clock);
+        schedule.settings.slots[0] = {
+            TimeSchedule::Days::Everyday, 6 * 60, 8 * 60
+        };
+
+        Thermostat thermostat;
+        thermostat.begin("thermostat", "Thermostat", temperature);
+        thermostat.settings.setpoint = 20.0;
+        thermostat.setSchedule(schedule, 16.0);
+        thermostat.scheduledSetpoint.settings.outside =
+            ScheduledSetpoint::Outside::Off;
+
+        DelayTimer postCirculation;
+        postCirculation.begin(
+            "post", "Post-circ.", Mode::OffDelay, 3, Unit::Minutes);
+        postCirculation.setSource(thermostat);
+
+        auto cycle = [&](uint32_t now)
+        {
+            thermostat.update(now);
+            postCirculation.update(now);
+        };
+
+        temperature.set(15.0);
+        cycle(0);
+        CHECK_TRUE(postCirculation.isOn());
+
+        // Fin de plage : le thermostat s'arrête sur ordre, le circulateur
+        // tourne encore 3 min.
+        clock.dateTime.hour = 8;
+        cycle(1000);
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
+        CHECK_TRUE(postCirculation.isOn());
+
+        cycle(180999);
+        CHECK_TRUE(postCirculation.isOn());
+        cycle(181000);
+        CHECK_FALSE(postCirculation.isOn());
+        CHECK_TRUE(postCirculation.isCommandValid());
+
+        // Heure inconnue : défaut, la temporisation passe en état sûr.
+        clock.valid = false;
+        cycle(182000);
+        CHECK_FALSE(thermostat.isCommandValid());
+        CHECK_FALSE(postCirculation.isCommandValid());
+
+        // PID désactivé : arrêt commandé, commande 0 valide.
+        PID pid;
+        pid.begin("pid", temperature);
+        pid.stop();
+        pid.update(0);
+        CHECK_TRUE(pid.isCommandValid());
+        CHECK_NEAR(pid.readCommand(), 0.0, 0.0);
+    }
+
     void testParameters()
     {
         Parameter storage[4];
@@ -233,5 +324,8 @@ void runDelayTimerTests()
     TestHarness::run("temporisation : débordement de millis()", testWraparound);
     TestHarness::run("temporisation : reprise", testResumeKeepsTiming);
     TestHarness::run("temporisation : source", testSource);
+    TestHarness::run(
+        "temporisation : post-circulation après un arrêt programmé",
+        testPostCirculationAfterScheduledStop);
     TestHarness::run("temporisation : paramètres", testParameters);
 }

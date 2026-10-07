@@ -237,7 +237,9 @@ C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour
   acquittement, bandeau d'accueil, journal, action « Acquitter », pilotage d'un
   relais. Elle compte dans `MAX_ALARMS`.
 
-2.4 ⬜ **Tests sur l'hôte et README** pour les trois blocs.
+2.4 ✅ **Tests sur l'hôte et README** pour les trois blocs (`test_comparator.cpp`,
+`test_delay_timer.cpp`, `test_condition_alarm.cpp` ; README « Comparateur »,
+« Temporisation », « Alarme sur condition »).
 
 ### Phase 3 : les démonstrateurs
 
@@ -281,6 +283,11 @@ C'est un banc d'essai : on peut lui ajouter des fonctions fictives pour
     avec son hystérésis ; `SolarRegulator` exigeait les deux seuils de
     démarrage au même instant. L'écart ne joue que si le bas du ballon est
     entre 50 et 52 °C au début de la plage.
+- **Ajout ultérieur** : `Ballon max` (80 °C, reprise à 77 °C) et
+  `Capteur min` (20 °C, arrêt à 17 °C) ont deux seuils. Avec un seuil
+  unique, comme dans `SolarRegulator`, la pompe battait à chaque cycle tant
+  que le haut du ballon frôlait 80 °C. Test : « solaire : pas de battement au
+  ballon max ».
 
 3.2 ✅ **La chambre froide positive** (`Templates/ColdRoomInstallation`, tests
 dans `test/host/test_cold_room.cpp`) (fromagerie, 2 à 4 °C), démonstrateur
@@ -374,10 +381,15 @@ template). Priorité faible.
 - ✅ Une sortie PWM peut-elle être pilotée en tout ou rien (résistance de
   dégivrage par relais statique) ? Oui : à 0 et 100 %, `PWMOutput` passe la
   broche à un niveau constant.
-- ⬜ Un changement de template par `.uf2` ne doit pas charger les réglages de
-  l'ancien. `Storage::restore()` reçoit `configurationKey()`, donc c'est
-  probablement déjà le cas.
-- ⬜ Ce qu'il manque pour compiler un template complet dans les tests sur
+- ✅ Un changement de template par `.uf2` ne doit pas charger les réglages de
+  l'ancien. Vérifié : `Storage::readConfiguration()` compare la clé de
+  l'installation et ignore le fichier d'une autre (journal
+  `Config. non reprise : défauts`). Réserve : les calibrations de la carte
+  (Rref, N0, C.J.) sont dans le même fichier et sont donc perdues ; les
+  compteurs d'usure sont rattachés aux clés des sorties du template. À
+  traiter avant la phase 4 (fichier de calibration séparé, compteurs par
+  relais physique).
+- ✅ Ce qu'il manque pour compiler un template complet dans les tests sur
   l'hôte.
 
 ---
@@ -408,12 +420,11 @@ template). Priorité faible.
 
 ## 8. Liens avec les autres documents
 
-- `Comparatif_JUMO_diraTRON116.md` :
-  - la ligne « Logique et calcul » (⬜) : ce plan y répond par la glue en C++
-    dans le template, et non par des fonctions logiques configurées au menu ;
+- `Comparatif_JUMO_diraTRON116.md` (mis à jour le 07/10/2026) :
+  - ✅ la ligne « Logique et calcul » est marquée faite, par la glue en C++
+    dans le template ;
   - le § 4 et le point 4 de la feuille de route, « Template universel
-    configurable par le menu » : c'est un sujet distinct, que ce plan ne
-    couvre pas ;
-  - le point 2 de la feuille de route, « Verrouillage et niveau opérateur » :
-    il contredit la décision 4.
+    configurable par le menu » : sujet distinct, que ce plan ne couvre pas ;
+  - ✅ « Verrouillage et niveau opérateur » est passé en volontairement non
+    retenu (décision 4).
 - `Revue_code_OPC_v0.2.md`, item 24 : voir 4.5.

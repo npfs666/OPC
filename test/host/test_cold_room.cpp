@@ -219,6 +219,24 @@ namespace
         CHECK_TRUE(bench.logged("Alarme Temp. haute : ACTIVE"));
     }
 
+    void testHighAlarmInManual()
+    {
+        // Compresseur forcé à l'arrêt, chambre à 10 °C : l'alarme haute
+        // surveille toujours la consigne réglée (3 °C + 4 K).
+        ColdRoomBench bench;
+        bench.setBool("cold_room_high_alarm", "enabled", true);
+        bench.setDiscrete("cold_room_high_alarm", "delay", 0);
+        bench.setDiscrete(
+            "cold_room_thermostat",
+            "operation",
+            static_cast<int32_t>(Thermostat::Operation::ForcedOff));
+        bench.setTemperature(AMBIENT, 10.0);
+
+        bench.advance(1810);
+        CHECK_FALSE(bench.compressor());
+        CHECK_TRUE(bench.logged("Alarme Temp. haute : ACTIVE"));
+    }
+
     void testManualCompressorDuringDefrost()
     {
         // Le mode manuel passe avant l'inhibition du dégivrage.
@@ -256,8 +274,11 @@ namespace
         // Ventilateurs : mode manuel.
         CHECK_TRUE(bench.parameter("cold_room_fans", "operation") != nullptr);
 
-        // Consigne réglable depuis l'accueil.
-        CHECK_TRUE(bench.installation.homeSetpoint() != nullptr);
+        // Consigne réglable depuis l'accueil, de -10 à 20 °C.
+        const Parameter* setpoint = bench.installation.homeSetpoint();
+        CHECK_TRUE(setpoint != nullptr &&
+                   setpoint->data.number.minimum == -10.0 &&
+                   setpoint->data.number.maximum == 20.0);
 
         // Durées et fin de dégivrage rangées sous « Dégivrage ».
         MenuBuilder menu;
@@ -294,6 +315,7 @@ void runColdRoomTests()
     TestHarness::run("chambre froide : sonde évaporateur en défaut", testEvaporatorFault);
     TestHarness::run("chambre froide : dégivrage désactivé", testDefrostDisabled);
     TestHarness::run("chambre froide : alarme haute masquée", testHighAlarmMasked);
+    TestHarness::run("chambre froide : alarme haute en manuel", testHighAlarmInManual);
     TestHarness::run("chambre froide : manuel pendant le dégivrage", testManualCompressorDuringDefrost);
     TestHarness::run("chambre froide : menu", testMenu);
 }

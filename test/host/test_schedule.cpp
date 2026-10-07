@@ -478,15 +478,23 @@ namespace
             thermostat.scheduledSetpoint.state() ==
                 ScheduledSetpoint::State::Comfort);
 
-        // Hors plage réglé sur Arrêt : sorties en état sûr.
+        // Hors plage réglé sur Arrêt : arrêt programmé, pas un défaut.
+        // Commande 0 valide, même sonde en défaut.
         thermostat.scheduledSetpoint.settings.outside =
             ScheduledSetpoint::Outside::Off;
         setClock(clock, MONDAY, 20);
         thermostat.update(3000);
-        CHECK_FALSE(thermostat.isCommandValid());
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
         CHECK_TRUE(
             thermostat.scheduledSetpoint.state() ==
                 ScheduledSetpoint::State::Off);
+
+        temperature.setReading(NAN, false);
+        thermostat.update(3500);
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
+        temperature.setReading(18.0);
 
         // Dérogation : marche forcée du programme.
         schedule.settings.mode = TimeSchedule::Mode::ForcedOn;
@@ -550,11 +558,13 @@ namespace
         pid.update(2000);
         CHECK_NEAR(pid.readCommand(), 0.0, 0.0001);
 
-        // Arrêt hors plage : état sûr puis reprise sans mémoire.
+        // Arrêt hors plage : arrêt programmé (commande 0 valide, pas un
+        // défaut), puis reprise sans mémoire.
         pid.scheduledSetpoint.settings.outside =
             ScheduledSetpoint::Outside::Off;
         pid.update(3000);
-        CHECK_FALSE(pid.isCommandValid());
+        CHECK_TRUE(pid.isCommandValid());
+        CHECK_NEAR(pid.readCommand(), 0.0, 0.0);
 
         setClock(clock, MONDAY, 12);
         pid.update(4000);

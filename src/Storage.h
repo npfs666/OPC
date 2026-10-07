@@ -2,21 +2,11 @@
 #define STORAGE_H
 
 #include <Hardware/pinout.h>
+#include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
 
 #include <ArduinoJson.h>
 #include <EventLog.h>
-
-class ParameterEditor;
-
-class ParameterRestoreValidator
-{
-public:
-    virtual ~ParameterRestoreValidator() = default;
-
-    virtual bool validateRestoredParameters(
-        const ParameterEditor& editor) const = 0;
-};
 
 class Storage
 {
@@ -24,10 +14,16 @@ public:
     enum class RestoreResult : uint8_t
     {
         Restored,
+        // Réglages refusés (hors plage, validation croisée) remis par
+        // défaut, propriétaire par propriétaire ; les autres sont restaurés.
+        PartiallyRestored,
         NoFile,
         InvalidFile,
         StorageUnavailable
     };
+
+    // Propriétaires remis par défaut gardés pour le journal.
+    static constexpr size_t MAX_RESET_OWNERS = 4;
 
     bool begin();
 
@@ -38,6 +34,13 @@ public:
         ParameterList& parameters,
         ParameterEditor& editor,
         const ParameterRestoreValidator& validator);
+
+    /**
+     * Après PartiallyRestored : nombre de propriétaires remis par défaut,
+     * et le premier réglage de chacun (MAX_RESET_OWNERS au plus).
+     */
+    size_t resetOwnerCount() const;
+    const Parameter* resetOwner(size_t index) const;
 
     bool save(
         const char* installationId,
@@ -93,6 +96,9 @@ private:
 
     bool mounted = false;
     bool usbExportStarted = false;
+
+    const Parameter* resetOwners[MAX_RESET_OWNERS] = {};
+    size_t resetOwnerTotal = 0;
     volatile bool usbDriveMounted = false;
     volatile bool usbExportPending = false;
 

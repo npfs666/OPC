@@ -73,7 +73,12 @@ public:
         const char* onLabel,
         const char* offLabel);
 
-    /** Un seul seuil, sans hystérésis : le seuil d'arrêt suit celui de marche. */
+    /**
+     * Un seul seuil, sans hystérésis : le seuil d'arrêt suit celui de marche.
+     * Pour un seuil qui déclenche un changement d'étape (fin de dégivrage) ;
+     * une condition qui pilote une sortie garde une hystérésis, sinon la
+     * sortie bat quand la mesure frôle le seuil.
+     */
     void useSingleThreshold();
 
     /**

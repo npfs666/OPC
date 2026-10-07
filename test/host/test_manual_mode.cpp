@@ -1,8 +1,11 @@
 #include "TestHarness.h"
 
+#include <Hardware/RTC.h>
 #include <Measurements/Temperature/Temperature.h>
+#include <Regulator/LimitAlarm.h>
 #include <Regulator/PID.h>
 #include <Regulator/Thermostat.h>
+#include <Regulator/TimeSchedule.h>
 #include <hmi/ParameterEditor.h>
 #include <hmi/ParameterList.h>
 
@@ -183,6 +186,116 @@ namespace
         CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
     }
 
+    void testRelativeAlarmsInManual()
+    {
+        // Chambre froide : 3 °C, alarme à consigne + 4 K, sans tempo.
+        ControlledTemperature temperature;
+        Thermostat thermostat;
+        thermostat.begin("thermostat", "Thermostat", temperature);
+        thermostat.settings.mode = Thermostat::Mode::Cooling;
+        thermostat.settings.setpoint = 3.0;
+        thermostat.settings.hysteresis = 2.0;
+
+        LimitAlarm alarm;
+        alarm.begin("alarm", "Temp. haute", temperature);
+        alarm.settings.enabled = true;
+        alarm.settings.type = LimitAlarm::Type::DeviationHigh;
+        alarm.settings.limit = 4.0;
+        alarm.setReference(thermostat);
+
+        temperature.set(3.0);
+        thermostat.update(0);
+        alarm.update(0);
+        CHECK_FALSE(alarm.isActive());
+
+        // Compresseur oublié à l'arrêt : la chambre se réchauffe, l'alarme
+        // surveille toujours la consigne réglée.
+        thermostat.settings.operation = Thermostat::Operation::ForcedOff;
+        temperature.set(15.0);
+        thermostat.update(1000);
+        alarm.update(1000);
+        CHECK_TRUE(alarm.isActive());
+
+        // En manuel, consigne réglée, sans rampe (qui repartirait de la
+        // mesure).
+        thermostat.setpointRamp.settings.enabled = true;
+        thermostat.update(2000);
+        double_t setpoint = 0.0;
+        CHECK_TRUE(thermostat.readSetpoint(setpoint));
+        CHECK_NEAR(setpoint, 3.0, 0.0);
+
+        // PID en manuel : consigne réglée, même désactivé (le manuel passe
+        // avant « Activé »).
+        PID pid;
+        pid.begin("pid", temperature);
+        pid.settings.setpoint = 50.0;
+        pid.settings.enabled = false;
+        pid.update(0);
+        CHECK_FALSE(pid.readSetpoint(setpoint));
+
+        pid.settings.operation = PID::Operation::Manual;
+        pid.update(1000);
+        CHECK_TRUE(pid.readSetpoint(setpoint));
+        CHECK_NEAR(setpoint, 50.0, 0.0);
+    }
+
+    void testScheduledSetpointInManual()
+    {
+        // Programme 08:00-18:00, consigne réduite 16 °C hors plage.
+        ControlledTemperature temperature;
+        ClockSample clock;
+        TimeSchedule schedule;
+        schedule.begin("prog", "Chauffe", clock);
+        schedule.settings.slots[0] = {
+            TimeSchedule::Days::Everyday, 8 * 60, 18 * 60
+        };
+
+        Thermostat thermostat;
+        thermostat.begin("thermostat", "Thermostat", temperature);
+        thermostat.settings.setpoint = 20.0;
+        thermostat.setSchedule(schedule, 16.0);
+        thermostat.settings.operation = Thermostat::Operation::ForcedOn;
+
+        temperature.set(18.0);
+        clock.dateTime.dayOfWeek = 1;
+        clock.dateTime.hour = 20;
+        clock.valid = true;
+        thermostat.update(0);
+
+        // Hors plage : la consigne réduite reste la référence.
+        double_t setpoint = 0.0;
+        CHECK_TRUE(thermostat.readSetpoint(setpoint));
+        CHECK_NEAR(setpoint, 16.0, 0.0);
+
+        clock.dateTime.hour = 10;
+        CHECK_TRUE(thermostat.readSetpoint(setpoint));
+        CHECK_NEAR(setpoint, 20.0, 0.0);
+
+        // Pas de consigne hors plage en « Arrêt », ni sans heure.
+        thermostat.scheduledSetpoint.settings.outside =
+            ScheduledSetpoint::Outside::Off;
+        clock.dateTime.hour = 20;
+        CHECK_FALSE(thermostat.readSetpoint(setpoint));
+
+        thermostat.scheduledSetpoint.settings.outside =
+            ScheduledSetpoint::Outside::Reduced;
+        clock.valid = false;
+        CHECK_FALSE(thermostat.readSetpoint(setpoint));
+
+        // La lecture ne change pas l'état affiché, mis à jour par update().
+        clock.valid = true;
+        thermostat.settings.operation = Thermostat::Operation::Auto;
+        thermostat.update(1000);
+        CHECK_TRUE(
+            thermostat.scheduledSetpoint.state() ==
+                ScheduledSetpoint::State::Reduced);
+        clock.dateTime.hour = 10;
+        CHECK_TRUE(thermostat.readSetpoint(setpoint));
+        CHECK_TRUE(
+            thermostat.scheduledSetpoint.state() ==
+                ScheduledSetpoint::State::Reduced);
+    }
+
     void testManualParametersAreNotSaved()
     {
         ControlledTemperature temperature;
@@ -292,6 +405,8 @@ void runManualModeTests()
     TestHarness::run("manuel : sortie PID fixee", testPIDManualOutput);
     TestHarness::run("manuel : retour PID sans a-coup", testPIDBumplessReturn);
     TestHarness::run("manuel : thermostat force", testThermostatManual);
+    TestHarness::run("manuel : alarmes relatives actives", testRelativeAlarmsInManual);
+    TestHarness::run("manuel : consigne programmee", testScheduledSetpointInManual);
     TestHarness::run("manuel : reglages non sauvegardes", testManualParametersAreNotSaved);
     TestHarness::run("menu : reglages de conduite", testLiveParameters);
 }

@@ -161,7 +161,10 @@ public:
     void update(uint32_t now) override;
     void resume(uint32_t now) override;
 
-    /** Consigne active, sauf PID arrêté ou autotune en cours. */
+    /**
+     * Consigne active, sauf PID arrêté ou autotune en cours. En manuel,
+     * consigne réglée (voir Regulator::readSetpoint()).
+     */
     bool readSetpoint(double_t& setpoint) const override;
 
     void readOutputLimits(
@@ -235,6 +238,13 @@ private:
 
     /** Comme holdController(), sans toucher à la commande. */
     void freezeController();
+
+    /**
+     * Arrêt commandé (PID désactivé, hors plage en « Arrêt ») : état remis
+     * à zéro, commande 0 valide. Ce n'est pas un défaut : les blocs qui
+     * dépendent du PID ne passent pas en état sûr.
+     */
+    void stopController();
 
     /*
      * Retour de manuel en automatique : au premier cycle, l'intégrale est

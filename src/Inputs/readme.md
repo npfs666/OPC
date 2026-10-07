@@ -85,27 +85,35 @@ diagnostic de câblage : un fil coupé est lu comme un état normal.
 
 ### Exemple : bloquer un régulateur
 
-Dans l'`update()` d'un régulateur personnalisé qui reçoit une référence vers
-l'entrée :
+Dans la glue de l'installation (`processLogic()`, voir « Ajouter de la glue »
+dans le README principal) :
 
 ```cpp
-if (!autorisation.isActive())
-{
-    invalidateCommand();   // les sorties passent en état sûr
-    return;
-}
-
-// calcul habituel de la commande...
+// Thermostat autorisé seulement quand le contact est fermé.
+thermostat.inhibit(!autorisation.isActive());
 ```
 
-Une entrée seule ne coupe **aucune** sortie : c'est au régulateur ou à
-l'actionneur d'utiliser son état.
+`inhibit()` arrête le régulateur sur ordre, sans toucher à ses réglages : sa
+commande vaut 0 et reste valide (ce n'est pas un défaut), et le mode manuel
+reste prioritaire. Sans glue, une entrée peut aussi :
 
-Un régulateur n'est mis à jour qu'à l'arrivée d'une nouvelle mesure ADC : sa
-réaction à l'entrée suit donc ce rythme. Pour réagir plus vite, placer la
-logique dans l'`update(now)` d'un actionneur personnalisé, exécuté à chaque
-tour de boucle. La condition doit alors être réappliquée à chaque tour : une
-écriture ponctuelle sur un relais serait écrasée par l'actionneur.
+- déclencher une alarme : `ConditionAlarm` liée à l'entrée (porte ouverte,
+  défaut externe) ;
+- acquitter les alarmes : `alarme.setAcknowledgeInput(entree)` (front
+  montant) ;
+- conditionner une sortie de la glue : `commande.dependsOn(entree)` met la
+  sortie en état sûr tant que l'entrée n'est pas valide.
+
+Une entrée seule ne coupe **aucune** sortie : c'est à la glue, au régulateur
+ou à l'actionneur d'utiliser son état.
+
+Les régulateurs et la glue ne sont mis à jour qu'à chaque cycle de mesure
+(à l'arrivée d'une nouvelle mesure ADC, ou chaque seconde sans entrée
+analogique) : leur réaction à l'entrée suit ce rythme. Pour réagir plus vite,
+placer la logique dans l'`update(now)` d'un actionneur personnalisé, exécuté
+à chaque tour de boucle. La condition doit alors être réappliquée à chaque
+tour : une écriture ponctuelle sur un relais serait écrasée par
+l'actionneur.
 
 ## Afficher l'état (écran d'accueil)
 

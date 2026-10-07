@@ -453,6 +453,12 @@ bool OPC::initMeasurements()
             "Configuration restored");
         break;
 
+    case Storage::RestoreResult::PartiallyRestored:
+        Serial.print("Configuration restored; groups reset to defaults: ");
+        Serial.println(
+            static_cast<unsigned>(storage.resetOwnerCount()));
+        break;
+
     case Storage::RestoreResult::NoFile:
         Serial.println(
             "No saved configuration; using defaults");
@@ -482,6 +488,7 @@ bool OPC::initMeasurements()
 
     refreshClock();
     logStartup();
+    logConfigurationRestore(restoreResult);
 
     input.startContinuous();
     controlCycleStarted = true;
@@ -851,6 +858,44 @@ void OPC::logStartup()
 
     mutex_enter_blocking(&processDataMutex);
     controller.logEvent(millis(), EventKind::Restart, true, "%s", text);
+    mutex_exit(&processDataMutex);
+}
+
+void OPC::logConfigurationRestore(Storage::RestoreResult result)
+{
+    mutex_enter_blocking(&processDataMutex);
+
+    if (result == Storage::RestoreResult::InvalidFile)
+    {
+        controller.logEvent(
+            millis(), EventKind::Fault, true,
+            "Config. non reprise : défauts");
+    }
+    else if (result == Storage::RestoreResult::PartiallyRestored)
+    {
+        // Groupes de réglages refusés (hors plage, validation croisée),
+        // remis par défaut : les autres réglages sont conservés.
+        const size_t count = storage.resetOwnerCount();
+
+        for (size_t i = 0; i < count && i < Storage::MAX_RESET_OWNERS; i++)
+        {
+            const Parameter* owner = storage.resetOwner(i);
+
+            controller.logEvent(
+                millis(), EventKind::Fault, true,
+                "Par défaut : %s",
+                owner != nullptr ? owner->ownerName : "?");
+        }
+
+        if (count > Storage::MAX_RESET_OWNERS)
+        {
+            controller.logEvent(
+                millis(), EventKind::Fault, true,
+                "Par défaut : %u autres groupes",
+                static_cast<unsigned>(count - Storage::MAX_RESET_OWNERS));
+        }
+    }
+
     mutex_exit(&processDataMutex);
 }
 
@@ -1324,9 +1369,11 @@ void OPC::handleControlMessage(
 
             const bool liveApplied = parameterEditor.apply();
 
+            // Pas d'onParametersApplied() : la régulation n'est pas
+            // interrompue (un autotune en cours continue, comme après un
+            // réglage de la consigne à l'accueil).
             if (liveApplied)
             {
-                userInstall.onParametersApplied();
                 controller.logEvent(
                     millis(), EventKind::Info, false, "Réglages modifiés");
             }

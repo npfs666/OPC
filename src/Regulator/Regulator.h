@@ -75,8 +75,9 @@ public:
 
     /**
      * Consigne active (rampe et programme compris), pour les alarmes
-     * relatives à la consigne. Faux si le régulateur n'en a pas, ou s'il
-     * est arrêté.
+     * relatives à la consigne. En manuel, consigne réglée (programme
+     * compris, sans rampe) : la surveillance continue. Faux si le
+     * régulateur n'en a pas, ou s'il est arrêté.
      */
     virtual bool readSetpoint(double_t& setpoint) const
     {

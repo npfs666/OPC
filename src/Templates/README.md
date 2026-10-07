@@ -140,8 +140,8 @@ d'échec : la cause s'affiche sur l'écran d'erreur de démarrage.
   `temporisation.setMenuParent("cle")` range un bloc dans le menu d'un autre
   propriétaire, **enregistré avant lui** (bloc ajouté avant au `process`, ou
   réglage du template enregistré avant `process.registerParameters()`).
-- Actions de menu : identifiants **1 à 31** (32 à 37, 48 à 64 et 70 sont
-  réservés).
+- Actions de menu : identifiants **1 à 31** (32 à 37, 48 à 64, 70 et 71
+  sont réservés).
 
 ### Écran d'accueil
 
@@ -157,10 +157,12 @@ d'échec : la cause s'affiche sur l'écran d'erreur de démarrage.
 
 ### Capacités
 
-16 mesures, 16 régulateurs (blocs compris), 16 actionneurs, 16 sorties,
-2 entrées TOR, 8 alarmes et 192 réglages ([pinout.h](../Hardware/pinout.h)).
-Un `TimeSchedule` utilise 19 réglages, une `LimitAlarm` 8, une
-`ConditionAlarm` 3.
+16 mesures, 32 régulateurs (blocs, alarmes et `LogicCommand` compris),
+16 actionneurs, 16 sorties, 2 entrées TOR, 8 alarmes et 192 réglages
+([pinout.h](../Hardware/pinout.h)). Un `TimeSchedule` utilise 19 réglages,
+une `LimitAlarm` 8, une `LoopBreakAlarm` 5, une `ConditionAlarm` 3. Les
+réglages de la carte (6 par sonde RTD, 13 de calibration) et de l'horloge
+(8) s'y ajoutent : le template solaire en utilise environ 120.
 
 ## 4. Les blocs de la glue
 

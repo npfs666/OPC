@@ -50,7 +50,7 @@ double_t PressureBMP580::pressureSeaLevel(
         pow(
             1.0 -
                 ((0.0065 * altitude) /
-                 (temperature + 273.14)),
+                 (temperature + 273.15)),
             5.255);
 }
 

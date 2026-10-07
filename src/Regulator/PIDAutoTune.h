@@ -117,6 +117,16 @@ public:
     uint8_t getCompletedCycles() const;
     const Result& getResult() const;
 
+    /**
+     * Cohérence propre des réglages d'essai (bornes, durées, règle), sans
+     * le PID : vérifiée à la validation du menu.
+     */
+    static bool settingsAreConsistent(const Settings& settings);
+
+    /**
+     * Réglages cohérents et compatibles avec le PID : consigne à l'intérieur
+     * de la plage de mesure, sorties dans les limites. Vérifié au lancement.
+     */
     static bool settingsAreValid(
         const Settings& settings,
         double_t setpoint,

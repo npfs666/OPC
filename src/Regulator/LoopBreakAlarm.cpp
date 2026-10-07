@@ -168,7 +168,16 @@ void LoopBreakAlarm::update(uint32_t now)
         confirmed = windowElapsed;
     }
 
-    applyCondition(confirmed, settings.latching);
+    /*
+     * Mise en sécurité : toujours mémorisée. Sorties en sécurité, la boucle
+     * n'est plus surveillée et ne peut pas montrer qu'elle s'est refermée ;
+     * sans mémorisation, l'alarme retomberait au cycle suivant et la sortie
+     * repartirait en butée. L'acquittement lève la sécurité et relance la
+     * surveillance.
+     */
+    applyCondition(
+        confirmed,
+        settings.latching || settings.safeState);
 }
 
 void LoopBreakAlarm::registerParameters(ParameterList& list)

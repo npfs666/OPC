@@ -268,7 +268,9 @@ chaque cycle. Rien n'est journalisé.
   inhibé). À la levée, il repart comme une réactivation : intégrale nulle,
   rampe repartie de la mesure.
 - **Programme horaire** : sortie 0 quelle que soit la plage.
-  `isActive()`, lu par la glue, n'est pas modifié.
+  `isActive()`, lu par la glue, n'est pas modifié ; un thermostat ou un PID
+  dont il pilote la consigne (`setSchedule()`) le lit aussi et n'est donc
+  pas affecté : inhiber ce régulateur lui-même.
 - **Comparateur, temporisation** : à l'arrêt ; à la levée, ils repartent de
   zéro.
 - Une **alarme de boucle ouverte** ne surveille pas un régulateur inhibé ; sa
@@ -349,15 +351,15 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 | `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
+| `TestInstallation` (`testInstallation.h`) | Développement du psychromètre : température sèche (PT100 4 fils, ou thermocouple K avec `INPUT1_IS_THERMOCOUPLE`), température humide (PT100 4 fils), pression BMP580 (obligatoire) et humidité relative ; aucune sortie |
 
 ### PID et autotune
 
 Le menu `Regulateur` du template PID contient :
 
 - **PID** : commande `Auto` / `Manuel` et sortie manuelle (voir
-  [Mode manuel](#mode-manuel)), activation, mode (`Chauffage` /
-  `Refroidissement`), consigne, `Kp`, `Ti`, `Td`, limites de sortie, repli
-  sur défaut de sonde ;
+  [Mode manuel](#mode-manuel)), `Activé`, mode (`Chaud` / `Froid`),
+  consigne, `Kp`, `Ti`, `Td`, limites de sortie, repli sur défaut de sonde ;
 - **Rampe PID** : limitation de la vitesse de variation de la consigne
   (°C/min) ;
 - **PID autotune** : paramètres de l'essai, règle de calcul des gains et
@@ -385,12 +387,12 @@ changer cette plage avec `setSetpointLimits()`.
 > ou relancer l'autotune.
 
 Pour un **réglage manuel** : saisir les gains dans `Regulateur > PID`, passer
-`Régulation active` à `Oui` et quitter le menu.
+`Activé` à `Oui` et quitter le menu.
 
 Pour un **réglage automatique** :
 
-1. choisir le bon mode dans `Regulateur > PID` (`Chauffage` si la sortie fait
-   monter la température, `Refroidissement` sinon) ;
+1. choisir le bon mode dans `Regulateur > PID` (`Chaud` si la sortie fait
+   monter la température, `Froid` sinon) ;
 2. régler les limites de l'essai dans `Regulateur > PID autotune` ;
 3. sélectionner `Lancer autotune`.
 
@@ -408,11 +410,22 @@ Les gains sont copiés dans le PID et sauvegardés ; le port série affiche `Ku`
 `Tu` et les gains obtenus. Le PID reste arrêté : relire les gains puis
 activer la régulation manuellement. L'essai s'interrompt et met la sortie en
 sécurité en cas de mesure invalide, de dépassement des limites, de timeout ou
-d'oscillations instables.
+d'oscillations instables. Il s'interrompt aussi quand des réglages du menu
+sont appliqués, ou au passage en `Manuel`. La consultation du menu ne
+l'interrompt pas, ni les autres réglages de conduite (consigne, au menu ou à
+l'accueil, seuil d'entretien).
+
+La consigne doit se trouver entre `Mesure min` et `Mesure max`, à la
+demi-bande près, et les sorties de l'essai dans les limites du PID. Ces
+conditions ne sont vérifiées qu'au lancement : hors de la plage d'essai,
+l'essai est refusé (`TUNE ERREUR` à l'accueil) et le PID reste arrêté. La
+consigne, elle, reste réglable dans toute sa plage. `Mesure min` et
+`Mesure max` suivent la plage de consigne donnée par `setSetpointLimits()`
+(un four à 600 °C peut donc être réglé par autotune).
 
 > - La règle `Z-N classique` peut être agressive : commencer avec une
 >   puissance et une plage de température prudentes.
-> - Ne jamais choisir `Refroidissement` avec un chauffage raccordé.
+> - Ne jamais choisir `Froid` avec un chauffage raccordé.
 > - Un compresseur ne doit pas être piloté avec la période de 10 s de ce
 >   template : allonger la période et régler `Marche mini` et `Arrêt mini`
 >   sur son relais (voir [Outputs/README.md](src/Outputs/README.md)).
@@ -480,8 +493,12 @@ paramètres. Le programme est ajouté au `ProcessControl` pour apparaître dans
 le menu, mais il n'est relié à aucun actionneur. Le menu du régulateur gagne :
 
 - **Cons. réduite** : consigne appliquée hors plage ;
-- **Hors plage** : `Réduite` ou `Arrêt` (sorties en état sûr, PID remis à
-  zéro pour repartir sans à-coup).
+- **Hors plage** : `Réduite` ou `Arrêt`. L'arrêt programmé est un arrêt
+  commandé, pas un défaut : commande à 0 (valide), comme une
+  [inhibition](#inhibition-par-la-glue) ou un PID non `Activé`, et PID
+  remis à zéro pour repartir sans à-coup. Les blocs reliés au régulateur
+  (post-circulation, dépendances de la glue) ne le prennent donc pas pour
+  une panne.
 
 La rampe de consigne, si elle est activée, adoucit les passages réduite →
 normale. Les modes `Marche forcée` / `Arrêt forcé` du programme servent de
@@ -498,8 +515,9 @@ comparateurs donnent les conditions, et quelques lignes de glue
   solaire`) :
   - **charge** quand le capteur est plus chaud que le bas du ballon
     (`Charge` : marche à 8 K, arrêt à 4 K), que le capteur atteint
-    `Temp. capteur min` (20 °C) et que le haut du ballon reste sous
-    `Temp. ballon max` (80 °C) ;
+    `Temp. capteur min` (20 °C, jusqu'à `Arrêt capteur`, 17 °C) et que le
+    haut du ballon reste sous `Temp. ballon max` (80 °C, reprise à
+    `Reprise ballon`, 77 °C) ;
   - **décharge nocturne en mode vacances** : sans puisage, un ballon solaire
     surchauffe en quelques jours. Pendant les plages du programme
     `Programmation > Décharge nuit` (23:00 à 06:00 par défaut), la pompe fait
@@ -531,8 +549,10 @@ pumpCommand.setOn(charging || discharging);
 ```
 
 Chaque comparateur garde sa propre hystérésis : quand `Temp. ballon max`
-interrompt la charge, elle reprend dès que le ballon redescend si l'écart
-est encore au-dessus de `Delta arrêt`.
+interrompt la charge, elle reprend dès que le ballon redescend à
+`Reprise ballon` si l'écart est encore au-dessus de `Delta arrêt`. Les
+limites ont deux seuils : avec un seul, la pompe battrait à chaque cycle
+tant que la mesure frôle la limite (ballon plein qui refroidit lentement).
 
 L'écran d'accueil affiche `DECHARGE` ou `VACANCES` à la place de l'état de la
 pompe, ainsi que l'état de l'appoint.
@@ -543,7 +563,8 @@ pompe, ainsi que l'état de l'appoint.
 2 à 4 °C) :
 
 - **Relais 1, compresseur** : thermostat en froid sur la sonde d'ambiance
-  (consigne 3 °C, hystérésis 2 K, réglable à l'accueil), arrêt mini de 3 min
+  (consigne 3 °C, réglable de -10 à 20 °C, à l'accueil comme au menu ;
+  hystérésis 2 K), arrêt mini de 3 min
   contre les cycles courts ;
 - **Relais 2, ventilateurs** de l'évaporateur ;
 - **PWM 1, résistance de dégivrage** par un relais statique (commande de
@@ -568,6 +589,7 @@ dégivrage.
 Alarmes, à activer dans `Alarmes` : `Porte ouverte` (5 min) et `Temp. haute`
 (consigne + 4 K pendant 15 min), masquée hors `FROID` et pendant
 `Masquage alarme` (30 min) après le retour en froid, comme au démarrage.
+`Temp. haute` reste active quand le compresseur est forcé en manuel.
 
 L'écran d'accueil affiche l'étape, l'ambiance, la consigne, l'évaporateur,
 le compresseur, les ventilateurs (`PORTE` porte ouverte) et le temps restant
@@ -606,8 +628,10 @@ Notes sur les mesures :
 
   Pour changer la valeur par défaut dans une installation, après
   `begin()` : `sonde.settings.range = Sensor::Range::Extended;`. La consigne
-  d'un PID est limitée à 250 °C par défaut : l'élargir avec
-  `setSetpointLimits()`.
+  d'un PID est limitée à -50..250 °C par défaut, celle d'un thermostat
+  (consigne réduite comprise) à 0..200 °C : changer ces plages avec
+  `setSetpointLimits()`, après `begin()` (un four, une chambre négative).
+  Elles bornent aussi le réglage à l'accueil.
 - **Filtre d'entrée** (`Input > <sonde> > Filtre`) : filtre numérique du
   2e ordre, H = 1 / (1 + τs)², de constante τ réglable de 0 à 100,0 s
   (0 par défaut, sans filtre), comme sur les régulateurs compacts. Il
@@ -618,9 +642,11 @@ Notes sur les mesures :
   relancer l'autotune après l'avoir modifié.
 
 Les tailles des listes internes sont fixes (pas d'allocation dynamique) et
-réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 16 régulateurs,
+réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 32 régulateurs
+(comparateurs, temporisations, alarmes et commandes de la glue compris),
 16 actionneurs, 16 sorties, 2 entrées numériques, 8 alarmes, 192 paramètres
-(un `TimeSchedule` en utilise 19, une `LimitAlarm` 8, une `ConditionAlarm` 3).
+(un `TimeSchedule` en utilise 19, une `LimitAlarm` 8, une `LoopBreakAlarm` 5,
+une `ConditionAlarm` 3).
 
 ### Comparateur
 
@@ -632,7 +658,10 @@ deux seuils, avec hystérésis. Sa commande vaut 1 en marche, 0 à l'arrêt :
   quand elle redescend au seuil d'arrêt, seuils compris ; entre les deux,
   l'état est conservé. **En dessous** : l'inverse.
 - `useSingleThreshold()` : un seul réglage, sans hystérésis (marche au-delà
-  du seuil, seuil compris).
+  du seuil, seuil compris). À réserver à un seuil qui déclenche un
+  changement d'étape (fin de dégivrage) : une condition qui pilote une
+  sortie a besoin d'une hystérésis, sinon la sortie bat tant que la mesure
+  frôle le seuil.
 - Une mesure en défaut rend la commande invalide. Au retour de la mesure, ou
   après une reprise du menu, le comparateur repart de l'arrêt.
 - Réglages dans `Regulateur > <nom>` : `Seuil marche` et `Seuil arrêt`
@@ -686,8 +715,11 @@ commandeCirculateur.begin("cde_circ", "Cde circulateur", postCirculation);
 const bool degivrer = intervalle.run(etat == Etat::Froid, now);
 ```
 
-Avec une source, une commande invalide de la source rend la temporisation
-invalide (état sûr de ses sorties) et la remet à zéro.
+Avec une source, une commande invalide de la source (défaut de sonde, heure
+inconnue) rend la temporisation invalide (état sûr de ses sorties) et la
+remet à zéro. Un arrêt commandé de la source (consigne atteinte, inhibition,
+PID non `Activé`, fin de plage d'un programme réglé sur `Arrêt`) laisse la
+post-circulation s'écouler.
 
 ## Utilisation
 
@@ -705,16 +737,18 @@ valeur invalide reste dans le menu pour correction.
 Exception : les **réglages de conduite** sont appliqués sans arrêter la
 régulation (ni pause de l'acquisition, ni état sûr), quand ce sont les seuls
 réglages modifiés : consigne et consigne réduite, `Commande` (Auto / Manuel /
-Marche / Arrêt) et `Sortie man.` du PID et du thermostat. Ils sont ensuite
-sauvegardés par la boucle de contrôle. Si un autre réglage est modifié en même
-temps, l'application complète s'applique à l'ensemble. Une installation
+Marche / Arrêt) et `Sortie man.` du PID et du thermostat, `Commande` des
+sorties de la glue (`LogicCommand`), et `Seuil entret.` des relais. Ils sont
+ensuite sauvegardés par la boucle de contrôle. Si un autre réglage est modifié
+en même temps, l'application complète s'applique à l'ensemble. Une installation
 marque ses propres réglages de conduite avec `parameterList.setLive(clé
 propriétaire, clé)`.
 
 ### Consigne depuis l'accueil
 
 Comme les touches ▲/▼ d'un régulateur compact, l'encodeur règle la consigne
-directement depuis l'écran d'accueil (templates thermostat et PID) :
+directement depuis l'écran d'accueil (templates thermostat, PID et chambre
+froide) :
 
 - tourner : la consigne s'affiche en jaune et change d'un pas (0,1 °C) par
   cran, dans le même sens que l'édition d'une valeur dans le menu ; une
@@ -755,6 +789,11 @@ affiche `MANUEL` en orange. Passer d'Auto à Manuel, revenir, ou changer la
 sortie manuelle n'interrompt pas les sorties : ce sont des réglages de
 conduite (voir [Menu](#menu)).
 
+Les [alarmes](#alarmes) relatives à la consigne du PID ou du thermostat
+restent actives en manuel : elles surveillent la consigne réglée, comme une
+chambre froide qui se réchauffe parce que son compresseur a été laissé à
+`Arrêt`.
+
 Le mode manuel n'est **pas sauvegardé** : au démarrage, la régulation repart
 toujours en Auto.
 
@@ -768,6 +807,7 @@ clic revient au menu.
 | Événement | Exemple | Conservé en flash |
 | --- | --- | --- |
 | Démarrage et sa cause | `Mise sous tension`, `Redémarrage (watchdog)`, `Redémarrage (baisse tension)` | oui |
+| Réglages remis par défaut au démarrage (voir [Configuration](#configuration-et-usb)) | `Par défaut : PID autotune`, `Config. non reprise : défauts` | oui |
 | Défaut de sonde et sa fin | `Temperature : RUPTURE`, `Temperature : OK` | oui |
 | Alarme | `Alarme Temp. haute : ACTIVE`, `MEMORISEE`, `FIN` | oui |
 | Acquittement, remise à zéro, actions du menu | `Alarmes acquittées`, `RAZ compteurs Relais 1`, `Action : Mesurer N0 E1` | oui |
@@ -854,6 +894,19 @@ la carte apparaît comme un petit disque USB contenant une copie `config.json`,
 en plus du port série. Cette copie est **en lecture seule** : la modifier
 depuis le PC ne change pas la configuration.
 
+Au démarrage, un réglage refusé ne fait pas perdre toute la configuration :
+- une valeur hors de sa plage (plage réduite par une mise à jour, par
+  exemple) revient seule à sa valeur par défaut ;
+- un groupe de réglages refusé par une vérification croisée (seuils d'un
+  comparateur inversés, deux sorties sur la même broche...) revient
+  entièrement par défaut ;
+- les autres réglages, calibrations comprises, sont conservés.
+
+Le journal indique chaque groupe remis par défaut (`Par défaut : <groupe>`).
+Un fichier d'une autre installation ou d'un format incompatible n'est pas
+repris : tous les réglages sont alors par défaut
+(`Config. non reprise : défauts`).
+
 ## Défauts de mesure
 
 Chaque mesure porte un état (`getStatus()`, `MeasurementStatus`) en plus de
@@ -914,8 +967,9 @@ ainsi, comme la pompe du template solaire).
 ## Alarmes
 
 Une `LimitAlarm` surveille une mesure, sur le modèle des fonctions d'alarme
-des régulateurs compacts. Les templates thermostat, PID et solaire en ont une,
-**désactivée par défaut**, affichée seulement : menu `Alarmes > <nom>`.
+des régulateurs compacts. Les templates thermostat, PID, solaire et chambre
+froide en ont une, **désactivée par défaut**, affichée seulement : menu
+`Alarmes > <nom>`.
 
 | Type | Alarme quand |
 | --- | --- |
@@ -927,8 +981,15 @@ des régulateurs compacts. Les templates thermostat, PID et solaire en ont une,
 
 Les types relatifs lisent la consigne active (rampe et programme compris) du
 régulateur de référence donné par `setReference()` ; sans référence, seuls
-`Max` et `Min` sont proposés. Quand ce régulateur est arrêté, l'alarme
-relative est suspendue.
+`Max` et `Min` sont proposés.
+
+- En [mode manuel](#mode-manuel), ils lisent la consigne réglée, programme
+  compris, sans rampe : la surveillance continue pendant que l'opérateur a
+  la main, même si le PID n'est pas `Activé`.
+- Quand le régulateur n'a pas de consigne, l'alarme relative est suspendue :
+  en automatique, PID non `Activé` ou régulateur inhibé par la glue ; dans
+  tous les modes, hors plage d'un programme réglé sur `Arrêt`, ou heure
+  inconnue.
 
 Réglages :
 
@@ -982,16 +1043,22 @@ Réglages (menu `Alarmes > Boucle`) :
 | `Active` | Non | L'alarme n'a aucun effet tant qu'elle est désactivée |
 | `Temps détect.` | 0 (automatique) | 0 = 2 × Ti du PID (au moins 60 s), 600 s pour un thermostat. Sinon, durée en secondes |
 | `Variation min.` | 2 °C | Rapprochement attendu pendant la fenêtre, et bande autour de la consigne sans surveillance |
-| `Mémorisation` | Oui | L'alarme reste signalée jusqu'à l'acquittement |
+| `Mémorisation` | Oui | L'alarme reste signalée jusqu'à l'acquittement. Toujours le cas avec `Mise en sécu.` |
 | `Mise en sécu.` | Oui | Sorties du régulateur en état sûr tant que l'alarme est signalée |
 
 Avec `Mise en sécu.`, le régulateur est **verrouillé** jusqu'à l'acquittement
 (`Alarmes > Acquitter`) : sa commande est invalide, ses sorties en état sûr,
 l'écran PID affiche `SECURITE` et le PID fige son intégrale. Le verrouillage
 ne s'applique qu'en régulation automatique : en manuel, l'opérateur garde la
-main. Sans mémorisation, la sécurité se lève avec sa cause et la surveillance
-reprend : l'alarme revient après un nouveau temps de détection si la boucle
-est toujours ouverte.
+main.
+
+L'alarme est alors toujours mémorisée, même avec `Mémorisation` à Non :
+sorties en sécurité, la boucle ne peut pas montrer qu'elle s'est refermée.
+Sans cela, la sécurité retomberait au cycle suivant, et la sortie repartirait
+en butée pour tout un temps de détection. L'acquittement lève la sécurité et
+relance la surveillance : l'alarme revient après un nouveau temps de
+détection si la boucle est toujours ouverte. Sans mise en sécurité,
+`Mémorisation` à Non fait cesser l'alarme avec sa cause.
 
 L'alarme est **optionnelle** : un régulateur sans `LoopBreakAlarm` reliée
 n'est jamais verrouillé. Les templates PID et thermostat en déclarent une,

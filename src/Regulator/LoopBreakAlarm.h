@@ -44,6 +44,7 @@ public:
 
         // Sorties du régulateur en sécurité tant que l'alarme est signalée
         // (en régulation automatique : le mode manuel garde la main).
+        // L'alarme est alors toujours mémorisée, quel que soit latching.
         bool safeState = true;
     };
 

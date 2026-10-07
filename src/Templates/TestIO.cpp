@@ -87,13 +87,13 @@ bool TestIO::begin(
         Sensor::Type::Pt100, Sensor::Wiring::FourWire, 16, 0.0f);
 
     if (!board.addSensor(pt100Input))
-        return false;
+        return fail("PT100 : entrée analogique indisponible");
 
     pt100Resistance.begin("Resistance PT100", board, pt100Input);
     pt100Temperature.begin("Temperature PT100", pt100Resistance);
 
     if (!process.add(pt100Resistance) || !process.add(pt100Temperature))
-        return false;
+        return fail("Mesures PT100 non enregistrées");
 
     const uint8_t inputPins[] = {
         Board::Rp2040::DIGITAL_INPUT_1, Board::Rp2040::DIGITAL_INPUT_2
@@ -117,7 +117,7 @@ bool TestIO::begin(
         commands[i].begin(COMMAND_KEYS[i], commandNames[i]);
 
         if (!commands[i].dependsOn(inputs[i]))
-            return fail("Dependance commande impossible");
+            return fail("Dépendance commande impossible");
 
         relayActuators[i].begin(relayNames[i], commands[i]);
         pwmActuators[i].begin(pwmNames[i], commands[i]);
@@ -129,14 +129,14 @@ bool TestIO::begin(
             !process.connect(relayActuators[i], relays[i]) ||
             !process.connect(pwmActuators[i], pwms[i]))
         {
-            return false;
+            return fail("Entrées et sorties non reliées");
         }
     }
 
     // Fonctions fictives de la glue : la commande 2 dépend aussi de la PT100
     // et n'a pas de mode manuel.
     if (!commands[1].dependsOn(pt100Temperature))
-        return fail("Dependance PT100 impossible");
+        return fail("Dépendance PT100 impossible");
 
     commands[1].disableManualMode();
 
@@ -153,7 +153,10 @@ bool TestIO::begin(
         parameter->persistent = false;
     }
 
-    return !parameterList.hasError();
+    if (parameterList.hasError())
+        return fail("Paramètres TestIO invalides");
+
+    return true;
 }
 
 bool TestIO::addMenuActions(MenuBuilder& menu) const

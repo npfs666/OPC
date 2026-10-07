@@ -226,7 +226,10 @@ bool PIDInstallation::begin(
 
 void PIDInstallation::onParametersApplied()
 {
-    /* Appliquer des réglages interrompt l'essai ; la consultation le laisse tourner. */
+    /*
+     * Appliquer des réglages interrompt l'essai ; la consultation et les
+     * réglages de conduite (consigne, seuil d'entretien) le laissent tourner.
+     */
     pid.cancelAutoTune();
 }
 

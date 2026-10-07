@@ -214,6 +214,9 @@ private:
     void logStartup();
     void saveEvents();
 
+    // Cœur contrôle : réglages illisibles ou remis par défaut, au journal.
+    void logConfigurationRestore(Storage::RestoreResult result);
+
     // Cœur UI : visionneuse du journal.
     void openEventLog();
     void eventLogPoll(int32_t movement, bool clicked);

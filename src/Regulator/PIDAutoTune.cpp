@@ -218,6 +218,22 @@ bool PIDAutoTune::settingsAreValid(
         return false;
     }
 
+    if (!settingsAreConsistent(settings))
+        return false;
+
+    if (settings.outputLow < outputMinimum ||
+        settings.outputHigh > outputMaximum)
+    {
+        return false;
+    }
+
+    return
+        setpoint - settings.noiseBand > settings.inputMin &&
+        setpoint + settings.noiseBand < settings.inputMax;
+}
+
+bool PIDAutoTune::settingsAreConsistent(const Settings& settings)
+{
     if (!ruleIsSupported(settings.rule))
         return false;
 
@@ -232,19 +248,13 @@ bool PIDAutoTune::settingsAreValid(
         return false;
     }
 
-    if (settings.outputLow < outputMinimum ||
-        settings.outputHigh > outputMaximum ||
+    // La plage de mesure doit pouvoir contenir une consigne et sa demi-bande.
+    if (settings.outputLow < 0.0 ||
+        settings.outputHigh > 1.0 ||
         settings.outputLow >= settings.outputHigh ||
         settings.noiseBand <= 0.0 ||
-        settings.inputMin >= settings.inputMax)
-    {
-        return false;
-    }
-
-    if (setpoint - settings.noiseBand <=
-            settings.inputMin ||
-        setpoint + settings.noiseBand >=
-            settings.inputMax)
+        settings.inputMax - settings.inputMin <=
+            2.0 * settings.noiseBand)
     {
         return false;
     }

@@ -5,6 +5,7 @@
 #include <ProcessSnapshot.h>
 #include <Regulator/LoopBreakAlarm.h>
 #include <Regulator/PID.h>
+#include <Regulator/Thermostat.h>
 #include <hmi/AlarmDisplay.h>
 #include <hmi/ParameterList.h>
 
@@ -346,6 +347,74 @@ namespace
         CHECK_FALSE(alarm.isActive());
     }
 
+    void testSafeStateAlwaysLatches()
+    {
+        // Thermostat de chauffage, résistance grillée : la mesure reste à
+        // 30 °C pour 50 °C de consigne. Mise en sécurité sans mémorisation.
+        ControlledTemperature temperature;
+        Thermostat thermostat;
+        thermostat.begin("thermostat", "Thermostat", temperature);
+        thermostat.settings.setpoint = 50.0;
+
+        LoopBreakAlarm alarm;
+        alarm.begin("loop", "Boucle", temperature, thermostat);
+        alarm.settings.enabled = true;
+        alarm.settings.detectionTime = 60;
+        alarm.settings.latching = false;
+        alarm.settings.safeState = true;
+
+        ProcessControl process;
+        CHECK_TRUE(process.add(temperature));
+        CHECK_TRUE(process.add(thermostat));
+        CHECK_TRUE(process.add(alarm));
+
+        temperature.set(30.0);
+        uint32_t now = 0;
+        uint32_t safeSeconds = 0;
+
+        for (; now <= 200000; now += 1000)
+        {
+            process.updateMeasurementsAndRegulators(now);
+
+            if (!thermostat.isCommandValid())
+                safeSeconds++;
+        }
+
+        // La sécurité tient jusqu'à l'acquittement : plus de chauffe à 100 %
+        // entre deux fenêtres de détection.
+        CHECK_TRUE(alarm.isActive());
+        CHECK_TRUE(alarm.isLatched());
+        CHECK_TRUE(thermostat.isInterlocked());
+        CHECK_TRUE(safeSeconds >= 135);
+
+        // Acquittement : sécurité levée, surveillance relancée ; la boucle
+        // toujours ouverte redéclenche après un nouveau temps de détection.
+        process.acknowledgeAlarms();
+        CHECK_FALSE(thermostat.isInterlocked());
+        process.updateMeasurementsAndRegulators(now += 1000);
+        CHECK_TRUE(thermostat.isCommandValid());
+        CHECK_NEAR(thermostat.readCommand(), 1.0, 0.0);
+
+        for (uint32_t end = now + 61000; now < end; )
+            process.updateMeasurementsAndRegulators(now += 1000);
+
+        CHECK_TRUE(thermostat.isInterlocked());
+
+        // Sans mise en sécurité, le réglage Mémorisation s'applique :
+        // l'alarme cesse avec sa cause.
+        alarm.settings.safeState = false;
+        process.acknowledgeAlarms();
+
+        for (uint32_t end = now + 61000; now < end; )
+            process.updateMeasurementsAndRegulators(now += 1000);
+
+        CHECK_TRUE(alarm.isActive());
+        CHECK_FALSE(thermostat.isInterlocked());
+        temperature.set(49.0);
+        process.updateMeasurementsAndRegulators(now += 1000);
+        CHECK_FALSE(alarm.isActive());
+    }
+
     void testLongSaturation()
     {
         ControlledTemperature temperature;
@@ -374,5 +443,6 @@ void runLoopBreakTests()
     TestHarness::run("boucle ouverte : butee basse et froid", testLowSaturationAndCooling);
     TestHarness::run("boucle ouverte : options", testOptions);
     TestHarness::run("boucle ouverte : verrouillage du PID", testPIDInterlock);
+    TestHarness::run("boucle ouverte : mise en sécurité mémorisée", testSafeStateAlwaysLatches);
     TestHarness::run("boucle ouverte : saturation de plus de 49 jours", testLongSaturation);
 }

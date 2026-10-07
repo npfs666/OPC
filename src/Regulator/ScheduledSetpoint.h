@@ -10,7 +10,8 @@ class TimeSchedule;
  * Option de programmation horaire d'un régulateur à consigne.
  *
  * Pendant une plage du programme, la consigne normale (confort) s'applique.
- * Hors plage : consigne réduite, ou régulation arrêtée (sorties en état sûr).
+ * Hors plage : consigne réduite, ou régulation arrêtée (arrêt commandé : le
+ * régulateur écrit une commande 0 valide, ce n'est pas un défaut).
  * Sans programme attaché, la consigne normale s'applique toujours.
  *
  * Heure inconnue en mode Auto : régulation arrêtée. L'écran d'accueil affiche
@@ -59,6 +60,14 @@ public:
         double_t setpoint,
         double_t& target);
 
+    /**
+     * Comme update(), sans mettre à jour l'état : consigne programmée lue
+     * par les alarmes relatives, régulateur en manuel.
+     */
+    bool readTarget(
+        double_t setpoint,
+        double_t& target) const;
+
     State state() const;
 
     static const char* stateName(State state);
@@ -73,6 +82,11 @@ public:
         const char* unit);
 
 private:
+    /** État du programme à l'instant présent, et consigne à appliquer. */
+    State evaluate(
+        double_t setpoint,
+        double_t& target) const;
+
     const TimeSchedule* schedule = nullptr;
     State currentState = State::Unscheduled;
 };

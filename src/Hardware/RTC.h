@@ -187,8 +187,9 @@ private:
         const ParameterEditor& editor,
         DateTime& dateTime) const;
 
+    // Distinct des actions d'OPC (48 : « Acquitter », 70 : journal).
     static constexpr MenuBuilder::ActionId
-        SET_DATE_TIME_ACTION = 48;
+        SET_DATE_TIME_ACTION = 71;
 
     static uint8_t toBcd(uint8_t value);
 

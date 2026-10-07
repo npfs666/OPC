@@ -8,7 +8,7 @@
 // Maxixum array sizes
 #define MAX_MEASUREMENTS 16 // Used in ProcessControl
 #define MAX_DIGITAL_INPUTS 2 // Entrées numériques gérées par ProcessControl
-#define MAX_REGULATORS 16   // Used in ProcessControl
+#define MAX_REGULATORS 32   // Used in ProcessControl (blocs et alarmes compris)
 #define MAX_ACTUATORS 16    // Used in ProcessControl
 #define MAX_OUTPUTS 4       // Maximum outputs connected to one Actuator
 #define MAX_REGISTERED_OUTPUTS 16 // Outputs managed by ProcessControl

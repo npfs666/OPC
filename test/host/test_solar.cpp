@@ -62,9 +62,16 @@ namespace
         bench.setTemperatures(60.0, 80.5, 40.0);
         CHECK_FALSE(bench.pump());
 
-        // Capteur sous 20 °C : pas de charge, même avec un écart suffisant.
-        bench.setTemperatures(19.5, 5.0, 5.0);
+        // Capteur sous « Arrêt capteur » (17 °C) : pas de charge, même avec
+        // un écart suffisant.
+        bench.setTemperatures(16.5, 5.0, 5.0);
         CHECK_FALSE(bench.pump());
+
+        // Hystérésis : reprise seulement dès « Temp. capteur min » (20 °C).
+        bench.setTemperature(COLLECTOR, 19.5);
+        CHECK_FALSE(bench.pump());
+        bench.setTemperature(COLLECTOR, 20.5);
+        CHECK_TRUE(bench.pump());
 
         // Sonde en défaut : la pompe s'arrête.
         bench.setTemperatures(60.0, 40.0, 40.0);
@@ -83,13 +90,43 @@ namespace
         bench.setTemperature(TANK_TOP, 80.5);
         CHECK_FALSE(bench.pump());
 
+        // Hystérésis : le ballon doit redescendre à « Reprise ballon » (77 °C).
+        bench.setTemperatures(45.0, 79.5, 40.0);
+        CHECK_FALSE(bench.pump());
+
         /*
          * Limite levée avec un écart de 5 K, entre arrêt et démarrage : le
          * différentiel est resté en marche, la charge reprend. L'ancien
          * SolarRegulator attendait de nouveau l'écart de démarrage.
          */
-        bench.setTemperatures(45.0, 79.5, 40.0);
+        bench.setTemperatures(45.0, 76.5, 40.0);
         CHECK_TRUE(bench.pump());
+    }
+
+    void testNoChatterAtTankMaximum()
+    {
+        // Haut du ballon qui plafonne à 80 °C, bruit de mesure de ±0,01 °C :
+        // une seule manœuvre de la pompe (l'arrêt), au lieu d'une par cycle.
+        SolarBench bench;
+        bench.setTemperatures(100.0, 79.0, 40.0);
+        CHECK_TRUE(bench.pump());
+
+        bool previous = true;
+        size_t switches = 0;
+
+        for (size_t i = 0; i < 60; i++)
+        {
+            bench.setTemperature(TANK_TOP, (i % 2) ? 80.01 : 79.99);
+            const bool pump = bench.pump();
+
+            if (pump != previous)
+                switches++;
+
+            previous = pump;
+        }
+
+        CHECK_TRUE(switches == 1);
+        CHECK_FALSE(previous);
     }
 
     void testHolidayDischarge()
@@ -185,9 +222,11 @@ namespace
         CHECK_TRUE(
             bench.parameter("solar_pump_command", "fault_action") == nullptr);
 
-        // Seuil unique pour les limites.
+        // Limites avec hystérésis : seuil de la limite et seuil de reprise.
         CHECK_TRUE(bench.parameter("solar_tank_max", "on_threshold") != nullptr);
-        CHECK_TRUE(bench.parameter("solar_tank_max", "off_threshold") == nullptr);
+        CHECK_TRUE(bench.parameter("solar_tank_max", "off_threshold") != nullptr);
+        CHECK_TRUE(
+            bench.parameter("solar_collector_min", "off_threshold") != nullptr);
 
         // Conditions rangées sous « Pompe solaire » et « Vacances ».
         MenuBuilder menu;
@@ -229,6 +268,7 @@ void runSolarTests()
 {
     TestHarness::run("solaire : charge", testCharge);
     TestHarness::run("solaire : charge après une limite", testChargeAfterLimit);
+    TestHarness::run("solaire : pas de battement au ballon max", testNoChatterAtTankMaximum);
     TestHarness::run("solaire : décharge nocturne vacances", testHolidayDischarge);
     TestHarness::run("solaire : réglages de la décharge", testDischargeSettings);
     TestHarness::run("solaire : pompe en manuel", testManualPump);

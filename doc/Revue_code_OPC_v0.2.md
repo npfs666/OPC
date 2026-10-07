@@ -1,6 +1,6 @@
 # Revue du code OPC v0.2
 
-Revue initiale du 28/09/2026. Statuts mis à jour le 29/09/2026.
+Revue initiale du 28/09/2026. Statuts mis à jour le 07/10/2026.
 
 Légende : ✅ corrigé · ⬜ à faire
 
@@ -83,19 +83,22 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
     - Reprise sans à-coup : l'intégrale est conservée à la reprise, sur une mesure invalide et au changement de gains.
     - Ajouts : filtre sur la dérivée (Td/10), et anti-windup corrigé (la sortie atteint bien la saturation).
     - Autotune : choix de la règle de calcul, Tyreus-Luyben par défaut.
-12. ⬜ **Restauration « tout ou rien »** (`Storage::readConfiguration`).
-    - Un seul paramètre hors plage, ou une liste d'options modifiée, invalide tout le fichier.
-    - Les calibrations (Rref, N0) sont alors perdues en silence.
+12. ⬜ (partiellement ✅) **Restauration « tout ou rien »** (`Storage::readConfiguration`).
+    - ✅ Un paramètre hors plage revient seul à sa valeur par défaut ; un propriétaire refusé par la validation croisée revient entièrement par défaut ; le reste du fichier est gardé (`ParameterEditor::keepValidDrafts()`).
+    - ✅ Chaque groupe remis par défaut est inscrit au journal (`Par défaut : <groupe>`), comme un fichier non repris (`Config. non reprise : défauts`).
+    - ⬜ Un type de paramètre ou une liste d'options modifiés invalident encore tout le fichier.
+    - ⬜ Les calibrations (Rref, N0, C.J.) sont dans le même fichier : un changement de template les perd. Prévoir un fichier de calibration séparé.
 13. ⬜ **Interruptions coupées pendant toute la sauvegarde** (`Storage::save`, `InterruptGuard`).
     - Cela représente des centaines de ms sans IRQ sur le cœur 0.
-14. ⬜ **Thermostat après une reprise** (`Thermostat::update`).
-    - Après `resume()`, la commande reste invalide (sortie OFF) tant que la température est dans l'hystérésis, même en refroidissement.
-15. ⬜ **`TimeProportionalActuator` sans durée minimale d'impulsion**.
-    - Il n'y a pas non plus de temps mini marche/arrêt (anti-court-cycle).
+14. ✅ **Thermostat après une reprise** (`Thermostat::update`).
+    - Après `resume()`, la commande restait invalide (sortie OFF) tant que la température était dans l'hystérésis, même en refroidissement.
+    - Sans état précédent (démarrage, retour du menu, levée d'une inhibition), le thermostat part maintenant à l'arrêt dans la bande.
+15. ✅ **`TimeProportionalActuator` sans durée minimale d'impulsion**.
+    - `Impulsion mini` sur l'actionneur temporel, `Marche mini` et `Arrêt mini` (anti-court-cycle) sur chaque relais.
 16. ⬜ **Glitch possible au démarrage d'une sortie** (`RelayOutput::begin`).
     - `pinMode(OUTPUT)` force le niveau bas avant `forceSafe()`. Un SSR actif à LOW peut réagir.
     - Avant `beginOutputs()`, les broches sont en haute impédance : il faut une résistance de tirage matérielle.
-17. ✅ **Tempo des alarmes après 49 jours** (`LimitAlarm`, `LoopBreakAlarm`).
+25. ✅ **Tempo des alarmes après 49 jours** (`LimitAlarm`, `LoopBreakAlarm`). Ajouté après la revue initiale (renuméroté : il portait le n° 17, déjà pris).
     - La tempo était recalculée à chaque cycle (`now - début >= délai`). Une alarme non mémorisée en cours depuis plus de 49,7 jours retombait pendant sa tempo au rebouclage de `millis()`.
     - La tempo écoulée est maintenant acquise tant que la condition dure, comme dans `ConditionAlarm` et `DelayTimer`. Tests de non-régression dans `test_limit_alarm.cpp` et `test_loop_break.cpp`.
 
@@ -103,32 +106,34 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 
 17. ⬜ `FixedBufferPrint` tronque en silence au-delà de 1024 octets.
 18. ⬜ `Sensor::isAccumulationDone()` utilise `==` : `>=` serait plus robuste.
-19. ⬜ `273.14` au lieu de `273.15` dans `pressureSeaLevel` (BMP580 et BME).
+19. ✅ `273.14` au lieu de `273.15` dans `pressureSeaLevel` (BMP580 et BME).
 20. ⬜ Code mort :
-    - `RTC::addMenuActions` / `executeMenuAction` / `validateParameters` ne sont jamais appelés ;
+    - `RTC::addMenuActions` / `executeMenuAction` / `validateParameters` ne sont jamais appelés (seulement par les tests). Son action, qui portait le n° 48 comme « Acquitter », porte maintenant le n° 71 ;
     - `printCSVPsychro` indexe sans vérifier les bornes ;
     - `readADC_Array` et `readADC_SingleArray` (boucle sans timeout) ne servent pas.
 21. ⬜ `ADS1120::begin` : `beginTransaction` n'est jamais fermé, et `begin(true)` (CS matériel) est ensuite écrasé par `pinMode(cs)`.
-22. ⬜ Gain 3 fils : `setGain(16)` mais `measurementGain()` renvoie 8. C'est **correct**, car Vref vaut 2·I·Rref avec les deux IDAC, mais il faut le commenter.
-23. ⬜ `src/.garbo` gagnerait à sortir de `src/`, car IntelliSense voit des `main.cpp` en double.
-24. ⬜ Le README est désynchronisé du code :
+22. ✅ Gain 3 fils : `setGain(16)` mais `measurementGain()` renvoie 8. C'est **correct**, car Vref vaut 2·I·Rref avec les deux IDAC : `Sensor::adcGain()` le commente.
+23. ✅ `src/.garbo` gagnerait à sortir de `src/`, car IntelliSense voit des `main.cpp` en double (dossier supprimé).
+24. ✅ Le README est désynchronisé du code :
     - ✅ chemin de `main.cpp` : le fichier est `src/main.cpp` ; le README et l'exemple minimal citaient `src/Templates/main.cpp` (corrigé) ;
-    - il décrit l'ancienne TestInstallation ;
-    - il dit « PWM prévu », alors que PWMOutput existe ;
-    - il dit « PT1000 désactivée », alors qu'elle est convertie ;
-    - l'environnement `opc_v01` est cassé.
+    - ✅ il décrit l'ancienne TestInstallation (le template psychromètre `TestInstallation` figure maintenant dans le tableau des templates) ;
+    - ✅ il dit « PWM prévu », alors que PWMOutput existe ;
+    - ✅ il dit « PT1000 désactivée », alors qu'elle est convertie ;
+    - ✅ l'environnement `opc_v01` est cassé (seul `opc_v02` reste).
 
 ---
 
 ## 3. Améliorations et fonctionnalités proposées
 
+Les propositions réalisées depuis sont marquées ✅.
+
 **Robustesse et architecture**
-- Acquisition hors ISR, avec une machine d'états dans `loop()`, et I²C à 400 kHz.
+- Acquisition hors ISR, avec une machine d'états dans `loop()`, et I²C à 400 kHz (✅ I²C à 400 kHz).
 - Registre de défauts centralisé, affiché à l'écran : MCP ou ADC absent, BMP en panne, stockage en erreur, sonde coupée ou en court-circuit.
-- Détection de sonde coupée ou en court-circuit :
-  - une plage plausible en Ω pour les RTD ;
-  - les sources *burn-out* de l'ADS1120 (`setBurnoutCurrentSources` existe déjà) pour les thermocouples.
-- Restauration tolérante paramètre par paramètre, et fichier de calibration séparé.
+- ✅ Détection de sonde coupée ou en court-circuit (`MeasurementStatus` : rupture, court-circuit, hors étendue) :
+  - ✅ une plage plausible en Ω pour les RTD ;
+  - les sources *burn-out* de l'ADS1120 (`setBurnoutCurrentSources` existe déjà) pour les thermocouples (un thermocouple ouvert est détecté par la polarisation 1 MΩ).
+- Restauration tolérante paramètre par paramètre (✅, voir le point 12), et fichier de calibration séparé.
 - Diagnostic du watchdog : enregistrer l'étape en cours dans ses registres *scratch*.
 
 **Métrologie**
@@ -139,36 +144,36 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
   - formule sur glace ;
   - mesures « point de rosée » et « humidité absolue » (les fonctions existent déjà dans `Psychrometer`) ;
   - détection de mèche sèche (humide ≈ sec ⇒ fausse HR à 100 %).
-- Filtre configurable par mesure : EMA ou médiane (`addLP` existe mais n'est pas utilisé).
+- ✅ Filtre configurable par mesure : filtre du 2e ordre réglable par entrée (`Filtre`). `addLP` n'est toujours pas utilisé.
 
 **Régulation**
-- PID :
-  - paramétrage en Kp/Ti/Td (en secondes) ;
-  - filtre sur la dérivée ;
-  - transfert *bumpless* ;
-  - mode manuel ;
-  - autotune moins agressif (Tyreus–Luyben ou SIMC).
-- Actionneurs : temps mini ON/OFF, durée mini d'impulsion, anti-court-cycle.
-- Verrouillages par les entrées numériques ISO1212 : fluxostat, contact de porte, autorisation externe.
-- Programmation horaire des consignes avec le DS3231.
-- Alarmes haut/bas sur les mesures.
+- ✅ PID :
+  - ✅ paramétrage en Kp/Ti/Td (en secondes) ;
+  - ✅ filtre sur la dérivée ;
+  - ✅ transfert *bumpless* ;
+  - ✅ mode manuel ;
+  - ✅ autotune moins agressif (Tyreus–Luyben).
+- ✅ Actionneurs : temps mini ON/OFF, durée mini d'impulsion, anti-court-cycle.
+- ✅ Verrouillages par les entrées numériques ISO1212 : fluxostat, contact de porte, autorisation externe (glue et `inhibit()`, `ConditionAlarm`, `dependsOn()`).
+- ✅ Programmation horaire des consignes avec le DS3231.
+- ✅ Alarmes haut/bas sur les mesures (`LimitAlarm`).
 - Solaire : protection antigel et surchauffe du capteur.
 
 **Données et communication**
-- Journal CSV horodaté dans LittleFS, visible par l'USB MSC. Il remplacerait les logs série et les scripts Python.
+- Journal CSV horodaté dans LittleFS, visible par l'USB MSC. Il remplacerait les logs série et les scripts Python (✅ journal des événements dans `/events.csv` ; ni mesures, ni accès par l'USB).
 - Mode de sortie série CSV générique sélectionnable dans le menu.
 - Interface en ligne de commande série : paramètres, calibration, export de la config.
 - Import de `config.json` depuis le PC, validé puis appliqué.
 - Modbus RTU (RS485).
 
 **Interface**
-- Accélération de l'encodeur.
+- Accélération de l'encodeur (✅ pour la consigne réglée à l'accueil).
 - Confirmation avant les actions de calibration.
-- Heure affichée sur l'écran d'accueil.
+- ✅ Heure affichée sur l'écran d'accueil (templates thermostat, solaire, programmation horaire, chambre froide).
 - Mini-courbe de tendance.
-- Écran d'erreur au démarrage.
+- ✅ Écran d'erreur au démarrage.
 
 **Qualité**
-- Tests hôte à ajouter : PT100/CVD, psychrométrie, PID, `SetpointRamp`, `TimeProportionalActuator`.
+- ✅ Tests hôte à ajouter : PT100/CVD, psychrométrie, PID, `SetpointRamp`, `TimeProportionalActuator`.
   - Ils demandent un compilateur hôte : sous Fedora, `sudo dnf install gcc-c++`.
 - CI GitHub Actions : tests hôte + `pio run -e opc_v02`.

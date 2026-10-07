@@ -60,6 +60,15 @@ public:
         const TimeSchedule& schedule,
         double_t reducedSetpoint);
 
+    /**
+     * Plage de réglage de la consigne et de la consigne réduite dans le menu
+     * (défaut 0 à 200 °C) : chambre négative, hors-gel... À appeler après
+     * begin(), avant l'enregistrement des paramètres.
+     */
+    bool setSetpointLimits(
+        double_t minimum,
+        double_t maximum);
+
     void update(uint32_t now);
     void resume(uint32_t now) override;
 
@@ -80,6 +89,9 @@ public:
 private:
 
     Temperature* temperature = nullptr;
+
+    double_t setpointMinimum = 0.0;
+    double_t setpointMaximum = 200.0;
 };
 
 #endif

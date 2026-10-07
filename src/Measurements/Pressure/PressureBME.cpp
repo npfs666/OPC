@@ -51,7 +51,7 @@ double_t PressureBME::pressureSeaLevel(int16_t altitude) {
         pow(
             1.0 -
                 ((0.0065 * altitude) /
-                 (temperature + 273.14)),
+                 (temperature + 273.15)),
             5.255);
 }
 

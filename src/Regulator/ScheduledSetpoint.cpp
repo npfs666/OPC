@@ -14,6 +14,14 @@ namespace
             "Arrêt"
         }
     };
+
+    // Hors plage en arrêt ou heure inconnue : pas de consigne, régulation
+    // arrêtée.
+    bool regulates(ScheduledSetpoint::State state)
+    {
+        return state != ScheduledSetpoint::State::Off &&
+               state != ScheduledSetpoint::State::ClockInvalid;
+    }
 }
 
 void ScheduledSetpoint::begin()
@@ -36,42 +44,43 @@ bool ScheduledSetpoint::isAttached() const
     return schedule != nullptr;
 }
 
-bool ScheduledSetpoint::update(
+ScheduledSetpoint::State ScheduledSetpoint::evaluate(
     double_t setpoint,
-    double_t& target)
+    double_t& target) const
 {
     target = setpoint;
 
     if (schedule == nullptr)
-    {
-        currentState = State::Unscheduled;
-        return true;
-    }
+        return State::Unscheduled;
 
     bool active = false;
 
     if (!schedule->isActive(active))
-    {
-        currentState = State::ClockInvalid;
-        return false;
-    }
+        return State::ClockInvalid;
 
     if (active)
-    {
-        currentState = State::Comfort;
-        return true;
-    }
+        return State::Comfort;
 
     if (settings.outside == Outside::Off)
-    {
-        currentState = State::Off;
-        return false;
-    }
+        return State::Off;
 
-    currentState = State::Reduced;
     target = settings.reducedSetpoint;
+    return State::Reduced;
+}
 
-    return true;
+bool ScheduledSetpoint::update(
+    double_t setpoint,
+    double_t& target)
+{
+    currentState = evaluate(setpoint, target);
+    return regulates(currentState);
+}
+
+bool ScheduledSetpoint::readTarget(
+    double_t setpoint,
+    double_t& target) const
+{
+    return regulates(evaluate(setpoint, target));
 }
 
 ScheduledSetpoint::State ScheduledSetpoint::state() const

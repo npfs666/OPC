@@ -22,6 +22,7 @@
 #include <Regulator/PID.h>
 #include <Regulator/SetpointRamp.h>
 #include <Regulator/Thermostat.h>
+#include <Regulator/TimeSchedule.h>
 #include <StartupStatus.h>
 #include <SystemWatchdog.h>
 #include <hmi/MenuBuilder.h>
@@ -882,6 +883,66 @@ namespace
         thermostat.update(3000);
         CHECK_TRUE(thermostat.isCommandValid());
         CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
+    }
+
+    void testThermostatSetpointLimits()
+    {
+        FakeTemperature temperature;
+
+        // Par défaut, 0 à 200 °C : une chambre négative est refusée.
+        Thermostat heater;
+        heater.begin("heater", "Chauffage", temperature);
+        heater.settings.setpoint = -18.0;
+        {
+            Parameter storage[16];
+            ParameterList list;
+            list.begin(storage, 16);
+            heater.registerParameters(list);
+            CHECK_TRUE(list.hasError());
+        }
+
+        // Plage réglée par le template, consigne réduite comprise.
+        ClockSample clock;
+        TimeSchedule schedule;
+        schedule.begin("prog", "Prog", clock);
+
+        Thermostat freezer;
+        freezer.begin("freezer", "Congélateur", temperature);
+        freezer.settings.mode = Thermostat::Mode::Cooling;
+        freezer.settings.setpoint = -18.0;
+        freezer.setSchedule(schedule, -15.0);
+        CHECK_FALSE(freezer.setSetpointLimits(10.0, -30.0));
+        CHECK_FALSE(freezer.setSetpointLimits(NAN, 0.0));
+        CHECK_TRUE(freezer.setSetpointLimits(-30.0, 10.0));
+
+        Parameter storage[16];
+        ParameterList list;
+        list.begin(storage, 16);
+        freezer.registerParameters(list);
+        CHECK_FALSE(list.hasError());
+
+        const Parameter* setpoint = list.find("freezer", "setpoint");
+        const Parameter* reduced = list.find("freezer", "reduced_setpoint");
+        CHECK_TRUE(setpoint != nullptr &&
+                   setpoint->data.number.minimum == -30.0 &&
+                   setpoint->data.number.maximum == 10.0);
+        CHECK_TRUE(reduced != nullptr &&
+                   reduced->data.number.minimum == -30.0);
+
+        // Régulation en froid à -18 °C.
+        temperature.setReading(-15.0);
+        schedule.settings.mode = TimeSchedule::Mode::ForcedOn;
+        freezer.update(0);
+        CHECK_NEAR(freezer.readCommand(), 1.0, 0.0);
+
+        // Un nouveau begin() rétablit la plage par défaut.
+        freezer.begin("freezer", "Congélateur", temperature);
+        freezer.settings.setpoint = -18.0;
+        Parameter storageAfter[16];
+        ParameterList listAfter;
+        listAfter.begin(storageAfter, 16);
+        freezer.registerParameters(listAfter);
+        CHECK_TRUE(listAfter.hasError());
     }
 
     void testPID()
@@ -2604,6 +2665,140 @@ namespace
         CHECK_NEAR(gain, 6.0, 0.0001);
     }
 
+    // Validation croisée de test : seuil de « a » sous celui de « b ».
+    class OrderedThresholds final : public ParameterRestoreValidator
+    {
+    public:
+        bool validateRestoredParameters(
+            const ParameterEditor& editor) const override
+        {
+            const ParameterDraft* low = editor.find("a", "x");
+            const ParameterDraft* high = editor.find("b", "z");
+
+            return low != nullptr && high != nullptr &&
+                   low->numberValue < high->numberValue;
+        }
+    };
+
+    void testTolerantRestore()
+    {
+        Parameter storage[4];
+        ParameterList list;
+        list.begin(storage, 4);
+
+        double_t x = 10.0;
+        int32_t y = 5;
+        double_t z = 50.0;
+
+        auto a = list.forOwner({"test", "Test", "a", "Groupe A"});
+        auto b = list.forOwner({"test", "Test", "b", "Groupe B"});
+        CHECK_TRUE(a.addDouble("x", "X", x, 0.0, 100.0, 1.0, 0));
+        CHECK_TRUE(a.addInteger("y", "Y", y, 0, 10, 1));
+        CHECK_TRUE(b.addDouble("z", "Z", z, 0.0, 100.0, 1.0, 0));
+
+        const OrderedThresholds validator;
+        ParameterEditor editor;
+        editor.begin(list);
+
+        // Comme Storage::restore() : réglages par défaut capturés, puis
+        // valeurs du fichier dans les brouillons.
+        auto load = [&](double_t storedX, int32_t storedY, double_t storedZ)
+        {
+            editor.capture();
+            editor.get(0).numberValue = storedX;
+            editor.get(1).integerValue = storedY;
+            editor.get(2).numberValue = storedZ;
+        };
+
+        const Parameter* reset[2] = {};
+
+        // Fichier valide : tout est gardé.
+        load(20.0, 7, 60.0);
+        CHECK_TRUE(editor.keepValidDrafts(validator, reset, 2) == 0);
+        CHECK_NEAR(editor.get(0).numberValue, 20.0, 0.0);
+        CHECK_TRUE(editor.get(1).integerValue == 7);
+
+        // Un réglage hors plage revient seul par défaut ; le reste de son
+        // propriétaire et les autres sont gardés.
+        load(20.0, 50, 60.0);
+        CHECK_TRUE(editor.keepValidDrafts(validator, reset, 2) == 1);
+        CHECK_TRUE(reset[0] != nullptr &&
+                   std::strcmp(reset[0]->ownerKey, "a") == 0);
+        CHECK_NEAR(editor.get(0).numberValue, 20.0, 0.0);
+        CHECK_TRUE(editor.get(1).integerValue == 5);
+        CHECK_NEAR(editor.get(2).numberValue, 60.0, 0.0);
+
+        // Validation croisée refusée : le propriétaire en cause revient
+        // entièrement par défaut, l'autre est gardé.
+        load(70.0, 7, 60.0);
+        CHECK_TRUE(editor.keepValidDrafts(validator, reset, 2) == 1);
+        CHECK_TRUE(std::strcmp(reset[0]->ownerName, "Groupe A") == 0);
+        CHECK_NEAR(editor.get(0).numberValue, 10.0, 0.0);
+        CHECK_TRUE(editor.get(1).integerValue == 5);
+        CHECK_NEAR(editor.get(2).numberValue, 60.0, 0.0);
+        CHECK_TRUE(editor.apply());
+        CHECK_NEAR(z, 60.0, 0.0);
+    }
+
+    void testPIDSetpointOutsideAutoTuneRange()
+    {
+        // Template PID : plage d'essai 0..60 °C, consigne permise -50..250.
+        FakeTemperature measurement;
+        PID pid;
+        pid.begin("pid", measurement);
+        pid.settings.setpoint = 35.0;
+        pid.autoTuneSettings.inputMin = 0.0;
+        pid.autoTuneSettings.inputMax = 60.0;
+
+        Parameter storage[32];
+        ParameterList list;
+        list.begin(storage, 32);
+        pid.registerParameters(list);
+        CHECK_TRUE(pid.registerAutoTuneParameters(list, "tune", "Autotune"));
+        CHECK_FALSE(list.hasError());
+
+        ParameterEditor editor;
+        editor.begin(list);
+        editor.capture();
+
+        // Consigne à 70 °C, au menu ou à l'accueil puis au redémarrage : la
+        // plage d'essai ne bloque ni le menu ni la restauration.
+        const_cast<ParameterDraft*>(editor.find("pid", "setpoint"))
+            ->numberValue = 70.0;
+        CHECK_TRUE(editor.validate());
+        CHECK_TRUE(pid.validateParameters(editor));
+        CHECK_TRUE(editor.apply());
+
+        // Réglages d'essai incohérents entre eux : toujours refusés.
+        const_cast<ParameterDraft*>(editor.find("tune", "autotune_input_max"))
+            ->numberValue = -10.0;
+        CHECK_FALSE(pid.validateParameters(editor));
+
+        // Le lancement vérifie la consigne : essai refusé, visible à
+        // l'accueil (« TUNE ERREUR »).
+        measurement.setReading(65.0);
+        CHECK_FALSE(pid.startAutoTune(0));
+        CHECK_TRUE(pid.getAutoTuneStatus() == PID::AutoTuneStatus::Failed);
+        CHECK_TRUE(
+            pid.getAutoTuneError() == PID::AutoTuneError::InvalidSettings);
+
+        // Plage de mesure de l'essai : celle de la consigne (four à 600 °C).
+        PID oven;
+        oven.begin("oven", measurement);
+        CHECK_TRUE(oven.setSetpointLimits(0.0, 800.0));
+
+        Parameter ovenStorage[32];
+        ParameterList ovenList;
+        ovenList.begin(ovenStorage, 32);
+        oven.registerParameters(ovenList);
+        CHECK_TRUE(oven.registerAutoTuneParameters(ovenList, "tune", "Autotune"));
+
+        const Parameter* inputMax = ovenList.find("tune", "autotune_input_max");
+        const Parameter* inputMin = ovenList.find("tune", "autotune_input_min");
+        CHECK_TRUE(inputMax != nullptr && inputMax->data.number.maximum == 800.0);
+        CHECK_TRUE(inputMin != nullptr && inputMin->data.number.minimum == -50.0);
+    }
+
     void testMenuStructure()
     {
         MenuTestInstallation installation;
@@ -2793,7 +2988,10 @@ namespace
                 "rtc_set_date_time");
 
         CHECK_TRUE(clockAction != nullptr);
-        CHECK_TRUE(clockAction->id == 48);
+        CHECK_TRUE(clockAction->id == 71);
+        CHECK_TRUE(
+            clockAction->id !=
+                ProcessControl::ACKNOWLEDGE_ALARMS_ACTION);
         CHECK_TRUE(
             clockAction->group == clockGroup);
 
@@ -3079,6 +3277,10 @@ int main()
         testCoolingThermostat);
 
     TestHarness::run(
+        "thermostat : plage de consigne",
+        testThermostatSetpointLimits);
+
+    TestHarness::run(
         "PID",
         testPID);
 
@@ -3180,6 +3382,10 @@ int main()
         testParameterEditor);
 
     TestHarness::run("brouillons pendant la régulation", testLiveMenuDrafts);
+    TestHarness::run("restauration tolérante", testTolerantRestore);
+    TestHarness::run(
+        "consigne PID hors plage d'autotune",
+        testPIDSetpointOutsideAutoTuneRange);
 
     TestHarness::run(
         "structure du menu",

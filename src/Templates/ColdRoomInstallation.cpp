@@ -212,6 +212,9 @@ bool ColdRoomInstallation::begin(
     thermostat.settings.setpoint = 3.0;
     thermostat.settings.hysteresis = 2.0;
 
+    // Consigne d'une chambre froide, à l'accueil comme au menu.
+    thermostat.setSetpointLimits(-10.0, 20.0);
+
     compressor.begin("cold_room_compressor", "Cde compresseur", thermostat);
 
     compressorRelay.begin(

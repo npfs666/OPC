@@ -261,6 +261,12 @@ void PID::holdController()
     invalidateCommand();
 }
 
+void PID::stopController()
+{
+    resetController();
+    writeCommand(0.0);
+}
+
 void PID::freezeController()
 {
     filteredDerivative = 0.0;
@@ -535,6 +541,12 @@ double_t PID::integralTime() const
 
 bool PID::readSetpoint(double_t& setpoint) const
 {
+    // Manuel : la consigne réglée (programme compris, sans rampe) reste la
+    // référence des alarmes relatives, même PID désactivé : le manuel passe
+    // avant « Activé ».
+    if (isManual())
+        return scheduledSetpoint.readTarget(settings.setpoint, setpoint);
+
     if (isInhibited() ||
         !settings.enabled ||
         autoTune.isActive() ||
@@ -680,21 +692,29 @@ void PID::updateControl(uint32_t now)
 
     if (!settings.enabled)
     {
-        // Une réactivation (menu ou start()) repart d'une intégrale nulle.
+        // Arrêt commandé : commande 0 valide. Une réactivation (menu ou
+        // start()) repart d'une intégrale nulle.
         setpointRamp.restart();
-        resetController();
+        stopController();
         return;
     }
 
     double_t target = settings.setpoint;
 
-    // Arrêt programmé : l'intégrale repart de zéro à la plage suivante.
+    // Hors plage en « Arrêt » : arrêt programmé, commande 0 valide ; heure
+    // inconnue : défaut, état sûr. L'intégrale repart de zéro à la plage
+    // suivante.
     if (!scheduledSetpoint.update(
             settings.setpoint,
             target))
     {
         setpointRamp.restart();
-        resetController();
+
+        if (scheduledSetpoint.state() == ScheduledSetpoint::State::Off)
+            stopController();
+        else
+            resetController();
+
         return;
     }
 
@@ -1122,6 +1142,14 @@ bool PID::registerAutoTuneParameters(
             ? measurement->getUnit()
             : nullptr;
 
+    // Plage de mesure de l'essai : celle de la consigne (setSetpointLimits(),
+    // un four à 600 °C par exemple), jamais plus étroite que la plage par
+    // défaut.
+    const double_t inputMinimum =
+        std::fmin(setpointMinimum, DEFAULT_SETPOINT_MIN);
+    const double_t inputMaximum =
+        std::fmax(setpointMaximum, DEFAULT_SETPOINT_MAX);
+
     const bool registered =
         parameters.addDouble(
             "autotune_output_low",
@@ -1152,8 +1180,8 @@ bool PID::registerAutoTuneParameters(
             "autotune_input_min",
             "Mesure min",
             autoTuneSettings.inputMin,
-            -50.0,
-            250.0,
+            inputMinimum,
+            inputMaximum,
             1.0,
             1,
             inputUnit) &&
@@ -1161,8 +1189,8 @@ bool PID::registerAutoTuneParameters(
             "autotune_input_max",
             "Mesure max",
             autoTuneSettings.inputMax,
-            -50.0,
-            250.0,
+            inputMinimum,
+            inputMaximum,
             1.0,
             1,
             inputUnit) &&
@@ -1242,7 +1270,12 @@ bool PID::validateParameters(
     if (autoTuneOwnerKey == nullptr)
         return false;
 
-    double_t setpoint = 0.0;
+    /*
+     * Réglages d'essai seuls : leur compatibilité avec la consigne et les
+     * limites de sortie n'est vérifiée qu'au lancement (startAutoTune()).
+     * Sinon, une consigne hors de la plage d'essai bloquerait tout le menu,
+     * et rendrait invalide la configuration sauvegardée.
+     */
     AutoTuneSettings tuneSettings =
         autoTuneSettings;
 
@@ -1252,11 +1285,6 @@ bool PID::validateParameters(
     int32_t rule = 0;
 
     if (!readNumberDraft(
-            editor,
-            pidOwnerKey,
-            "setpoint",
-            setpoint) ||
-        !readNumberDraft(
             editor,
             autoTuneOwnerKey,
             "autotune_output_low",
@@ -1334,11 +1362,7 @@ bool PID::validateParameters(
     tuneSettings.cycles =
         static_cast<uint8_t>(cycles);
 
-    return PIDAutoTune::settingsAreValid(
-        tuneSettings,
-        setpoint,
-        outputMin,
-        outputMax);
+    return PIDAutoTune::settingsAreConsistent(tuneSettings);
 }
 
 void PID::print(Stream& stream) const

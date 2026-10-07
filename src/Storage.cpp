@@ -73,6 +73,8 @@ Storage::RestoreResult Storage::restore(
 {
     InterruptGuard interruptGuard;
 
+    resetOwnerTotal = 0;
+
     editor.begin(parameters);
     editor.capture();
 
@@ -85,13 +87,18 @@ Storage::RestoreResult Storage::restore(
     if (!readConfiguration(
             installationId,
             parameters,
-            editor) ||
-        !editor.validate() ||
-        !validator.validateRestoredParameters(editor))
+            editor))
     {
         editor.capture();
         return RestoreResult::InvalidFile;
     }
+
+    // Un réglage refusé ne fait pas perdre tout le fichier : seul son
+    // propriétaire revient par défaut (voir ParameterEditor).
+    resetOwnerTotal = editor.keepValidDrafts(
+        validator,
+        resetOwners,
+        MAX_RESET_OWNERS);
 
     if (!editor.apply())
     {
@@ -100,10 +107,25 @@ Storage::RestoreResult Storage::restore(
          * validation. En cas d'incohérence interne, le démarrage
          * doit néanmoins être refusé comme restauration valide.
          */
+        editor.capture();
         return RestoreResult::InvalidFile;
     }
 
-    return RestoreResult::Restored;
+    return resetOwnerTotal > 0
+        ? RestoreResult::PartiallyRestored
+        : RestoreResult::Restored;
+}
+
+size_t Storage::resetOwnerCount() const
+{
+    return resetOwnerTotal;
+}
+
+const Parameter* Storage::resetOwner(size_t index) const
+{
+    return index < resetOwnerTotal && index < MAX_RESET_OWNERS
+        ? resetOwners[index]
+        : nullptr;
 }
 
 bool Storage::save(

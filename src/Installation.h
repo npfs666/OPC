@@ -82,6 +82,11 @@ public:
         return true;
     }
 
+    /**
+     * Après une application complète des réglages du menu (acquisition en
+     * pause, sorties en sécurité). Pas après des réglages de conduite seuls
+     * ni une consigne réglée à l'accueil : la régulation continue.
+     */
     virtual void onParametersApplied()
     {
     }
