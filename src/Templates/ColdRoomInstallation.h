@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 GAOU
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef COLD_ROOM_INSTALLATION_H
 #define COLD_ROOM_INSTALLATION_H
 

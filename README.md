@@ -12,20 +12,131 @@ mise en sécurité des sorties.
 > Projet en développement : vérifiez toujours les états sûrs et le comportement
 > réel des sorties avant de piloter une installation.
 
+## Sommaire
+
+- [Matériel (carte v0.2)](#matériel-carte-v02)
+  - [Borniers](#borniers)
+  - [Mesure](#mesure)
+  - [Isolation](#isolation)
+- [Compiler et téléverser](#compiler-et-téléverser)
+- [Fonctionnement](#fonctionnement)
+- [Créer une installation](#créer-une-installation)
+  - [1. Déclarer les composants](#1-déclarer-les-composants)
+  - [2. Les assembler dans begin()](#2-les-assembler-dans-begin)
+  - [3. Ajouter de la glue (facultatif)](#3-ajouter-de-la-glue-facultatif)
+  - [4. Dessiner l'écran d'accueil](#4-dessiner-lécran-daccueil)
+  - [5. Sélectionner l'installation](#5-sélectionner-linstallation)
+- [Templates fournis](#templates-fournis)
+  - [PID et autotune](#pid-et-autotune)
+  - [Programmation horaire](#programmation-horaire)
+- [Composants disponibles](#composants-disponibles)
+  - [Comparateur](#comparateur)
+  - [Temporisation](#temporisation)
+  - [Loi d'eau](#loi-deau)
+- [Utilisation](#utilisation)
+  - [Menu](#menu)
+  - [Consigne depuis l'accueil](#consigne-depuis-laccueil)
+  - [Mode manuel](#mode-manuel)
+  - [Journal des événements](#journal-des-événements)
+  - [Compteurs d'entretien](#compteurs-dentretien)
+  - [Calibration](#calibration)
+  - [Horloge](#horloge)
+  - [Configuration et USB](#configuration-et-usb)
+- [Défauts de mesure](#défauts-de-mesure)
+  - [Repli sur défaut de sonde](#repli-sur-défaut-de-sonde)
+- [Alarmes](#alarmes)
+  - [Alarme de boucle ouverte](#alarme-de-boucle-ouverte)
+  - [Alarme sur condition](#alarme-sur-condition)
+  - [Câbler une alarme sur un relais](#câbler-une-alarme-sur-un-relais)
+- [Sécurité](#sécurité)
+- [Organisation du code](#organisation-du-code)
+- [Licence](#licence)
+
 ## Matériel (carte v0.2)
 
-| Fonction | Composant |
+| Caractéristique | Valeur |
 | --- | --- |
 | Microcontrôleur | Raspberry Pi Pico 2 (RP2350) |
-| Entrées analogiques | 3 entrées multiplexées, ADC ADS1120 (PT100, PT1000, thermocouples) |
-| Entrées numériques | 2 entrées isolées ISO1212 |
-| Sorties | 2 relais, 2 sorties PWM |
-| Interface | Écran ST7789 240 × 240, encodeur rotatif avec clic |
-| Capteurs embarqués | BMP580 (pression), DS3231 (horloge) |
-| Expandeur | MCP23017 (routage des entrées) |
+| Alimentation | 24 V CC, environ 20 mA (0,5 W), partie logique isolée |
+| Entrées analogiques | 3 : PT100, PT1000 (2, 3 ou 4 fils), thermocouples B, E, J, K, N, R, S, T |
+| Entrées TOR | 2, 24 V isolées |
+| Relais | 2, contact travail (NO), 5 A sous 250 V CA ou 30 V CC |
+| Sorties transistor | 2, côté bas (open drain), 55 V max, PWM 1 à 100 kHz |
+| Interface | Écran IPS 240 × 240, encodeur rotatif avec bouton |
+| Horloge | DS3231M (±5 ppm), secourue par supercondensateur |
+| Pression | BMP581 |
+| Extension | Bus I²C (3,3 V) sur la carte mesure |
 
-Le brochage complet est dans
+Le brochage est dans
 [Pinout_v0.2.h](src/Hardware/Boards/Pinout_v0.2.h).
+
+### Borniers
+
+**Alimentation et entrées TOR** (J6, carte puissance) :
+
+| Borne | Signal |
+| --- | --- |
+| 1 | +24 V |
+| 2 | 0 V |
+| 3 | Entrée TOR 2 |
+| 4 | Entrée TOR 1 |
+
+Une entrée TOR est active à 24 V par rapport au 0 V (borne 2) : un contact
+sec entre le +24 V et l'entrée suffit.
+
+**Relais** (J4, carte puissance, deux bornes par position) :
+
+| Position | Signal |
+| --- | --- |
+| 1 | Relais 2, commun |
+| 2 | Relais 2, travail (NO) |
+| 3 | Relais 1, commun |
+| 4 | Relais 1, travail (NO) |
+
+**Sorties transistor** (J5, carte puissance) :
+
+| Borne | Signal |
+| --- | --- |
+| 1 | PWM 2 |
+| 2 | 0 V |
+| 3 | PWM 1 |
+| 4 | 0 V |
+
+Les sorties sont côté bas : la charge se branche entre le + de son
+alimentation et la borne PWM. Au-delà de 24 V de charge, adapter la TVS de
+protection (33 V).
+
+**Entrées analogiques** (J1, J2, J4 : entrées 1, 2, 3, carte mesure) :
+
+| Borne | 2 fils | 3 fils | 4 fils | Thermocouple |
+| --- | --- | --- | --- | --- |
+| 1 | NC | NC | Courant + | NC |
+| 2 | Sonde | Côté A (fil seul) | Mesure + | + |
+| 3 | Sonde | Côté B, 1er fil | Mesure − | − |
+| 4 | NC | Côté B, 2e fil | Courant − | NC |
+
+En 3 fils, les deux fils du même côté de la sonde vont sur les bornes 3 et 4.
+En 4 fils, les bornes 1 et 2 vont d'un côté de la sonde, et les bornes 3 et
+4 de l'autre.
+
+### Mesure
+
+| Sonde | Résistance de référence | Courant (2 et 4 fils) | Courant (3 fils) |
+| --- | --- | --- | --- |
+| PT100 | 1,65 kΩ | 1 mA | 2 × 500 µA |
+| PT1000 | 16,5 kΩ | 100 µA | 2 × 50 µA |
+
+- ADC 16 bits, mesure ratiométrique sur la résistance de référence.
+- Thermocouples : référence interne 2,048 V, soudure froide mesurée par
+  l'ADC.
+
+### Isolation
+
+Les relais, les sorties transistor et les entrées TOR sont du côté 24 V. Les
+entrées analogiques, l'I²C et l'USB sont du côté logique, isolé du 24 V
+(isolation fonctionnelle, pas de sécurité). Sur USB seul, la partie logique
+fonctionne (menu, configuration), mais pas les relais ni les sorties
+transistor.
 
 ## Compiler et téléverser
 
@@ -467,7 +578,7 @@ L'état est recalculé en permanence à partir de l'heure courante : après une
 coupure de courant ou un réglage de l'horloge, la sortie reprend directement
 le bon état.
 
-> - Si l'heure du DS3231 est perdue (pile vide), le mode `Auto` met les
+> - Si l'heure du DS3231 est perdue (supercondensateur déchargé), le mode `Auto` met les
 >   sorties en état sûr jusqu'au réglage de l'horloge, et l'écran d'accueil
 >   est remplacé par une **alerte horloge** (un clic ouvre le menu). Les modes
 >   forcés restent utilisables.
@@ -1297,4 +1408,12 @@ src/
 
 ## Licence
 
-MIT — voir [LICENSE](LICENSE).
+Le firmware OPC est distribué sous licence **GNU GPL v3 ou ultérieure** (`GPL-3.0-or-later`) ; voir [LICENSE](LICENSE). Chaque fichier source porte l'en-tête SPDX correspondant.
+
+Vous pouvez utiliser, étudier, modifier et redistribuer OPC librement. Si vous distribuez un firmware dérivé (y compris pré-flashé dans un appareil), vous devez fournir son code source complet sous la même licence. Cela inclut vos installations, puisqu'elles sont compilées dans le même firmware. Un usage privé ou interne, sans distribution, n'impose aucune publication.
+
+Les versions publiées avant ce changement restent disponibles sous licence MIT.
+
+Le matériel (dossier [hardware/](hardware/)) est sous licence **CERN-OHL-S v2** (`CERN-OHL-S-2.0`) ; voir [hardware/LICENSE](hardware/LICENSE).
+
+Les bibliothèques tierces gardent leur propre licence : Adafruit GFX, BME280, BMP5xx et MCP23017 (BSD), Adafruit ST7735/ST7789, BusIO, RTClib, ArduinoJson et PrintSize (MIT), Adafruit Unified Sensor (Apache-2.0), ArduinoMenu et le core Arduino-Pico (LGPL-2.1). Toutes sont compatibles avec la GPL v3.

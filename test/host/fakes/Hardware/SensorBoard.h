@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 GAOU
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef HOST_FAKE_SENSORBOARD_H
 #define HOST_FAKE_SENSORBOARD_H
 #include <Hardware/Sensor.h>

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 GAOU
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <Outputs/ActuatorPWM.h>
 
 #include <Outputs/Output.h>

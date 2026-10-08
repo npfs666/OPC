@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 GAOU
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef LOOP_BREAK_ALARM_H
 #define LOOP_BREAK_ALARM_H
 

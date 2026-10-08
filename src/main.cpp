@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 GAOU
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * @file main.cpp
  *
@@ -7,7 +10,7 @@
  *
  * @copyright Copyright (c) 2022
  * 
- * MIT license, all text above must be included in any redistribution 
+ * Licence GPL-3.0-or-later, voir le fichier LICENSE.
  */
 #include <OPC.h>
 #include <SystemWatchdog.h>

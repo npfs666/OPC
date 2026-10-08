@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 GAOU
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef INSTALLATION_TEST_ACCESS_H
 #define INSTALLATION_TEST_ACCESS_H
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 GAOU
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Valeurs tabulées indépendantes des coefficients du code de production.
 // NIST ITS-90 : https://its90.nist.gov/downloadFiles/type_k.tab.txt
 // Même chemin pour les sept autres types. Tables arrondies à 0,001 mV.

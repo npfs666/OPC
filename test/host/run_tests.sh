@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2022-2026 GAOU
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 set -euo pipefail
 
