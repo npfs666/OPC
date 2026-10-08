@@ -45,12 +45,16 @@ public:
      *
      * @param resetOwners premier réglage de chaque propriétaire remis
      *        (en tout ou partie) par défaut, au plus capacity
+     * @param rejected optionnel, un drapeau par réglage : entrée du fichier
+     *        illisible, le réglage est déjà à sa valeur par défaut et son
+     *        propriétaire est compté comme remis par défaut
      * @return nombre de propriétaires remis par défaut (0 : tout est gardé)
      */
     size_t keepValidDrafts(
         const ParameterRestoreValidator& validator,
         const Parameter** resetOwners,
-        size_t capacity);
+        size_t capacity,
+        const bool* rejected = nullptr);
     bool hasChanges(const char* ownerKey = nullptr) const;
 
     /**

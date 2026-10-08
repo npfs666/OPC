@@ -13,6 +13,16 @@ cxx="${CXX:-g++}"
 
 mkdir -p "${build_dir}"
 
+# ArduinoJson (en-têtes seuls) est installé par PlatformIO.
+arduinojson_dir="${project_dir}/.pio/libdeps/opc_v02/ArduinoJson/src"
+
+if [ ! -f "${arduinojson_dir}/ArduinoJson.h" ]
+then
+    echo "ArduinoJson introuvable: ${arduinojson_dir}" >&2
+    echo "Lancer d'abord 'pio run' pour installer les bibliothèques." >&2
+    exit 1
+fi
+
 if ! command -v "${cxx}" >/dev/null 2>&1
 then
     echo "Compilateur C++ introuvable: ${cxx}" >&2
@@ -29,6 +39,7 @@ fi
     -I"${project_dir}/test/host/fakes" \
     -I"${project_dir}/test/host" \
     -I"${project_dir}/src" \
+    -isystem "${arduinojson_dir}" \
     "${project_dir}/test/host/test_main.cpp" \
     "${project_dir}/test/host/test_thermocouple.cpp" \
     "${project_dir}/test/host/test_pwm.cpp" \
@@ -55,6 +66,7 @@ fi
     "${project_dir}/test/host/test_three_point.cpp" \
     "${project_dir}/test/host/test_heating_curve.cpp" \
     "${project_dir}/test/host/test_heating_circuit.cpp" \
+    "${project_dir}/test/host/test_parameter_json.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -68,6 +80,7 @@ fi
     "${project_dir}/src/hmi/MeasurementDisplay.cpp" \
     "${project_dir}/src/hmi/MenuBuilder.cpp" \
     "${project_dir}/src/hmi/ParameterEditor.cpp" \
+    "${project_dir}/src/hmi/ParameterJson.cpp" \
     "${project_dir}/src/hmi/ParameterList.cpp" \
     "${project_dir}/src/Measurements/Humidity/HumidityBME.cpp" \
     "${project_dir}/src/Measurements/Measurement.cpp" \

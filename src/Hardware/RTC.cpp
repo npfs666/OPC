@@ -677,13 +677,17 @@ void RTC::registerParameters(
         1,
         "s");
 
-    // Sauvegardé : le DS3231 reste en UTC, seul l'affichage change.
-    auto timeZoneParameters = list.forOwner({
+    // Sauvegardé avec la carte (/board.json) : le DS3231 reste en UTC,
+    // seul l'affichage change.
+    ParameterOwner timeZoneOwner{
         "miscellaneous",
         "Divers",
         TIME_ZONE_OWNER_KEY,
         "Fuseau horaire"
-    });
+    };
+    timeZoneOwner.board = true;
+
+    auto timeZoneParameters = list.forOwner(timeZoneOwner);
 
     timeZoneParameters.addDouble(
         "utc_offset",

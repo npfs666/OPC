@@ -83,11 +83,11 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
     - Reprise sans à-coup : l'intégrale est conservée à la reprise, sur une mesure invalide et au changement de gains.
     - Ajouts : filtre sur la dérivée (Td/10), et anti-windup corrigé (la sortie atteint bien la saturation).
     - Autotune : choix de la règle de calcul, Tyreus-Luyben par défaut.
-12. ⬜ (partiellement ✅) **Restauration « tout ou rien »** (`Storage::readConfiguration`).
+12. ✅ **Restauration « tout ou rien »** (`Storage::restore`, `ParameterJson`).
     - ✅ Un paramètre hors plage revient seul à sa valeur par défaut ; un propriétaire refusé par la validation croisée revient entièrement par défaut ; le reste du fichier est gardé (`ParameterEditor::keepValidDrafts()`).
     - ✅ Chaque groupe remis par défaut est inscrit au journal (`Par défaut : <groupe>`), comme un fichier non repris (`Config. non reprise : défauts`).
-    - ⬜ Un type de paramètre ou une liste d'options modifiés invalident encore tout le fichier.
-    - ⬜ Les calibrations (Rref, N0, C.J.) sont dans le même fichier : un changement de template les perd. Prévoir un fichier de calibration séparé.
+    - ✅ Une entrée inconnue, en double ou illisible (type changé) n'invalide plus le fichier : elle est ignorée, ou son réglage revient seul par défaut. Une liste d'options complétée garde la valeur.
+    - ✅ Les réglages de la carte (calibrations Rref, N0, C.J., fuseau horaire ; `ParameterOwner::board`) sont dans `/board.json`, indépendant de l'installation. Migration automatique depuis `config.json`.
 13. ⬜ **Interruptions coupées pendant toute la sauvegarde** (`Storage::save`, `InterruptGuard`).
     - Cela représente des centaines de ms sans IRQ sur le cœur 0.
 14. ✅ **Thermostat après une reprise** (`Thermostat::update`).
@@ -133,7 +133,7 @@ Les propositions réalisées depuis sont marquées ✅.
 - ✅ Détection de sonde coupée ou en court-circuit (`MeasurementStatus` : rupture, court-circuit, hors étendue) :
   - ✅ une plage plausible en Ω pour les RTD ;
   - les sources *burn-out* de l'ADS1120 (`setBurnoutCurrentSources` existe déjà) pour les thermocouples (un thermocouple ouvert est détecté par la polarisation 1 MΩ).
-- Restauration tolérante paramètre par paramètre (✅, voir le point 12), et fichier de calibration séparé.
+- ✅ Restauration tolérante paramètre par paramètre, et fichier de calibration séparé (voir le point 12).
 - Diagnostic du watchdog : enregistrer l'étape en cours dans ses registres *scratch*.
 
 **Métrologie**

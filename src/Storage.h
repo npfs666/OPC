@@ -22,6 +22,17 @@ public:
         StorageUnavailable
     };
 
+    // Réglages de la carte (/board.json), voir ParameterOwner::board.
+    enum class BoardRestoreResult : uint8_t
+    {
+        Restored,
+        // Pas encore de /board.json : réglages repris de /config.json
+        // (version précédente), quelle que soit l'installation.
+        Migrated,
+        NoFile,
+        InvalidFile
+    };
+
     // Propriétaires remis par défaut gardés pour le journal.
     static constexpr size_t MAX_RESET_OWNERS = 4;
 
@@ -29,23 +40,40 @@ public:
 
     void poll();
 
+    /**
+     * Restaure /config.json (réglages de l'installation) et /board.json
+     * (réglages de la carte). Une entrée illisible ou refusée ne remet par
+     * défaut que son propriétaire. /config.json est ignoré entièrement s'il
+     * vient d'une autre installation ou d'un autre schéma ; /board.json ne
+     * dépend pas de l'installation.
+     *
+     * @return résultat pour /config.json ; voir boardRestoreResult()
+     */
     RestoreResult restore(
         const char* installationId,
         ParameterList& parameters,
         ParameterEditor& editor,
         const ParameterRestoreValidator& validator);
 
+    BoardRestoreResult boardRestoreResult() const;
+
     /**
-     * Après PartiallyRestored : nombre de propriétaires remis par défaut,
-     * et le premier réglage de chacun (MAX_RESET_OWNERS au plus).
+     * Après restore() : nombre de propriétaires remis par défaut, dans
+     * l'un ou l'autre fichier, et le premier réglage de chacun
+     * (MAX_RESET_OWNERS au plus).
      */
     size_t resetOwnerCount() const;
     const Parameter* resetOwner(size_t index) const;
 
+    /**
+     * Écrit /board.json s'il a changé, puis /config.json. Si /board.json
+     * ne peut être écrit, /config.json n'est pas modifié.
+     */
     bool save(
         const char* installationId,
         const ParameterList& parameters);
 
+    // Efface /config.json ; /board.json est conservé.
     bool erase();
 
     /**
@@ -66,11 +94,17 @@ public:
 
 private:
     static constexpr uint32_t SCHEMA_VERSION = 2;
+    static constexpr uint32_t BOARD_SCHEMA_VERSION = 1;
 
     static constexpr const char* CONFIG_PATH =
         "/config.json";
     static constexpr const char* TEMP_PATH =
         "/config.tmp";
+
+    static constexpr const char* BOARD_PATH =
+        "/board.json";
+    static constexpr const char* BOARD_TEMP_PATH =
+        "/board.tmp";
 
     static constexpr const char* COUNTERS_PATH =
         "/counters.json";
@@ -99,6 +133,7 @@ private:
 
     const Parameter* resetOwners[MAX_RESET_OWNERS] = {};
     size_t resetOwnerTotal = 0;
+    BoardRestoreResult boardResult = BoardRestoreResult::NoFile;
     volatile bool usbDriveMounted = false;
     volatile bool usbExportPending = false;
 
@@ -110,15 +145,24 @@ private:
     bool startUsbExport();
     bool refreshUsbExport();
 
-    bool readConfiguration(
-        const char* installationId,
-        ParameterList& parameters,
-        ParameterEditor& editor);
+    bool saveBoard(const ParameterList& parameters);
 
-    bool validateWrittenFile() const;
+    static bool readDocument(
+        const char* path,
+        JsonDocument& document);
 
-    static const char* typeName(
-        Parameter::Type type);
+    /**
+     * Écriture atomique : fichier temporaire relu et vérifié, puis
+     * renommé. Une coupure laisse soit l'ancien fichier, soit le nouveau.
+     */
+    static bool writeDocument(
+        const JsonDocument& document,
+        const char* temporaryPath,
+        const char* path);
+
+    static bool matchesFile(
+        const JsonDocument& document,
+        const char* path);
 };
 
 #endif

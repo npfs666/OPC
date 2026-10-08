@@ -60,6 +60,13 @@ struct ParameterOwner
      * Exemple : "prog_eclairage" pour la plage "prog_eclairage.p1"
      */
     const char* parentOwnerKey = nullptr;
+
+    /*
+     * Réglage propre à la carte (calibrations, fuseau horaire) : sauvegardé
+     * dans /board.json, conservé quand l'installation ou la configuration
+     * change.
+     */
+    bool board = false;
 };
 
 struct Parameter
@@ -121,6 +128,9 @@ struct Parameter
 
     /* Indique si Storage doit sauvegarder et restaurer ce paramètre. */
     bool persistent = true;
+
+    /* Voir ParameterOwner::board. */
+    bool board = false;
 
     /*
      * Réglage de conduite (consigne, commande manuelle...) : modifié seul,

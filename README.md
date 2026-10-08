@@ -155,7 +155,8 @@ Points à retenir :
   en ASCII, unique. Le second est le libellé affiché, modifiable librement.
 - De même, `configurationKey()` identifie l'installation dans `config.json`
   et ne doit plus changer une fois l'installation utilisée. `name()` n'est
-  qu'un libellé.
+  qu'un libellé. Les calibrations et le fuseau horaire sont dans
+  `board.json` et survivent à un changement d'installation.
 - Si l'installation a besoin du BMP580, surcharger `requiresBMP580()` pour
   renvoyer `true`.
 - Pour régler une consigne à l'encodeur depuis l'écran d'accueil (voir
@@ -967,6 +968,10 @@ la clé de configuration de chaque relais.
 Une mesure de calibration instable ou hors plage est rejetée sans écraser la
 calibration existante.
 
+Les calibrations sont propres à la carte : elles sont sauvegardées à part,
+dans `/board.json` (voir [Configuration et USB](#configuration-et-usb)), et
+conservées quand on téléverse un autre programme ou change d'installation.
+
 Les calibrations se font sur la plage `-200..280°C` et valent aussi pour la
 plage `-200..850°C` : Rref ne dépend pas du gain, et N0, mesuré en points ADC,
 est mis à l'échelle du gain de chaque entrée (deux fois plus de points en
@@ -992,23 +997,44 @@ l'heure répétée d'octobre (02:00 à 03:00), l'heure d'été est retenue.
 
 ### Configuration et USB
 
-La configuration est sauvegardée dans la flash (LittleFS). Branchée à un PC,
-la carte apparaît comme un petit disque USB contenant une copie `config.json`,
-en plus du port série. Cette copie est **en lecture seule** : la modifier
-depuis le PC ne change pas la configuration.
+La configuration est sauvegardée dans la flash (LittleFS), en deux fichiers :
 
-Au démarrage, un réglage refusé ne fait pas perdre toute la configuration :
-- une valeur hors de sa plage (plage réduite par une mise à jour, par
-  exemple) revient seule à sa valeur par défaut ;
+- `/board.json` : les réglages **de la carte**, indépendants de
+  l'installation : calibrations (`Zéros ADC`, profils PT100 et PT1000,
+  `C.J. offset`) et fuseau horaire (`Décalage UTC`, `Heure d'été`). Il n'est
+  réécrit que lorsqu'un de ces réglages change ;
+- `/config.json` : les réglages **de l'installation** (consignes, régulateurs,
+  sorties, alarmes, entrées et leurs offsets...), liés à son
+  `configurationKey()`.
+
+Branchée à un PC, la carte apparaît comme un petit disque USB contenant une
+copie de `config.json` (sans les réglages de la carte), en plus du port
+série. Cette copie est **en lecture seule** : la modifier depuis le PC ne
+change pas la configuration.
+
+Au démarrage, un réglage refusé ne fait pas perdre tout un fichier :
+- un réglage inconnu (supprimé par une mise à jour) est ignoré ;
+- un réglage illisible (type changé par une mise à jour) revient seul à sa
+  valeur par défaut ;
+- une valeur hors de sa plage (plage réduite, option retirée) revient seule à
+  sa valeur par défaut ; une liste d'options complétée garde la valeur ;
 - un groupe de réglages refusé par une vérification croisée (seuils d'un
   comparateur inversés, deux sorties sur la même broche...) revient
   entièrement par défaut ;
-- les autres réglages, calibrations comprises, sont conservés.
+- les autres réglages sont conservés.
 
 Le journal indique chaque groupe remis par défaut (`Par défaut : <groupe>`).
-Un fichier d'une autre installation ou d'un format incompatible n'est pas
-repris : tous les réglages sont alors par défaut
-(`Config. non reprise : défauts`).
+Un `config.json` d'une autre installation ou d'un format incompatible n'est
+pas repris : les réglages de l'installation sont alors par défaut
+(`Config. non reprise : défauts`), mais ceux de la carte sont gardés. Un
+`board.json` illisible remet les réglages de la carte par défaut
+(`Calib. non reprises : défauts`).
+
+Les versions précédentes enregistraient les calibrations dans `config.json`.
+Au premier démarrage sans `board.json`, elles y sont reprises, quelle que
+soit l'installation qui l'a écrit, puis `board.json` est créé
+(`Calib. reprises de config.json`). Revenir ensuite à une ancienne version
+du programme perd les calibrations : elle ne lit pas `board.json`.
 
 ## Défauts de mesure
 

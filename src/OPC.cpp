@@ -477,6 +477,25 @@ bool OPC::initMeasurements()
         break;
     }
 
+    switch (storage.boardRestoreResult())
+    {
+    case Storage::BoardRestoreResult::Restored:
+        Serial.println("Board settings restored");
+        break;
+
+    case Storage::BoardRestoreResult::Migrated:
+        Serial.println("Board settings migrated from configuration");
+        break;
+
+    case Storage::BoardRestoreResult::NoFile:
+        Serial.println("No saved board settings; using defaults");
+        break;
+
+    case Storage::BoardRestoreResult::InvalidFile:
+        Serial.println("Invalid saved board settings; using defaults");
+        break;
+    }
+
     if (!controller.beginOutputs())
         return failStartup(StartupError::Outputs);
 
@@ -871,29 +890,46 @@ void OPC::logConfigurationRestore(Storage::RestoreResult result)
             millis(), EventKind::Fault, true,
             "Config. non reprise : défauts");
     }
-    else if (result == Storage::RestoreResult::PartiallyRestored)
+
+    switch (storage.boardRestoreResult())
     {
-        // Groupes de réglages refusés (hors plage, validation croisée),
-        // remis par défaut : les autres réglages sont conservés.
-        const size_t count = storage.resetOwnerCount();
+    case Storage::BoardRestoreResult::InvalidFile:
+        controller.logEvent(
+            millis(), EventKind::Fault, true,
+            "Calib. non reprises : défauts");
+        break;
 
-        for (size_t i = 0; i < count && i < Storage::MAX_RESET_OWNERS; i++)
-        {
-            const Parameter* owner = storage.resetOwner(i);
+    case Storage::BoardRestoreResult::Migrated:
+        controller.logEvent(
+            millis(), EventKind::Info, true,
+            "Calib. reprises de config.json");
+        break;
 
-            controller.logEvent(
-                millis(), EventKind::Fault, true,
-                "Par défaut : %s",
-                owner != nullptr ? owner->ownerName : "?");
-        }
+    default:
+        break;
+    }
 
-        if (count > Storage::MAX_RESET_OWNERS)
-        {
-            controller.logEvent(
-                millis(), EventKind::Fault, true,
-                "Par défaut : %u autres groupes",
-                static_cast<unsigned>(count - Storage::MAX_RESET_OWNERS));
-        }
+    // Groupes de réglages refusés (entrée illisible, hors plage,
+    // validation croisée), remis par défaut : les autres réglages sont
+    // conservés, dans l'un ou l'autre fichier.
+    const size_t count = storage.resetOwnerCount();
+
+    for (size_t i = 0; i < count && i < Storage::MAX_RESET_OWNERS; i++)
+    {
+        const Parameter* owner = storage.resetOwner(i);
+
+        controller.logEvent(
+            millis(), EventKind::Fault, true,
+            "Par défaut : %s",
+            owner != nullptr ? owner->ownerName : "?");
+    }
+
+    if (count > Storage::MAX_RESET_OWNERS)
+    {
+        controller.logEvent(
+            millis(), EventKind::Fault, true,
+            "Par défaut : %u autres groupes",
+            static_cast<unsigned>(count - Storage::MAX_RESET_OWNERS));
     }
 
     mutex_exit(&processDataMutex);

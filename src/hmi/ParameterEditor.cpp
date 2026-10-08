@@ -272,9 +272,15 @@ bool ParameterEditor::isValidSet(
 size_t ParameterEditor::keepValidDrafts(
     const ParameterRestoreValidator& validator,
     const Parameter** resetOwners,
-    size_t capacity)
+    size_t capacity,
+    const bool* rejected)
 {
-    if (isValidSet(validator))
+    bool anyRejected = false;
+
+    for (size_t i = 0; rejected != nullptr && i < draftCount; i++)
+        anyRejected = anyRejected || rejected[i];
+
+    if (!anyRejected && isValidSet(validator))
         return 0;
 
     for (size_t i = 0; i < draftCount; i++)
@@ -293,7 +299,9 @@ size_t ParameterEditor::keepValidDrafts(
     // réglage revient par défaut.
     for (size_t i = 0; i < draftCount; i++)
     {
-        reset[i] = !isDraftValid(drafts[i]);
+        reset[i] =
+            (rejected != nullptr && rejected[i]) ||
+            !isDraftValid(drafts[i]);
         loaded[i] = reset[i] ? capturedValues[i] : draftValue(drafts[i]);
     }
 

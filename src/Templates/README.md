@@ -132,7 +132,8 @@ d'échec : la cause s'affiche sur l'écran d'erreur de démarrage.
   place au menu, et un firmware compilé reste adaptable.
 - **Clés stables** : le premier texte de chaque `begin()` et
   `configurationKey()` identifient les réglages dans `config.json`. Les
-  renommer perd les réglages sauvegardés. Les libellés (second texte) sont
+  renommer perd les réglages sauvegardés (pas les calibrations ni le fuseau
+  horaire, dans `board.json`). Les libellés (second texte) sont
   libres. Préfixer les clés par celle du template (`cold_room_...`).
 - Réglages de conduite (consigne, commande manuelle) : ils sont appliqués
   sans arrêter la régulation (`ParameterList::setLive()`).

@@ -3241,6 +3241,7 @@ void runMinimalInstallationTests();
 void runThreePointTests();
 void runHeatingCurveTests();
 void runHeatingCircuitTests();
+void runParameterJsonTests();
 
 int main()
 {
@@ -3448,6 +3449,7 @@ int main()
     runThreePointTests();
     runHeatingCurveTests();
     runHeatingCircuitTests();
+    runParameterJsonTests();
 
     return TestHarness::finish();
 }

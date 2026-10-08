@@ -4,6 +4,7 @@
 #include <LittleFS.h>
 #include <SingleFileDrive.h>
 #include <hmi/ParameterEditor.h>
+#include <hmi/ParameterJson.h>
 
 #include <cmath>
 #include <cstring>
@@ -24,11 +25,40 @@ namespace
         }
     };
 
-    bool isValidRequiredText(JsonVariantConst value)
+    // Compare la sérialisation d'un document au contenu d'un fichier.
+    class FileComparator final
     {
-        return value.is<const char*>() &&
-               value.as<const char*>()[0] != '\0';
-    }
+    public:
+        explicit FileComparator(File& file)
+            : file(file)
+        {
+        }
+
+        size_t write(uint8_t character)
+        {
+            if (same && file.read() != character)
+                same = false;
+
+            return 1;
+        }
+
+        size_t write(const uint8_t* buffer, size_t length)
+        {
+            for (size_t i = 0; i < length; i++)
+                write(buffer[i]);
+
+            return length;
+        }
+
+        bool matches()
+        {
+            return same && file.available() == 0;
+        }
+
+    private:
+        File& file;
+        bool same = true;
+    };
 }
 
 Storage* Storage::usbOwner = nullptr;
@@ -74,6 +104,7 @@ Storage::RestoreResult Storage::restore(
     InterruptGuard interruptGuard;
 
     resetOwnerTotal = 0;
+    boardResult = BoardRestoreResult::NoFile;
 
     editor.begin(parameters);
     editor.capture();
@@ -81,16 +112,82 @@ Storage::RestoreResult Storage::restore(
     if (!mounted)
         return RestoreResult::StorageUnavailable;
 
-    if (!LittleFS.exists(CONFIG_PATH))
-        return RestoreResult::NoFile;
+    // Hors de la pile : appelée au démarrage seulement.
+    static ParameterJson::ReadState state;
+    state = ParameterJson::ReadState{};
 
-    if (!readConfiguration(
-            installationId,
-            parameters,
-            editor))
+    RestoreResult result = RestoreResult::NoFile;
+    const bool hasBoardFile = LittleFS.exists(BOARD_PATH);
+
+    if (LittleFS.exists(CONFIG_PATH))
     {
-        editor.capture();
-        return RestoreResult::InvalidFile;
+        JsonDocument document;
+        const bool readable = readDocument(CONFIG_PATH, document);
+
+        const bool sameInstallation =
+            readable &&
+            installationId != nullptr &&
+            installationId[0] != '\0' &&
+            document["schema"].as<uint32_t>() == SCHEMA_VERSION &&
+            document["installation_id"].is<const char*>() &&
+            strcmp(
+                installationId,
+                document["installation_id"].as<const char*>()) == 0;
+
+        result =
+            sameInstallation &&
+            ParameterJson::read(
+                document["parameters"],
+                parameters,
+                editor,
+                ParameterJson::Scope::Installation,
+                state)
+            ? RestoreResult::Restored
+            : RestoreResult::InvalidFile;
+
+        /*
+         * Une version précédente enregistrait les réglages de la carte
+         * dans /config.json : ils sont repris même si l'installation a
+         * changé depuis, puis /board.json est créé.
+         */
+        if (!hasBoardFile &&
+            readable &&
+            ParameterJson::read(
+                document["parameters"],
+                parameters,
+                editor,
+                ParameterJson::Scope::Board,
+                state))
+        {
+            for (size_t i = 0; i < parameters.count(); i++)
+            {
+                const Parameter* parameter = parameters.get(i);
+
+                if (state.seen[i] &&
+                    parameter != nullptr &&
+                    parameter->board)
+                {
+                    boardResult = BoardRestoreResult::Migrated;
+                }
+            }
+        }
+    }
+
+    if (hasBoardFile)
+    {
+        JsonDocument document;
+
+        boardResult =
+            readDocument(BOARD_PATH, document) &&
+            document["schema"].as<uint32_t>() == BOARD_SCHEMA_VERSION &&
+            ParameterJson::read(
+                document["parameters"],
+                parameters,
+                editor,
+                ParameterJson::Scope::Board,
+                state)
+            ? BoardRestoreResult::Restored
+            : BoardRestoreResult::InvalidFile;
     }
 
     // Un réglage refusé ne fait pas perdre tout le fichier : seul son
@@ -98,7 +195,8 @@ Storage::RestoreResult Storage::restore(
     resetOwnerTotal = editor.keepValidDrafts(
         validator,
         resetOwners,
-        MAX_RESET_OWNERS);
+        MAX_RESET_OWNERS,
+        state.rejected);
 
     if (!editor.apply())
     {
@@ -108,12 +206,25 @@ Storage::RestoreResult Storage::restore(
          * doit néanmoins être refusé comme restauration valide.
          */
         editor.capture();
+        resetOwnerTotal = 0;
+        boardResult = BoardRestoreResult::InvalidFile;
         return RestoreResult::InvalidFile;
     }
 
-    return resetOwnerTotal > 0
+    if (boardResult == BoardRestoreResult::Migrated &&
+        !saveBoard(parameters))
+    {
+        Serial.println("Board settings migration save failed");
+    }
+
+    return result == RestoreResult::Restored && resetOwnerTotal > 0
         ? RestoreResult::PartiallyRestored
-        : RestoreResult::Restored;
+        : result;
+}
+
+Storage::BoardRestoreResult Storage::boardRestoreResult() const
+{
+    return boardResult;
 }
 
 size_t Storage::resetOwnerCount() const
@@ -139,140 +250,87 @@ bool Storage::save(
         return false;
     }
 
+    /*
+     * /board.json d'abord : tant qu'il n'est pas écrit, /config.json garde
+     * les réglages de la carte d'une version précédente (migration).
+     */
+    if (!saveBoard(parameters))
+        return false;
+
     JsonDocument document;
     document["schema"] = SCHEMA_VERSION;
     document["installation_id"] = installationId;
 
-    JsonArray storedParameters =
-        document["parameters"].to<JsonArray>();
-
-    for (size_t i = 0; i < parameters.count(); i++)
+    if (!ParameterJson::write(
+            document["parameters"].to<JsonArray>(),
+            parameters,
+            ParameterJson::Scope::Installation))
     {
-        const Parameter* parameter =
-            parameters.get(i);
-
-        if (parameter != nullptr &&
-            !parameter->persistent)
-        {
-            continue;
-        }
-
-        if (parameter == nullptr ||
-            parameter->categoryKey == nullptr ||
-            parameter->categoryName == nullptr ||
-            parameter->ownerKey == nullptr ||
-            parameter->ownerName == nullptr ||
-            parameter->key == nullptr ||
-            parameter->name == nullptr)
-        {
-            return false;
-        }
-
-        JsonObject stored =
-            storedParameters.add<JsonObject>();
-
-        stored["category_key"] =
-            parameter->categoryKey;
-        stored["category_name"] =
-            parameter->categoryName;
-        stored["owner_key"] =
-            parameter->ownerKey;
-        stored["owner_name"] =
-            parameter->ownerName;
-        stored["key"] = parameter->key;
-        stored["name"] = parameter->name;
-        stored["type"] = typeName(parameter->type);
-
-        switch (parameter->type)
-        {
-        case Parameter::Type::Bool:
-            if (parameter->value.boolean == nullptr)
-                return false;
-
-            stored["value"] =
-                *parameter->value.boolean;
-            break;
-
-        case Parameter::Type::Integer:
-            if (parameter->discrete.target == nullptr ||
-                parameter->discrete.read == nullptr)
-            {
-                return false;
-            }
-
-            stored["value"] =
-                parameter->discrete.read(
-                    parameter->discrete.target);
-            stored["unit"] =
-                parameter->data.integer.unit != nullptr
-                    ? parameter->data.integer.unit
-                    : "";
-            break;
-
-        case Parameter::Type::Double:
-            if (parameter->value.number == nullptr ||
-                !std::isfinite(*parameter->value.number))
-            {
-                return false;
-            }
-
-            stored["value"] =
-                *parameter->value.number;
-            stored["unit"] =
-                parameter->data.number.unit != nullptr
-                    ? parameter->data.number.unit
-                    : "";
-            break;
-
-        case Parameter::Type::Selection:
-        {
-            if (parameter->discrete.target == nullptr ||
-                parameter->discrete.read == nullptr ||
-                parameter->data.selection.options == nullptr ||
-                parameter->data.selection.count == 0)
-            {
-                return false;
-            }
-
-            stored["value"] =
-                parameter->discrete.read(
-                    parameter->discrete.target);
-
-            JsonArray options =
-                stored["options"].to<JsonArray>();
-
-            for (uint8_t option = 0;
-                 option < parameter->data.selection.count;
-                 option++)
-            {
-                const ParameterOption& source =
-                    parameter->data.selection.options[option];
-
-                if (source.name == nullptr ||
-                    source.name[0] == '\0')
-                {
-                    return false;
-                }
-
-                JsonObject destination =
-                    options.add<JsonObject>();
-
-                destination["value"] = source.value;
-                destination["name"] = source.name;
-            }
-
-            break;
-        }
-
-        default:
-            return false;
-        }
+        return false;
     }
+
+    if (!writeDocument(document, TEMP_PATH, CONFIG_PATH))
+        return false;
+
+    usbExportPending = true;
 
     InterruptGuard interruptGuard;
 
+    if (usbExportStarted &&
+        !usbDriveMounted)
+    {
+        usbExportPending =
+            !refreshUsbExport();
+    }
+
+    return true;
+}
+
+bool Storage::saveBoard(const ParameterList& parameters)
+{
+    JsonDocument document;
+    document["schema"] = BOARD_SCHEMA_VERSION;
+
+    if (!ParameterJson::write(
+            document["parameters"].to<JsonArray>(),
+            parameters,
+            ParameterJson::Scope::Board))
+    {
+        return false;
+    }
+
+    // Réglages rarement modifiés : la flash n'est réécrite qu'au besoin.
+    if (matchesFile(document, BOARD_PATH))
+        return true;
+
+    return writeDocument(document, BOARD_TEMP_PATH, BOARD_PATH);
+}
+
+bool Storage::readDocument(
+    const char* path,
+    JsonDocument& document)
+{
+    File file = LittleFS.open(path, "r");
+
+    if (!file)
+        return false;
+
+    const DeserializationError error =
+        deserializeJson(document, file);
+
+    file.close();
+    return !error;
+}
+
+bool Storage::writeDocument(
+    const JsonDocument& document,
+    const char* temporaryPath,
+    const char* path)
+{
+    InterruptGuard interruptGuard;
+
     File temporary =
-        LittleFS.open(TEMP_PATH, "w");
+        LittleFS.open(temporaryPath, "w");
 
     if (!temporary)
         return false;
@@ -285,35 +343,48 @@ bool Storage::save(
     temporary.flush();
     temporary.close();
 
-    if (writtenSize != expectedSize ||
-        !validateWrittenFile())
-    {
-        LittleFS.remove(TEMP_PATH);
-        return false;
-    }
+    JsonDocument written;
+
+    const bool valid =
+        writtenSize == expectedSize &&
+        readDocument(temporaryPath, written) &&
+        written["schema"] == document["schema"] &&
+        written["parameters"].is<JsonArrayConst>();
 
     /*
      * littlefs remplace atomiquement la destination lors du rename :
      * une coupure laisse donc soit l'ancien fichier, soit le nouveau.
      */
-    if (!LittleFS.rename(
-            TEMP_PATH,
-            CONFIG_PATH))
+    if (!valid ||
+        !LittleFS.rename(temporaryPath, path))
     {
-        LittleFS.remove(TEMP_PATH);
+        LittleFS.remove(temporaryPath);
         return false;
     }
 
-    usbExportPending = true;
-
-    if (usbExportStarted &&
-        !usbDriveMounted)
-    {
-        usbExportPending =
-            !refreshUsbExport();
-    }
-
     return true;
+}
+
+bool Storage::matchesFile(
+    const JsonDocument& document,
+    const char* path)
+{
+    InterruptGuard interruptGuard;
+
+    if (!LittleFS.exists(path))
+        return false;
+
+    File file = LittleFS.open(path, "r");
+
+    if (!file)
+        return false;
+
+    FileComparator comparator(file);
+    serializeJson(document, comparator);
+
+    const bool same = comparator.matches();
+    file.close();
+    return same;
 }
 
 bool Storage::saveCounters(const JsonDocument& document)
@@ -623,246 +694,4 @@ bool Storage::refreshUsbExport()
     }
 
     return true;
-}
-
-bool Storage::readConfiguration(
-    const char* installationId,
-    ParameterList& parameters,
-    ParameterEditor& editor)
-{
-    File file =
-        LittleFS.open(CONFIG_PATH, "r");
-
-    if (!file)
-        return false;
-
-    JsonDocument document;
-    const DeserializationError error =
-        deserializeJson(document, file);
-
-    file.close();
-
-    if (error ||
-        installationId == nullptr ||
-        installationId[0] == '\0' ||
-        document["schema"].as<uint32_t>() !=
-            SCHEMA_VERSION ||
-        !isValidRequiredText(
-            document["installation_id"]) ||
-        strcmp(
-            installationId,
-            document["installation_id"]
-                .as<const char*>()) != 0 ||
-        !document["parameters"].is<JsonArrayConst>())
-    {
-        return false;
-    }
-
-    bool seen[MAX_PARAMETERS] = {};
-
-    for (JsonObjectConst stored :
-         document["parameters"].as<JsonArrayConst>())
-    {
-        if (!isValidRequiredText(stored["category_key"]) ||
-            !isValidRequiredText(stored["category_name"]) ||
-            !isValidRequiredText(stored["owner_key"]) ||
-            !isValidRequiredText(stored["owner_name"]) ||
-            !isValidRequiredText(stored["key"]) ||
-            !isValidRequiredText(stored["name"]) ||
-            !isValidRequiredText(stored["type"]) ||
-            stored["value"].isNull())
-        {
-            return false;
-        }
-
-        const char* ownerKey =
-            stored["owner_key"].as<const char*>();
-        const char* key =
-            stored["key"].as<const char*>();
-
-        size_t parameterIndex = parameters.count();
-
-        for (size_t i = 0; i < parameters.count(); i++)
-        {
-            const Parameter* candidate =
-                parameters.get(i);
-
-            if (candidate != nullptr &&
-                strcmp(candidate->ownerKey, ownerKey) == 0 &&
-                strcmp(candidate->key, key) == 0)
-            {
-                parameterIndex = i;
-                break;
-            }
-        }
-
-        /*
-         * Une version plus récente peut avoir supprimé un paramètre.
-         * Une entrée inconnue est donc ignorée, sans invalider les
-         * paramètres encore reconnus.
-         */
-        if (parameterIndex >= parameters.count())
-            continue;
-
-        Parameter* parameter =
-            parameters.get(parameterIndex);
-
-        /* Ignore aussi une ancienne entrée devenue transitoire. */
-        if (parameter != nullptr &&
-            !parameter->persistent)
-        {
-            continue;
-        }
-
-        if (seen[parameterIndex])
-            return false;
-
-        seen[parameterIndex] = true;
-
-        ParameterDraft& draft =
-            editor.get(parameterIndex);
-
-        if (parameter == nullptr ||
-            draft.parameter != parameter ||
-            strcmp(
-                parameter->categoryKey,
-                stored["category_key"].as<const char*>()) != 0 ||
-            strcmp(
-                typeName(parameter->type),
-                stored["type"].as<const char*>()) != 0)
-        {
-            return false;
-        }
-
-        switch (parameter->type)
-        {
-        case Parameter::Type::Bool:
-            if (!stored["value"].is<bool>())
-                return false;
-
-            draft.booleanValue =
-                stored["value"].as<bool>();
-            break;
-
-        case Parameter::Type::Integer:
-        {
-            if (!stored["value"].is<int32_t>() ||
-                !stored["unit"].is<const char*>())
-            {
-                return false;
-            }
-
-            draft.integerValue =
-                stored["value"].as<int32_t>();
-            break;
-        }
-
-        case Parameter::Type::Double:
-        {
-            if (!stored["value"].is<double>() ||
-                !stored["unit"].is<const char*>())
-            {
-                return false;
-            }
-
-            draft.numberValue =
-                stored["value"].as<double_t>();
-            break;
-        }
-
-        case Parameter::Type::Selection:
-        {
-            if (!stored["value"].is<int32_t>() ||
-                !stored["options"].is<JsonArrayConst>())
-            {
-                return false;
-            }
-
-            JsonArrayConst options =
-                stored["options"].as<JsonArrayConst>();
-
-            if (options.size() !=
-                    parameter->data.selection.count)
-            {
-                return false;
-            }
-
-            draft.selectionValue =
-                stored["value"].as<int32_t>();
-
-            size_t optionIndex = 0;
-
-            for (JsonObjectConst storedOption : options)
-            {
-                if (!storedOption["value"].is<int32_t>() ||
-                    !isValidRequiredText(
-                        storedOption["name"]))
-                {
-                    return false;
-                }
-
-                const ParameterOption& currentOption =
-                    parameter->data.selection
-                        .options[optionIndex];
-
-                if (storedOption["value"].as<int32_t>() !=
-                    currentOption.value)
-                {
-                    return false;
-                }
-
-                optionIndex++;
-            }
-
-            break;
-        }
-
-        default:
-            return false;
-        }
-
-    }
-
-    return true;
-}
-
-bool Storage::validateWrittenFile() const
-{
-    File file =
-        LittleFS.open(TEMP_PATH, "r");
-
-    if (!file)
-        return false;
-
-    JsonDocument document;
-    const DeserializationError error =
-        deserializeJson(document, file);
-
-    file.close();
-
-    return
-        !error &&
-        document["schema"].as<uint32_t>() ==
-            SCHEMA_VERSION &&
-        isValidRequiredText(
-            document["installation_id"]) &&
-        document["parameters"].is<JsonArrayConst>();
-}
-
-const char* Storage::typeName(
-    Parameter::Type type)
-{
-    switch (type)
-    {
-    case Parameter::Type::Bool:
-        return "bool";
-    case Parameter::Type::Integer:
-        return "integer";
-    case Parameter::Type::Double:
-        return "double";
-    case Parameter::Type::Selection:
-        return "selection";
-    default:
-        return "invalid";
-    }
 }

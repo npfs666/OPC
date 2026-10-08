@@ -24,6 +24,18 @@ namespace
     constexpr double_t REFERENCE_TOLERANCE = 0.05;
     constexpr double_t ADC_FULL_SCALE = 32768.0;
     constexpr int32_t ADC_POSITIVE_SATURATION = 32767;
+
+    // Calibrations propres à la carte : /board.json, voir ParameterOwner.
+    ParameterOwner boardOwner(
+        const char* ownerKey,
+        const char* ownerName,
+        bool persistent = true)
+    {
+        ParameterOwner owner{
+            "calibration", "Calibration", ownerKey, ownerName, persistent};
+        owner.board = true;
+        return owner;
+    }
 }
 
 
@@ -461,15 +473,13 @@ void SensorBoard::registerParameters(ParameterList& list)
         rtd[i]->registerParameters(list);
     }
 
-    auto parameters = list.forOwner({
-        "calibration", "Calibration", "sensor_board.thermocouple_calibration", "Thermocouples"
-    });
+    auto parameters = list.forOwner(boardOwner(
+        "sensor_board.thermocouple_calibration", "Thermocouples"));
     parameters.addDouble("cold_junction_offset", "C.J. offset",
         settings.coldJunctionOffset, -10, 10, 0.01, 2, "°C");
 
-    auto readings = list.forOwner({
-        "calibration", "Calibration", "sensor_board.thermocouple_calibration", "Thermocouples", false
-    });
+    auto readings = list.forOwner(boardOwner(
+        "sensor_board.thermocouple_calibration", "Thermocouples", false));
     readings.addDouble("adc_temperature", "Temp. ADC",
         adcTemperature, "°C", true, 2);
 
@@ -500,14 +510,11 @@ void SensorBoard::registerCalibrationParameters(
     const double_t nominalCalibrationResistance =
         isPt1000 ? 1000.0 : 100.0;
 
-    auto parameters = list.forOwner({
-        "calibration",
-        "Calibration",
+    auto parameters = list.forOwner(boardOwner(
         isPt1000
             ? "sensor_board.pt1000_calibration"
             : "sensor_board.pt100_calibration",
-        isPt1000 ? "PT1000" : "PT100"
-    });
+        isPt1000 ? "PT1000" : "PT100"));
 
     parameters.addDouble(
         "reference_resistance",
@@ -556,12 +563,9 @@ void SensorBoard::registerCalibrationParameters(
 void SensorBoard::registerZeroCalibrationParameters(
     ParameterList& list)
 {
-    auto parameters = list.forOwner({
-        "calibration",
-        "Calibration",
+    auto parameters = list.forOwner(boardOwner(
         "sensor_board.zero_calibration",
-        "Zeros ADC"
-    });
+        "Zeros ADC"));
 
     constexpr const char* ZERO_KEYS[MAX_RTD] = {
         "zero_input_1",
