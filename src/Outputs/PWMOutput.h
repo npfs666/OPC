@@ -38,6 +38,7 @@ public:
     bool begin() override;
     void poll(uint32_t now) override;
     void forceSafe() override;
+    double_t safeCommand() const override;
     bool applySettings() override;
     bool isHealthy() const override;
 
@@ -46,7 +47,7 @@ public:
      * par exemple 0 pour une résistance chauffante (voir
      * RelayOutput::lockSafeState()).
      */
-    void lockSafeCommand(double_t safeCommand);
+    void lockSafeCommand(double_t safeCommand) override;
 
     void registerParameters(ParameterList& list) override;
     bool validateParameters(const ParameterEditor& editor) const override;

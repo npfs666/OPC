@@ -11,6 +11,7 @@ industriel.
 - Mise à jour : 2026-10-07 (logique d'installation : glue, comparateur,
   temporisation, inhibition, alarme sur condition ; voir
   `Plan_logique_installation.md`)
+- Mise à jour : 2026-10-08 (vanne 3 points, `ThreePointActuator`)
 
 Légende : ✅ fait · 🟡 partiel · ⬜ à faire · ➖ volontairement non retenu.
 
@@ -37,7 +38,7 @@ Légende : ✅ fait · 🟡 partiel · ⬜ à faire · ➖ volontairement non re
 
 | Fonction | JUMO | OPC | État |
 | --- | --- | --- | --- |
-| Types de régulateur | 2 états, 3 états (chaud / froid), pas à pas, continu | Thermostat, PID chauffage ou refroidissement, comparateur (seuil ou différentiel), programmation horaire ; solaire et chambre froide en templates | 🟡 pas de 3 états ni de pas à pas |
+| Types de régulateur | 2 états, 3 états (chaud / froid), pas à pas, continu | Thermostat, PID chauffage ou refroidissement, comparateur (seuil ou différentiel), programmation horaire ; solaire et chambre froide en templates | 🟡 pas de 3 états ; pas à pas : vanne 3 points (`ThreePointActuator`) |
 | Comportement sur défaut de sonde | Configurable, dont sortie forcée | `Sécurité` (défaut) ou `Maintien` limité dans le temps. Pas de sortie forcée : sans mesure, l'état sûr reste la règle | ✅ choix volontaire |
 | Temps mini du relais (Tk) | Oui | `Marche mini`, `Arrêt mini` par relais, `Impulsion mini` de l'actionneur temporel | ✅ |
 | Autotune | Oscillation ou réponse indicielle | Oscillation, 4 règles de calcul | 🟡 pas de réponse indicielle |
@@ -96,7 +97,7 @@ Les quatre premières sont du logiciel seul, réalisable sur la carte actuelle.
 | **PID chaud / froid** avec zone morte | Chambres climatiques, bains | Moyen |
 | **Import et sauvegarde de la configuration par USB** | Mise en service en série, sauvegarde avant intervention | Moyen |
 | **Fonctions des entrées numériques choisies dans le menu** : marche / arrêt à distance, deuxième consigne, manuel, acquittement, défaut externe (verrouillage) | Câbler un thermostat d'ambiance, un contact de porte, un défaut de pompe… sans programmer. Déjà possible en C++ : glue (inhibition), `ConditionAlarm` sur entrée TOR, acquittement par entrée | Moyen |
-| **Vanne 3 points** (pas à pas, deux relais, temps de course) | Chauffage hydraulique | Moyen |
+| ✅ **Vanne 3 points** (pas à pas, deux relais, temps de course) | Chauffage hydraulique | Fait : `ThreePointActuator`, câblage Ouvrir / Fermer ou Marche / Sens, recalage en butée |
 
 ### Plus tard
 
@@ -218,6 +219,13 @@ fixe, mesure en grand, jauge des seuils du thermostat.
   (dégivrage, porte, masquage d'alarme) ; verrou d'état sûr des sorties PWM.
 - Guide d'écriture d'un template, templates testés complets sur PC.
 
+**Vanne 3 points**
+
+- `ThreePointActuator` : position estimée sur le temps de course, recalage
+  en butée et au démarrage, zone morte, pause d'inversion. Câblage
+  Ouvrir / Fermer ou Marche / Sens (inverseur, interverrouillage matériel).
+- Mise en état sûr en deux passes (coupure avant mise en marche).
+
 ### Proposé
 
 1. Démarrage progressif. Export du journal par la clé USB (le disque USB
@@ -226,8 +234,7 @@ fixe, mesure en grand, jauge des seuils du thermostat.
    niveau opérateur ne sont plus retenus).
 3. Enregistrement des courbes, Modbus sur l'USB série.
 4. Template universel configurable par le menu.
-5. Selon les applications : programmateur de consigne, PID chaud / froid,
-   vanne 3 points.
+5. Selon les applications : programmateur de consigne, PID chaud / froid.
 6. Révision matérielle (§ 3).
 7. Distribution : un `.uf2` par template, identité du firmware dans le menu
    (phase 4 du plan de la logique d'installation, en fin de projet).

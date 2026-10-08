@@ -38,6 +38,9 @@ bool Actuator::addOutput(Output& output)
             return false;
     }
 
+    if (!acceptOutput(output))
+        return false;
+
     outputs[outputCount++] = &output;
 
     return true;

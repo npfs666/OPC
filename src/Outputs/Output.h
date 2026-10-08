@@ -47,6 +47,15 @@ public:
 
     virtual void forceSafe() = 0;
 
+    /** Commande appliquée par forceSafe(), de 0 à 1. */
+    virtual double_t safeCommand() const = 0;
+
+    /**
+     * Impose la commande de sécurité et la rend non modifiable dans le menu
+     * (un relais la ramène à ON ou OFF, voir RelayOutput::lockSafeState()).
+     */
+    virtual void lockSafeCommand(double_t safeCommand) = 0;
+
     virtual bool applySettings() = 0;
 
     virtual bool isHealthy() const = 0;

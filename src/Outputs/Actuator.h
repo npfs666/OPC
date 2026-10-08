@@ -38,6 +38,16 @@ protected:
     double_t printValue() const override;
     const char* getUnit() const override;
 
+    /**
+     * Appelé par process.connect() avant de relier la sortie. Faux pour la
+     * refuser (sortie inattendue, nombre de sorties dépassé).
+     */
+    virtual bool acceptOutput(Output& output)
+    {
+        (void)output;
+        return true;
+    }
+
     Output* outputs[MAX_OUTPUTS] = {};
 
     uint8_t outputCount = 0;

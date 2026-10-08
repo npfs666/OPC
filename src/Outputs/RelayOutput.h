@@ -44,6 +44,11 @@ public:
 
     void forceSafe() override;
 
+    double_t safeCommand() const override;
+
+    /** lockSafeState(safeCommand >= 0.5). */
+    void lockSafeCommand(double_t safeCommand) override;
+
     bool applySettings() override;
 
     bool isHealthy() const override;

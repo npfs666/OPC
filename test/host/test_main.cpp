@@ -316,6 +316,15 @@ namespace
             setAppliedCommand(0.0);
         }
 
+        double_t safeCommand() const override
+        {
+            return 0.0;
+        }
+
+        void lockSafeCommand(double_t) override
+        {
+        }
+
         bool applySettings() override
         {
             return begin();
@@ -3229,6 +3238,7 @@ void runInhibitTests();
 void runConditionAlarmTests();
 void runColdRoomTests();
 void runMinimalInstallationTests();
+void runThreePointTests();
 
 int main()
 {
@@ -3433,6 +3443,7 @@ int main()
     runConditionAlarmTests();
     runColdRoomTests();
     runMinimalInstallationTests();
+    runThreePointTests();
 
     return TestHarness::finish();
 }

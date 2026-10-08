@@ -20,6 +20,7 @@ Regulator ──► Actuator ──► Output
 | `ActuatorOnOff` | 1 si la commande du régulateur ≥ 0,5, sinon 0. Pour un thermostat, un comparateur, une temporisation, une alarme ou une commande de la glue. |
 | `TimeProportionalActuator` | Allume la sortie pendant `commande × période` à chaque période. Pour un PID sur relais. |
 | `ActuatorPWM` | Transmet la commande telle quelle (0 à 1). Pour un PID sur sortie PWM. |
+| `ThreePointActuator` | Deux sorties : ouvrir et fermer une vanne motorisée 3 points, la commande étant la position voulue. Voir [Vanne 3 points](#vanne-3-points). |
 
 | Sortie | Broches possibles |
 | --- | --- |
@@ -174,6 +175,132 @@ longue devant m (le template PID utilise 0,5 s sur 10 s, soit 5 %).
 Le menu refuse d'affecter la même broche à deux sorties. En code, utiliser une
 broche distincte par sortie.
 
+## Vanne 3 points
+
+Un servomoteur 3 points a un fil commun et un fil par sens : alimenter
+« ouvrir » ouvre la vanne, alimenter « fermer » la ferme, ne rien alimenter la
+laisse en place. Il n'y a pas de recopie de position ; les fins de course du
+servomoteur coupent le moteur en butée. « 3 points » désigne la commande
+électrique, pas l'hydraulique (une vanne 3 voies peut avoir un autre
+servomoteur).
+
+`ThreePointActuator` reçoit la commande du régulateur (0 à 1) comme position
+voulue. Le PID, l'autotune, le mode manuel et les alarmes ne changent pas.
+
+- **Position estimée** à partir de l'état réellement appliqué des sorties et du
+  temps de course. Elle reste juste malgré les temps minimaux d'un relais et
+  pendant les replis.
+- **Recalage** : une commande à 0 ou 1 pousse la vanne jusqu'en butée, puis
+  pendant la sur-course, et remet l'estimation exactement à 0 ou 1. Au
+  démarrage, la position est inconnue : la vanne fait une course complète plus
+  la sur-course vers la butée la plus proche de la commande (fermeture si la
+  commande est sous 50 %), puis rejoint la commande. Une marche de repli assez
+  longue (fermeture) recale aussi.
+- **Zone morte** : une nouvelle marche ne part que si l'écart dépasse la zone
+  morte ; elle va alors jusqu'à la position voulue. Une impulsion dure donc au
+  moins `zone morte × temps de course`.
+- **Inversion** : arrêt, puis `Pause inversion`, puis l'autre sens. Les deux
+  sens ne sont jamais commandés ensemble.
+- Un arrêt commandé (commande 0 valide : PID non activé, inhibition) **ferme**
+  la vanne. Une commande invalide applique le repli (voir plus bas).
+
+### Câblage
+
+**Ouvrir / Fermer** : une sortie par sens.
+
+```cpp
+vanne.begin("vanne", "Vanne mélange", pid, relaisOuvrir, relaisFermer, 120);
+
+relaisOuvrir.begin("v_open", "Vanne ouvrir", Board::Rp2040::OUTPUT_1);
+relaisFermer.begin("v_close", "Vanne fermer", Board::Rp2040::OUTPUT_2,
+                   true, true);     // état sûr ON : fermeture en défaut
+
+if (!process.add(vanne) ||
+    !process.connect(vanne, relaisOuvrir) ||
+    !process.connect(vanne, relaisFermer))
+    return fail("Vanne non reliée");
+```
+
+**Marche / Sens** (recommandé avec des relais) : un relais coupe
+l'alimentation, l'autre, câblé en inverseur, choisit le sens. Les deux fils ne
+peuvent **physiquement** jamais être alimentés ensemble.
+
+```
+Phase / 24 V ── COM R1 (Marche)
+                NO  R1 ──── COM R2 (Sens)
+                            NO  R2 ── Ouvrir
+                            NC  R2 ── Fermer
+```
+
+```cpp
+vanne.beginRunDirection("vanne", "Vanne mélange", pid, relaisMarche, relaisSens, 120);
+```
+
+Sens ne bascule que Marche coupée (contact sans courant), puis Marche repart
+100 ms plus tard : Marche prend toute l'usure.
+
+Dans les deux cas, relier les sorties avec `process.connect()` **après** leur
+`begin()`. `process.connect()` refuse toute autre sortie que les deux passées à
+`begin()`.
+
+**Sorties DC (`OUTPUT_3`, `OUTPUT_4`)** : ce sont des sorties à collecteur
+ouvert, qui commutent à la masse. Un servomoteur 3 points attend le commun en
+référence (⊥ ou G0) et le +24 V sur le fil du sens : **ne jamais le brancher
+directement** sur ces sorties, le commun serait inversé. Elles pilotent très
+bien deux relais d'interface externes (bobine entre le +24 V et la sortie,
+diode de roue libre), en Ouvrir / Fermer ou en Marche / Sens avec des relais
+inverseurs ; les deux relais de la carte restent alors libres. La commande de
+sécurité d'une sortie PWM reliée à la vanne doit être 0 ou 1 (le menu refuse
+une autre valeur).
+
+| Montage | Sorties de la carte | Reste libre |
+| --- | --- | --- |
+| Vanne sur les relais de la carte | Relais 1 + 2 | Les 2 sorties DC |
+| Vanne sur 2 relais externes pilotés par les sorties DC | DC 1 + 2 | Les 2 relais |
+
+### Repli
+
+| Câblage | Verrouillée à OFF | Choisit le repli (`État de sécurité`) |
+| --- | --- | --- |
+| Ouvrir / Fermer | Ouvrir | Fermer : ON = fermeture en défaut, OFF = vanne figée |
+| Marche / Sens | Sens (au repos : fermer) | Marche : ON = fermeture en défaut, OFF = vanne figée |
+
+Les fins de course coupent le moteur : une fermeture prolongée en défaut ne
+l'abîme pas. Le repli coupe toujours la sortie à l'arrêt avant de mettre
+l'autre en marche (voir [État sûr](#état-sûr)), mais il ne peut pas attendre
+la pause d'inversion : une vanne en ouverture repart aussitôt en fermeture.
+Les moteurs de vanne le supportent en général. À la reprise, l'estimation
+compte la durée du repli.
+
+### Réglages
+
+**Menu `Actionneurs > <nom de la vanne>`** (`ThreePointActuator`)
+
+| Paramètre | Champ | Rôle |
+| --- | --- | --- |
+| Temps de course | `settings.travelTime` | 10 à 600 s par pas de 5 s : durée fermée → ouverte (fiche du servomoteur) |
+| Zone morte | `settings.deadband` | 0,5 à 10 % (2 % par défaut) |
+| Pause inversion | `settings.reversalPause` | 100 à 5000 ms (500 ms par défaut) |
+| Sur-course | `settings.overtravel` | 0 à 100 % du temps de course (20 % par défaut) |
+
+`position()` donne la position estimée (0 à 1) et `isPositionKnown()` indique
+la fin du recalage du démarrage.
+
+### Limites
+
+- Laisser `Marche mini` et `Arrêt mini` à 0 sur les sorties de la vanne :
+  l'estimation reste juste, mais les impulsions s'allongent et la vanne
+  oscille autour de la position voulue.
+- Le temps de course s'ajoute au retard du process : l'autotune donne de bons
+  résultats si la course est courte devant la constante de temps. Le délai
+  d'une `LoopBreakAlarm` doit dépasser le temps de course.
+- Chaque impulsion compte une manœuvre de relais : la zone morte règle le
+  compromis entre précision et usure (seuil d'entretien, `Divers > Compteurs`).
+- L'estimation n'est recalée qu'en butée. Une vanne qui reste longtemps à mi-
+  course peut dériver de quelques % ; une commande à 0 ou 1 la recale.
+- La position n'est pas encore dans le snapshot : un écran d'accueil ne peut
+  pas l'afficher.
+
 ## État sûr
 
 Chaque sortie a un état de repli : `safeState` pour un relais, `safeCommand`
@@ -188,6 +315,11 @@ pour une sortie PWM. Il est appliqué automatiquement :
   (`Input > Timeout mesures`) ;
 - pendant l'application de réglages modifiés dans le menu ;
 - si une sortie n'est pas correctement initialisée (`isHealthy()`).
+
+Le repli se fait en deux passes : d'abord les sorties dont l'état sûr est
+l'arrêt, puis celles dont l'état sûr est la marche. Deux sorties qui ne doivent
+jamais être actives ensemble (les deux sens d'une vanne) ne le sont donc pas,
+même un instant.
 
 Un **arrêt commandé** n'est pas un défaut : PID non `Activé`, régulateur
 inhibé par la glue, programme hors plage réglé sur `Arrêt` donnent une

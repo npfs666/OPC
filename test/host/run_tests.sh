@@ -52,6 +52,7 @@ fi
     "${project_dir}/test/host/test_condition_alarm.cpp" \
     "${project_dir}/test/host/test_cold_room.cpp" \
     "${project_dir}/test/host/test_minimal_installation.cpp" \
+    "${project_dir}/test/host/test_three_point.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -80,6 +81,7 @@ fi
     "${project_dir}/src/Outputs/Output.cpp" \
     "${project_dir}/src/Outputs/RelayOutput.cpp" \
     "${project_dir}/src/Outputs/TimeProportionalActuator.cpp" \
+    "${project_dir}/src/Outputs/ThreePointActuator.cpp" \
     "${project_dir}/src/Outputs/PWMOutput.cpp" \
     "${project_dir}/src/Physics/PT100.cpp" \
     "${project_dir}/src/Physics/Thermocouple.cpp" \

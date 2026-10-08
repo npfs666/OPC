@@ -199,6 +199,21 @@ void RelayOutput::forceSafe()
     applyLogicalState(settings.safeState);
 }
 
+double_t RelayOutput::safeCommand() const
+{
+    const bool safeState =
+        safeStateLocked
+            ? lockedSafeState
+            : settings.safeState;
+
+    return safeState ? 1.0 : 0.0;
+}
+
+void RelayOutput::lockSafeCommand(double_t safeCommand)
+{
+    lockSafeState(safeCommand >= 0.5);
+}
+
 bool RelayOutput::applySettings()
 {
     if (safeStateLocked)

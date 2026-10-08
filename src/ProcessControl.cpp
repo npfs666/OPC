@@ -601,10 +601,19 @@ bool ProcessControl::applyOutputSettings()
 
 void ProcessControl::forceSafeOutputs()
 {
-    for (uint8_t i = 0; i < outputCount; i++)
+    // Coupure avant mise en marche : les sorties dont l'état sûr est à 0
+    // d'abord, pour qu'un repli n'alimente jamais un instant les deux sens
+    // d'une vanne 3 points.
+    for (uint8_t pass = 0; pass < 2; pass++)
     {
-        if (outputs[i] != nullptr)
-            outputs[i]->forceSafe();
+        for (uint8_t i = 0; i < outputCount; i++)
+        {
+            if (outputs[i] != nullptr &&
+                (outputs[i]->safeCommand() > 0.0) == (pass == 1))
+            {
+                outputs[i]->forceSafe();
+            }
+        }
     }
 }
 

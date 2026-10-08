@@ -115,6 +115,11 @@ void PWMOutput::forceSafe()
         setAppliedCommand(configuredSafeCommand);
 }
 
+double_t PWMOutput::safeCommand() const
+{
+    return configuredSafeCommand;
+}
+
 bool PWMOutput::applySettings()
 {
     return begin();

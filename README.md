@@ -606,7 +606,7 @@ avant le prochain dégivrage ou la fin de l'étape en cours.
 | Temporisation | `DelayTimer` : retard à la montée ou à la descente, voir [Temporisation](#temporisation) |
 | Glue | `LogicCommand` : sortie écrite par `processLogic()`, voir [Ajouter de la glue](#3-ajouter-de-la-glue-facultatif) |
 | Alarmes | `LimitAlarm` (seuil), `LoopBreakAlarm` (boucle ouverte), `ConditionAlarm` (entrée TOR ou glue), voir [Alarmes](#alarmes) |
-| Actionneurs | `ActuatorOnOff`, `ActuatorPWM`, `TimeProportionalActuator` |
+| Actionneurs | `ActuatorOnOff`, `ActuatorPWM`, `TimeProportionalActuator`, `ThreePointActuator` (vanne 3 points) |
 | Sorties | `RelayOutput`, `PWMOutput` — voir [src/Outputs/README.md](src/Outputs/README.md) |
 | Entrées numériques | `DigitalInput` — voir [src/Inputs/readme.md](src/Inputs/readme.md) |
 
