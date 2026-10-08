@@ -107,6 +107,20 @@ public:
         const TimeSchedule& schedule,
         double_t reducedSetpoint);
 
+    /**
+     * Consigne d'exécution : la consigne est celle de source
+     * (readSetpoint()), recalculée à chaque cycle et jamais sauvegardée
+     * (loi d'eau...). Source sans consigne et commande valide : arrêt
+     * commandé (commande 0 valide). Commande de la source invalide : état
+     * sûr. Les réglages « Consigne » et le programme du PID quittent le
+     * menu. La source doit être ajoutée au ProcessControl avant le PID.
+     * À appeler après begin(), avant l'enregistrement des paramètres.
+     */
+    void followSetpoint(const Regulator& source);
+
+    /** Vrai si la consigne vient d'un autre régulateur. */
+    bool followsSetpoint() const;
+
     /** Active la régulation PID automatique. */
     void start();
 
@@ -205,6 +219,14 @@ public:
 
 private:
     Measurement* measurement = nullptr;
+
+    const Regulator* setpointSource = nullptr;
+
+    /**
+     * Consigne cible avant rampe : celle de la source, ou la consigne
+     * réglée avec son programme. Faux s'il n'y en a pas.
+     */
+    bool readTarget(double_t& target) const;
 
     double_t setpointMinimum = -50.0;
     double_t setpointMaximum = 250.0;

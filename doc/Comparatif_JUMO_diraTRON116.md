@@ -11,7 +11,8 @@ industriel.
 - Mise à jour : 2026-10-07 (logique d'installation : glue, comparateur,
   temporisation, inhibition, alarme sur condition ; voir
   `Plan_logique_installation.md`)
-- Mise à jour : 2026-10-08 (vanne 3 points, `ThreePointActuator`)
+- Mise à jour : 2026-10-08 (vanne 3 points, `ThreePointActuator` ; loi d'eau,
+  `HeatingCurve`, et template circuit de chauffage)
 
 Légende : ✅ fait · 🟡 partiel · ⬜ à faire · ➖ volontairement non retenu.
 
@@ -225,6 +226,15 @@ fixe, mesure en grand, jauge des seuils du thermostat.
   en butée et au démarrage, zone morte, pause d'inversion. Câblage
   Ouvrir / Fermer ou Marche / Sens (inverseur, interverrouillage matériel).
 - Mise en état sûr en deux passes (coupure avant mise en marche).
+
+**Loi d'eau** (`Plan_loi_d_eau.md`)
+
+- `HeatingCurve` : courbe en deux points, ambiance confort / réduite par
+  programme, extérieur filtré, arrêt été, hors-gel, secours sur défaut de la
+  sonde extérieure.
+- Consigne d'exécution (`followSetpoint()`) du PID et du thermostat.
+- Template `HeatingCircuitInstallation` : vanne 3 points, pompe avec
+  post-circulation, sans glue.
 
 ### Proposé
 

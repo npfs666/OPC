@@ -3239,6 +3239,8 @@ void runConditionAlarmTests();
 void runColdRoomTests();
 void runMinimalInstallationTests();
 void runThreePointTests();
+void runHeatingCurveTests();
+void runHeatingCircuitTests();
 
 int main()
 {
@@ -3444,6 +3446,8 @@ int main()
     runColdRoomTests();
     runMinimalInstallationTests();
     runThreePointTests();
+    runHeatingCurveTests();
+    runHeatingCircuitTests();
 
     return TestHarness::finish();
 }

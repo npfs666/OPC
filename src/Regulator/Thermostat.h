@@ -61,6 +61,15 @@ public:
         double_t reducedSetpoint);
 
     /**
+     * Consigne d'exécution : voir PID::followSetpoint(). Source sans
+     * consigne et commande valide : arrêt commandé ; commande invalide :
+     * état sûr.
+     */
+    void followSetpoint(const Regulator& source);
+
+    bool followsSetpoint() const;
+
+    /**
      * Plage de réglage de la consigne et de la consigne réduite dans le menu
      * (défaut 0 à 200 °C) : chambre négative, hors-gel... À appeler après
      * begin(), avant l'enregistrement des paramètres.
@@ -89,6 +98,8 @@ public:
 private:
 
     Temperature* temperature = nullptr;
+
+    const Regulator* setpointSource = nullptr;
 
     double_t setpointMinimum = 0.0;
     double_t setpointMaximum = 200.0;

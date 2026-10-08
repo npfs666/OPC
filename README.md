@@ -350,6 +350,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 | `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
+| `HeatingCircuitInstallation` | Circuit de chauffage à vanne mélangeuse : départ (Pt100), extérieure (Pt1000), loi d'eau avec programme confort / réduit, PID du départ sur une vanne 3 points (relais 1 et 2), pompe avec post-circulation (sortie DC 1, par un relais d'interface) ; sans glue |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
 | `TestInstallation` (`testInstallation.h`) | Développement du psychromètre : température sèche (PT100 4 fils, ou thermocouple K avec `INPUT1_IS_THERMOCOUPLE`), température humide (PT100 4 fils), pression BMP580 (obligatoire) et humidité relative ; aucune sortie |
 
@@ -595,6 +596,32 @@ L'écran d'accueil affiche l'étape, l'ambiance, la consigne, l'évaporateur,
 le compresseur, les ventilateurs (`PORTE` porte ouverte) et le temps restant
 avant le prochain dégivrage ou la fin de l'étape en cours.
 
+#### Template circuit de chauffage
+
+`HeatingCircuitInstallation` régule un circuit de chauffage hydraulique
+(radiateurs, plancher) par une vanne mélangeuse, sans glue :
+
+- **Sonde 1, départ** (Pt100 3 fils), après la vanne et la pompe ;
+- **Sonde 2, extérieure** (Pt1000 2 fils), au nord, à l'abri du soleil ;
+- **Relais 1 et 2, vanne 3 points** (Ouvrir, Fermer ; course 120 s) : la vanne
+  se ferme en défaut ;
+- **Sortie DC 1, pompe**, par un relais d'interface (collecteur ouvert) :
+  elle tourne en défaut, contre le gel.
+
+La [loi d'eau](#loi-deau) calcule le départ (programme `Confort` de 6 h à
+22 h, ambiance réduite à 17 °C en dehors), le PID `Départ` le suit et pilote
+la vanne, la pompe suit la demande de chauffe avec 5 min de post-circulation.
+La consigne d'ambiance se règle à l'accueil. Le PID part de Kp 0,05 et
+Ti 240 s, à affiner à la mise en service ou par l'autotune.
+
+Pour un plancher, régler `Départ maxi` et activer l'alarme `Départ haut`
+(55 °C) ; garder le thermostat de sécurité matériel qui coupe la pompe.
+
+L'écran d'accueil affiche l'état de la loi d'eau (`CONFORT`, `REDUIT`, `ETE`,
+`ARRET`, `HORS-GEL`), l'extérieur (en orange sur la valeur de secours),
+l'ambiance, le départ et sa consigne, la position de la vanne (`RECALAGE` au
+démarrage) et la pompe.
+
 ## Composants disponibles
 
 | Catégorie | Classes |
@@ -602,6 +629,7 @@ avant le prochain dégivrage ou la fin de l'étape en cours.
 | Entrée analogique | `Sensor` : PT100 / PT1000 (2, 3 ou 4 fils), thermocouple B, E, J, K, N, R, S, T |
 | Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
 | Régulateurs | `Thermostat`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
+| Loi d'eau | `HeatingCurve` : consigne de départ selon l'extérieur, suivie par un PID ou un thermostat, voir [Loi d'eau](#loi-deau) |
 | Comparateur | `Comparator` : seuil ou différentiel à hystérésis, voir [Comparateur](#comparateur) |
 | Temporisation | `DelayTimer` : retard à la montée ou à la descente, voir [Temporisation](#temporisation) |
 | Glue | `LogicCommand` : sortie écrite par `processLogic()`, voir [Ajouter de la glue](#3-ajouter-de-la-glue-facultatif) |
@@ -720,6 +748,81 @@ inconnue) rend la temporisation invalide (état sûr de ses sorties) et la
 remet à zéro. Un arrêt commandé de la source (consigne atteinte, inhibition,
 PID non `Activé`, fin de plage d'un programme réglé sur `Arrêt`) laisse la
 post-circulation s'écouler.
+
+### Loi d'eau
+
+`HeatingCurve` ([Regulator/HeatingCurve.h](src/Regulator/HeatingCurve.h))
+calcule la température de départ d'un circuit de chauffage d'après la
+température extérieure. C'est un régulateur à deux sorties :
+
+- sa **consigne** (`readSetpoint()`) est le départ calculé, à suivre par un
+  PID ou un thermostat ;
+- sa **commande** est la demande de chauffe : 1 pour chauffer, 0 pour un arrêt
+  commandé (été, hors plage en `Arrêt`). Elle pilote la pompe, directement ou
+  par une `DelayTimer` de post-circulation.
+
+```cpp
+courbe.begin("loi_eau", "Loi d'eau", temperatureExterieure);
+courbe.setSchedule(programmeConfort, 17.0);   // ambiance réduite hors plage
+
+pid.begin("depart", "Départ", temperatureDepart);
+pid.followSetpoint(courbe);                   // consigne d'exécution
+
+// La courbe avant le PID : il lit la consigne du même cycle.
+process.add(programmeConfort); process.add(courbe); process.add(pid);
+```
+
+**Courbe.** Deux points, définis pour 20 °C d'ambiance : `T. ext. froid` →
+`Départ à froid` (-10 → 45 °C) et `T. ext. doux` → `Départ à doux`
+(20 → 20 °C), prolongés au-delà et bornés par `Départ mini` et `Départ maxi`
+(20 et 50 °C). La pente est l'écart de départ par degré extérieur
+((45 − 20) / 30 = 0,83 par défaut).
+
+**Ambiance.** `Cons. ambiance` (confort, 20 °C) se règle à l'accueil sans
+arrêter la régulation. Avec un programme, `Cons. réduite` s'applique hors
+plage, ou la chauffe s'arrête (`Hors plage` : `Arrêt`). Un écart d'ambiance
+décale la courbe de `(1 + pente) × écart` : avec la pente par défaut, 1 K
+d'ambiance en plus donne 1,83 K de départ en plus.
+
+**Extérieur filtré.** `Inertie bât.` (en heures, 0 = sans filtre) lisse la
+température extérieure par un premier ordre : un bâtiment lourd ne réagit
+pas à une heure de soleil. La courbe et l'arrêt été utilisent la valeur
+filtrée.
+
+**Arrêt été.** Au-dessus de `Arrêt été` (17 °C), la chauffe s'arrête ; elle
+reprend 1 K en dessous.
+
+**Hors-gel.** Chauffe arrêtée (été, programme en `Arrêt`) et extérieur
+mesuré, non filtré, sous `Hors-gel` (3 °C) : la demande de chauffe est
+maintenue, départ à `Départ mini`. La pompe tourne, la vanne régule.
+
+**Défauts.**
+
+| Situation | Comportement |
+| --- | --- |
+| Sonde extérieure en défaut | La courbe utilise `T. ext. secours` (0 °C) : la chauffe continue |
+| Pas encore de mesure extérieure (démarrage) | Commande invalide, état sûr |
+| Heure inconnue avec un programme | Commande invalide, état sûr |
+| Sonde de départ en défaut | Règle normale du PID (`Si défaut`) |
+
+Le secours de la sonde extérieure est une exception voulue à la règle
+« défaut de mesure = état sûr » : arrêter un chauffage en hiver sur une sonde
+coupée expose l'installation au gel. Le journal note le défaut, et l'écran du
+template l'affiche.
+
+**Consigne d'exécution.** `PID::followSetpoint(source)` et
+`Thermostat::followSetpoint(source)` remplacent la consigne réglée par celle
+d'un autre régulateur, recalculée à chaque cycle et jamais sauvegardée :
+
+- la source donne une consigne : le régulateur la suit (rampe comprise) ;
+- pas de consigne et commande de la source valide : arrêt commandé
+  (commande 0 valide, la vanne se ferme) ;
+- commande de la source invalide : état sûr ;
+- `Consigne` et le programme du régulateur suiveur quittent son menu. Le mode
+  manuel, l'autotune (autour de la consigne du moment) et les alarmes
+  relatives restent.
+
+Un thermostat qui suit la loi d'eau pilote une chaudière en tout-ou-rien.
 
 ## Utilisation
 

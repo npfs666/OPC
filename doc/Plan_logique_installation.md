@@ -396,9 +396,10 @@ template). Priorité faible.
 
 ## 6. Plus tard, si un besoin apparaît
 
-- **Consigne d'exécution** non persistante sur les régulateurs (loi d'eau,
-  réduit sur contact). Aucun démonstrateur ne l'utilise : elle sera ajoutée
-  quand une application la demandera.
+- ✅ **Consigne d'exécution** non persistante sur les régulateurs :
+  `followSetpoint()` du PID et du thermostat, utilisée par la loi d'eau
+  (`HeatingCurve`, voir `Plan_loi_d_eau.md`). Reste à faire : le réduit sur
+  contact, par une source pilotée par la glue.
 - **Retrait du mode manuel** du Thermostat et du PID (décision 8).
 - **Templates séparés en deux fichiers** (logique / écran).
 

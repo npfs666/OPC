@@ -53,6 +53,8 @@ fi
     "${project_dir}/test/host/test_cold_room.cpp" \
     "${project_dir}/test/host/test_minimal_installation.cpp" \
     "${project_dir}/test/host/test_three_point.cpp" \
+    "${project_dir}/test/host/test_heating_curve.cpp" \
+    "${project_dir}/test/host/test_heating_circuit.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -95,6 +97,7 @@ fi
     "${project_dir}/src/Regulator/Comparator.cpp" \
     "${project_dir}/src/Regulator/ConditionAlarm.cpp" \
     "${project_dir}/src/Regulator/DelayTimer.cpp" \
+    "${project_dir}/src/Regulator/HeatingCurve.cpp" \
     "${project_dir}/src/Regulator/LimitAlarm.cpp" \
     "${project_dir}/src/Regulator/LogicCommand.cpp" \
     "${project_dir}/src/Regulator/LoopBreakAlarm.cpp" \
@@ -105,6 +108,7 @@ fi
     "${project_dir}/src/SystemWatchdog.cpp" \
     "${project_dir}/src/Templates/SolarInstallation.cpp" \
     "${project_dir}/src/Templates/ColdRoomInstallation.cpp" \
+    "${project_dir}/src/Templates/HeatingCircuitInstallation.cpp" \
     "${project_dir}/examples/MinimalInstallation/MinimalInstallation.cpp" \
     -o "${binary}"
 

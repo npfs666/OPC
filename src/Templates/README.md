@@ -176,6 +176,7 @@ réglages de la carte (6 par sonde RTD, 13 de calibration) et de l'horloge
 | Masquer une alarme | alarme + `allowInhibit()` | `inhibit(true / false)` |
 | Signaler une condition | `ConditionAlarm` | `set(condition)` |
 | Lire une commande | tout régulateur | `isCommandValid()`, `readCommand()` |
+| Consigne calculée (loi d'eau) | `HeatingCurve` + `followSetpoint()` | reliée dans `begin()`, sans glue |
 | Lire une mesure, une entrée | `Measurement`, `DigitalInput` | `isValid()`, `getValue()`, `isActive()` |
 
 Un `Comparator` ou une `DelayTimer` (`setSource()`) peuvent aussi être reliés

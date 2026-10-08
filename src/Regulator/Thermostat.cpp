@@ -49,6 +49,7 @@ void Thermostat::begin(
     Regulator::begin(key, name);
 
     this->temperature = &temperature;
+    setpointSource = nullptr;
 
     settings.mode = Mode::Heating;
     settings.setpoint = 20.0;
@@ -64,6 +65,16 @@ void Thermostat::setSchedule(
     double_t reducedSetpoint)
 {
     scheduledSetpoint.attach(schedule, reducedSetpoint);
+}
+
+void Thermostat::followSetpoint(const Regulator& source)
+{
+    setpointSource = &source;
+}
+
+bool Thermostat::followsSetpoint() const
+{
+    return setpointSource != nullptr;
 }
 
 bool Thermostat::setSetpointLimits(
@@ -112,7 +123,23 @@ void Thermostat::update(uint32_t now)
 
     double_t target = settings.setpoint;
 
+    // Consigne d'exécution : sans consigne, arrêt commandé si la commande de
+    // la source est valide (été...), défaut sinon.
+    if (setpointSource != nullptr &&
+        !setpointSource->readSetpoint(target))
+    {
+        setpointRamp.restart();
+
+        if (setpointSource->isCommandValid())
+            writeCommand(0.0);
+        else
+            invalidateCommand();
+
+        return;
+    }
+
     const bool scheduled =
+        setpointSource != nullptr ||
         scheduledSetpoint.update(
             settings.setpoint,
             target);
@@ -222,7 +249,11 @@ bool Thermostat::readSetpoint(double_t& setpoint) const
     // Manuel : la consigne réglée (programme compris, sans rampe) reste la
     // référence des alarmes relatives, qui surveillent le forçage.
     if (isManual())
-        return scheduledSetpoint.readTarget(settings.setpoint, setpoint);
+    {
+        return setpointSource != nullptr
+            ? setpointSource->readSetpoint(setpoint)
+            : scheduledSetpoint.readTarget(settings.setpoint, setpoint);
+    }
 
     // Inhibé : pas de consigne active, les alarmes relatives sont suspendues.
     if (isInhibited() ||
@@ -306,23 +337,27 @@ void Thermostat::registerParameters(ParameterList& list) {
         settings.mode,
         THERMOSTAT_MODE_OPTIONS);
 
-    parameters.addDouble(
-        "setpoint",
-        "Consigne",
-        settings.setpoint,
-        setpointMinimum,
-        setpointMaximum,
-        0.1,
-        1,
-        "°C");
+    // Consigne d'exécution : la consigne n'est pas un réglage.
+    if (setpointSource == nullptr)
+    {
+        parameters.addDouble(
+            "setpoint",
+            "Consigne",
+            settings.setpoint,
+            setpointMinimum,
+            setpointMaximum,
+            0.1,
+            1,
+            "°C");
 
-    scheduledSetpoint.registerParameters(
-        parameters,
-        setpointMinimum,
-        setpointMaximum,
-        0.1,
-        1,
-        "°C");
+        scheduledSetpoint.registerParameters(
+            parameters,
+            setpointMinimum,
+            setpointMaximum,
+            0.1,
+            1,
+            "°C");
+    }
 
     parameters.addDouble(
         "hysteresis",

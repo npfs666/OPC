@@ -233,6 +233,7 @@ void PID::begin(
     Regulator::begin(key, name);
 
     this->measurement = &measurement;
+    setpointSource = nullptr;
 
     settings = Settings{};
     autoTuneSettings = AutoTuneSettings{};
@@ -297,6 +298,24 @@ void PID::setSchedule(
     double_t reducedSetpoint)
 {
     scheduledSetpoint.attach(schedule, reducedSetpoint);
+}
+
+void PID::followSetpoint(const Regulator& source)
+{
+    setpointSource = &source;
+}
+
+bool PID::followsSetpoint() const
+{
+    return setpointSource != nullptr;
+}
+
+bool PID::readTarget(double_t& target) const
+{
+    if (setpointSource != nullptr)
+        return setpointSource->readSetpoint(target);
+
+    return scheduledSetpoint.readTarget(settings.setpoint, target);
 }
 
 void PID::reset()
@@ -426,12 +445,18 @@ bool PID::startAutoTune(uint32_t now)
 
     bool started = false;
 
-    if (measurement != nullptr)
+    // Consigne d'exécution : l'essai se fait autour de la consigne du
+    // moment, et n'a pas lieu si la source n'en donne pas.
+    double_t tuneSetpoint = settings.setpoint;
+
+    if (measurement != nullptr &&
+        (setpointSource == nullptr ||
+         setpointSource->readSetpoint(tuneSetpoint)))
     {
         started = autoTune.start(
             now,
             autoTuneSettings,
-            settings.setpoint,
+            tuneSetpoint,
             settings.outputMin,
             settings.outputMax,
             direction);
@@ -545,7 +570,7 @@ bool PID::readSetpoint(double_t& setpoint) const
     // référence des alarmes relatives, même PID désactivé : le manuel passe
     // avant « Activé ».
     if (isManual())
-        return scheduledSetpoint.readTarget(settings.setpoint, setpoint);
+        return readTarget(setpoint);
 
     if (isInhibited() ||
         !settings.enabled ||
@@ -701,10 +726,26 @@ void PID::updateControl(uint32_t now)
 
     double_t target = settings.setpoint;
 
+    // Consigne d'exécution : pas de consigne avec une commande valide est un
+    // arrêt commandé (été...), une commande invalide un défaut.
+    if (setpointSource != nullptr)
+    {
+        if (!setpointSource->readSetpoint(target))
+        {
+            setpointRamp.restart();
+
+            if (setpointSource->isCommandValid())
+                stopController();
+            else
+                resetController();
+
+            return;
+        }
+    }
     // Hors plage en « Arrêt » : arrêt programmé, commande 0 valide ; heure
     // inconnue : défaut, état sûr. L'intégrale repart de zéro à la plage
     // suivante.
-    if (!scheduledSetpoint.update(
+    else if (!scheduledSetpoint.update(
             settings.setpoint,
             target))
     {
@@ -1045,23 +1086,27 @@ void PID::registerParameters(
         settings.mode,
         PID_MODE_OPTIONS);
 
-    parameters.addDouble(
-        "setpoint",
-        "Consigne",
-        settings.setpoint,
-        setpointMinimum,
-        setpointMaximum,
-        0.1,
-        1,
-        inputUnit);
+    // Consigne d'exécution : la consigne n'est pas un réglage.
+    if (setpointSource == nullptr)
+    {
+        parameters.addDouble(
+            "setpoint",
+            "Consigne",
+            settings.setpoint,
+            setpointMinimum,
+            setpointMaximum,
+            0.1,
+            1,
+            inputUnit);
 
-    scheduledSetpoint.registerParameters(
-        parameters,
-        setpointMinimum,
-        setpointMaximum,
-        0.1,
-        1,
-        inputUnit);
+        scheduledSetpoint.registerParameters(
+            parameters,
+            setpointMinimum,
+            setpointMaximum,
+            0.1,
+            1,
+            inputUnit);
+    }
 
     parameters.addDouble(
         "kp",
