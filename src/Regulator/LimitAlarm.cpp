@@ -39,6 +39,8 @@ void LimitAlarm::begin(
     beginAlarm();
     this->measurement = &measurement;
     reference = nullptr;
+    limitMinimum = -200.0;
+    limitMaximum = 1000.0;
     started = false;
     restart();
 }
@@ -46,6 +48,23 @@ void LimitAlarm::begin(
 void LimitAlarm::setReference(const Regulator& regulator)
 {
     reference = &regulator;
+}
+
+bool LimitAlarm::setLimitRange(
+    double_t minimum,
+    double_t maximum)
+{
+    if (!std::isfinite(minimum) ||
+        !std::isfinite(maximum) ||
+        minimum >= maximum)
+    {
+        return false;
+    }
+
+    limitMinimum = minimum;
+    limitMaximum = maximum;
+
+    return true;
 }
 
 bool LimitAlarm::isEnabled() const
@@ -247,8 +266,8 @@ void LimitAlarm::registerParameters(ParameterList& list)
         "limit",
         "Seuil",
         settings.limit,
-        -200.0,
-        1000.0,
+        limitMinimum,
+        limitMaximum,
         1.0,
         1,
         unit,

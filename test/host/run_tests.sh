@@ -68,6 +68,8 @@ fi
     "${project_dir}/test/host/test_three_point.cpp" \
     "${project_dir}/test/host/test_heating_curve.cpp" \
     "${project_dir}/test/host/test_heating_circuit.cpp" \
+    "${project_dir}/test/host/test_setpoint_program.cpp" \
+    "${project_dir}/test/host/test_kiln.cpp" \
     "${project_dir}/test/host/test_parameter_json.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
@@ -117,6 +119,7 @@ fi
     "${project_dir}/src/Regulator/LogicCommand.cpp" \
     "${project_dir}/src/Regulator/LoopBreakAlarm.cpp" \
     "${project_dir}/src/Regulator/ScheduledSetpoint.cpp" \
+    "${project_dir}/src/Regulator/SetpointProgram.cpp" \
     "${project_dir}/src/Regulator/SetpointRamp.cpp" \
     "${project_dir}/src/Regulator/Thermostat.cpp" \
     "${project_dir}/src/Regulator/TimeSchedule.cpp" \
@@ -124,6 +127,7 @@ fi
     "${project_dir}/src/Templates/SolarInstallation.cpp" \
     "${project_dir}/src/Templates/ColdRoomInstallation.cpp" \
     "${project_dir}/src/Templates/HeatingCircuitInstallation.cpp" \
+    "${project_dir}/src/Templates/KilnInstallation.cpp" \
     "${project_dir}/examples/MinimalInstallation/MinimalInstallation.cpp" \
     -o "${binary}"
 

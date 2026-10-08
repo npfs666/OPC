@@ -73,6 +73,15 @@ public:
      */
     void setReference(const Regulator& regulator);
 
+    /**
+     * Plage de réglage du seuil dans le menu (défaut -200 à 1000), par
+     * exemple jusqu'à 1300 °C pour un four. À appeler après begin(), avant
+     * l'enregistrement des paramètres.
+     */
+    bool setLimitRange(
+        double_t minimum,
+        double_t maximum);
+
     bool isEnabled() const override;
 
     void update(uint32_t now) override;
@@ -86,6 +95,8 @@ public:
 private:
     Measurement* measurement = nullptr;
     const Regulator* reference = nullptr;
+    double_t limitMinimum = -200.0;
+    double_t limitMaximum = 1000.0;
 
     bool started = false;       // état initialisé depuis l'activation
     bool beyond = false;        // seuil franchi (hystérésis comprise)

@@ -21,8 +21,9 @@ entre ces blocs et l'application réelle :
 4. il **dessine** son écran d'accueil.
 
 Un thermostat ou un PID n'ont besoin que des étapes 1, 2 et 4. Le
-[template solaire](SolarInstallation.cpp) et la
-[chambre froide](ColdRoomInstallation.cpp) montrent l'étape 3.
+[template solaire](SolarInstallation.cpp), la
+[chambre froide](ColdRoomInstallation.cpp) et le
+[four céramique](KilnInstallation.cpp) montrent l'étape 3.
 
 ### Bloc ou glue ?
 
@@ -161,9 +162,11 @@ d'échec : la cause s'affiche sur l'écran d'erreur de démarrage.
 16 mesures, 32 régulateurs (blocs, alarmes et `LogicCommand` compris),
 16 actionneurs, 16 sorties, 2 entrées TOR, 8 alarmes et 192 réglages
 ([pinout.h](../Hardware/pinout.h)). Un `TimeSchedule` utilise 19 réglages,
-une `LimitAlarm` 8, une `LoopBreakAlarm` 5, une `ConditionAlarm` 3. Les
+une `LimitAlarm` 8, une `LoopBreakAlarm` 5, une `ConditionAlarm` 3, un
+`SetpointProgram` 4 plus 25 par programme. Les
 réglages de la carte (6 par sonde RTD, 13 de calibration) et de l'horloge
-(8) s'y ajoutent : le template solaire en utilise environ 120.
+(8) s'y ajoutent : le template solaire en utilise environ 120, le four
+céramique (3 programmes) environ 155.
 
 ## 4. Les blocs de la glue
 
@@ -178,6 +181,7 @@ réglages de la carte (6 par sonde RTD, 13 de calibration) et de l'horloge
 | Signaler une condition | `ConditionAlarm` | `set(condition)` |
 | Lire une commande | tout régulateur | `isCommandValid()`, `readCommand()` |
 | Consigne calculée (loi d'eau) | `HeatingCurve` + `followSetpoint()` | reliée dans `begin()`, sans glue |
+| Consigne en paliers et rampes | `SetpointProgram` + `followSetpoint()` | `start()`, `stop()`, `skipSegment()` depuis une action de menu ; `isRunning()`, `state()` |
 | Lire une mesure, une entrée | `Measurement`, `DigitalInput` | `isValid()`, `getValue()`, `isActive()` |
 
 Un `Comparator` ou une `DelayTimer` (`setSource()`) peuvent aussi être reliés

@@ -33,6 +33,7 @@ mise en sécurité des sorties.
   - [Comparateur](#comparateur)
   - [Temporisation](#temporisation)
   - [Loi d'eau](#loi-deau)
+  - [Programme paliers-rampes](#programme-paliers-rampes)
 - [Utilisation](#utilisation)
   - [Menu](#menu)
   - [Consigne depuis l'accueil](#consigne-depuis-laccueil)
@@ -462,6 +463,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 | `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
+| `KilnInstallation` | Four céramique : thermocouple K, 3 programmes paliers-rampes de 8 segments, PID sur un relais statique (sortie DC 1), contacteur de sécurité (relais 1) piloté par la glue, alarmes de surchauffe et d'écart haut actives |
 | `HeatingCircuitInstallation` | Circuit de chauffage à vanne mélangeuse : départ (Pt100), extérieure (Pt1000), loi d'eau avec programme confort / réduit, PID du départ sur une vanne 3 points (relais 1 et 2), pompe avec post-circulation (sortie DC 1, par un relais d'interface) ; sans glue |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
 | `TestInstallation` (`testInstallation.h`) | Développement du psychromètre : température sèche (PT100 4 fils, ou thermocouple K avec `INPUT1_IS_THERMOCOUPLE`), température humide (PT100 4 fils), pression BMP580 (obligatoire) et humidité relative ; aucune sortie |
@@ -734,6 +736,58 @@ L'écran d'accueil affiche l'état de la loi d'eau (`CONFORT`, `REDUIT`, `ETE`,
 l'ambiance, le départ et sa consigne, la position de la vanne (`RECALAGE` au
 démarrage) et la pompe.
 
+#### Template four céramique
+
+`KilnInstallation` conduit un four électrique de céramique (biscuit, émail)
+par un [programme paliers-rampes](#programme-paliers-rampes) :
+
+- **Sonde 1, thermocouple K** dans le four. Pour le grès et la porcelaine,
+  choisir S, R ou N dans `Input > Thermocouple` ;
+- **Sortie DC 1, relais statique** des résistances, en proportionnel
+  temporisé (période 10 s, impulsion minimale 0,5 s). Sa commande de
+  sécurité est 0, non modifiable ;
+- **Relais 1, contacteur de sécurité**, en amont du relais statique. Il est
+  ouvert à l'arrêt et en défaut, sans mode manuel.
+
+Le menu `Regulateur > Cuisson` contient trois programmes de 8 segments et
+les actions `Démarrer` (programme choisi dans `Programme`), `Arrêter` et
+`Segment suivant`. Les programmes fournis sont des exemples, à adapter à la
+terre et aux émaux :
+
+| Programme | Segments (vitesse → cible, palier) |
+| --- | --- |
+| 1, biscuit | 50 °C/h → 200 °C ; 100 °C/h → 600 °C ; 150 °C/h → 950 °C, 15 min |
+| 2, émail faïence | 100 °C/h → 600 °C ; 200 °C/h → 1050 °C, 10 min |
+| 3, émail grès | 100 °C/h → 600 °C ; 150 °C/h → 1160 °C ; 60 °C/h → 1250 °C, 15 min |
+
+Le PID `PID four` suit la consigne du programme. Il part de Kp 0,03 (bande
+de 33 °C) et Ti 600 s, à affiner à la mise en service. Sur un défaut du
+thermocouple, il passe toujours en état sûr, sans maintien.
+
+La glue ferme le contacteur pendant la cuisson seulement (rampe, palier,
+maintien final). Elle l'ouvre dans ces cas :
+
+| Cause | Effet |
+| --- | --- |
+| `Surchauffe` : four au-dessus de 1300 °C pendant 10 s (alarme active par défaut, mémorisée) | Cuisson arrêtée, notée au journal. `Démarrer` est refusé jusqu'à l'acquittement |
+| `Écart haut` : four 50 °C au-dessus de la consigne pendant 2 min (active par défaut, mémorisée) | Relais statique collé : contacteur ouvert jusqu'à l'acquittement, le programme continue ; `Démarrer` est refusé. Inhibée pendant une rampe descendante, où le four est normalement au-dessus de la consigne |
+| Thermocouple ou PID en défaut | État sûr |
+
+L'alarme `Boucle four` ([boucle ouverte](#alarme-de-boucle-ouverte)) est
+désactivée par défaut. Activée, elle détecte une résistance coupée ou un
+thermocouple sorti du four, et met le PID en sécurité.
+
+Ces sécurités logicielles **ne remplacent pas** le limiteur de température
+matériel du four. Après une coupure de courant, la cuisson ne reprend pas :
+le four reste arrêté.
+
+L'écran d'accueil affiche l'état (`RAMPE`, `PALIER`, `MAINTIEN`, `TERMINE`,
+`DIFFERE`...), le programme et le segment (`P1 S2/3`), la température, la
+consigne (`Attente` en orange quand l'écart maxi fige le programme), la
+cible du segment, le temps (reste du programme, du palier ou du départ
+différé, durée en fin de cuisson), la puissance, les alarmes, l'état du
+contacteur et le temps écoulé.
+
 ## Composants disponibles
 
 | Catégorie | Classes |
@@ -742,6 +796,7 @@ démarrage) et la pompe.
 | Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
 | Régulateurs | `Thermostat`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
 | Loi d'eau | `HeatingCurve` : consigne de départ selon l'extérieur, suivie par un PID ou un thermostat, voir [Loi d'eau](#loi-deau) |
+| Programme | `SetpointProgram` : consigne en paliers et rampes (four, étuve), suivie par un PID ou un thermostat, voir [Programme paliers-rampes](#programme-paliers-rampes) |
 | Comparateur | `Comparator` : seuil ou différentiel à hystérésis, voir [Comparateur](#comparateur) |
 | Temporisation | `DelayTimer` : retard à la montée ou à la descente, voir [Temporisation](#temporisation) |
 | Glue | `LogicCommand` : sortie écrite par `processLogic()`, voir [Ajouter de la glue](#3-ajouter-de-la-glue-facultatif) |
@@ -786,7 +841,7 @@ réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 32 régulateurs
 (comparateurs, temporisations, alarmes et commandes de la glue compris),
 16 actionneurs, 16 sorties, 2 entrées numériques, 8 alarmes, 192 paramètres
 (un `TimeSchedule` en utilise 19, une `LimitAlarm` 8, une `LoopBreakAlarm` 5,
-une `ConditionAlarm` 3).
+une `ConditionAlarm` 3, un `SetpointProgram` 4 plus 25 par programme).
 
 ### Comparateur
 
@@ -935,6 +990,78 @@ d'un autre régulateur, recalculée à chaque cycle et jamais sauvegardée :
   relatives restent.
 
 Un thermostat qui suit la loi d'eau pilote une chaudière en tout-ou-rien.
+
+### Programme paliers-rampes
+
+`SetpointProgram` ([Regulator/SetpointProgram.h](src/Regulator/SetpointProgram.h))
+donne une consigne qui suit un programme en paliers et rampes, comme les
+régulateurs de four céramique. Comme la [loi d'eau](#loi-deau), c'est une
+source de consigne :
+
+- sa **consigne** (`readSetpoint()`) est celle du programme, à suivre par un
+  PID ou un thermostat (`followSetpoint()`) ;
+- sa **commande** vaut 1 pendant le programme, 0 sinon. Elle est toujours
+  valide : hors cuisson, le régulateur suiveur est à l'arrêt commandé, ce
+  n'est pas un défaut.
+
+```cpp
+cuisson.begin("cuisson", "Cuisson", temperatureFour, 3);  // 3 programmes
+cuisson.setLimits(0.0, 1300.0, 999.0);                    // cibles, vitesse maxi
+
+pid.begin("pid_four", "PID four", temperatureFour);
+pid.followSetpoint(cuisson);
+
+// Le programme avant le PID : il lit la consigne du même cycle.
+process.add(cuisson); process.add(pid);
+
+// Actions de menu de l'installation :
+cuisson.start();          // programme choisi dans « Programme »
+cuisson.stop();
+cuisson.skipSegment();
+```
+
+**Programmes.** 1 à 4 programmes (`Programme 1`...), chacun de 1 à 8
+segments (`Segments`). Un segment a trois réglages :
+
+- `Vitesse` : vitesse de la rampe, en °C/h. **0 = pleine puissance** : la
+  consigne passe tout de suite à la cible, et le palier commence quand la
+  mesure l'atteint ;
+- `Cible` : température de fin de rampe ;
+- `Palier` : durée de maintien à la cible, en minutes (0 à 1440).
+
+La consigne part de la **mesure** au démarrage : un four encore chaud ne
+repart pas de zéro. Une rampe monte ou descend selon la cible, ce qui permet
+un refroidissement contrôlé. À pleine puissance, une descente est un
+refroidissement libre. `Segment suivant` termine le segment en cours, rampe
+et palier compris ; pendant le départ différé, il lance le programme tout de
+suite.
+
+**Réglages généraux** (`Regulateur > <nom>`) :
+
+- `Programme` : le programme lancé par `start()` ;
+- `Départ diff.` : départ différé, de 0 à 1440 min. La sortie reste à l'arrêt
+  pendant l'attente ;
+- `Écart maxi` (**attente garantie**, 0 = sans) : tant que la mesure s'écarte
+  de la consigne de plus de cet écart, la rampe s'arrête et le temps de
+  palier ne compte pas. Un four en retard ne raccourcit donc pas le palier.
+  À pleine puissance, le palier commence à l'écart maxi de la cible ;
+- `Fin` : après le dernier segment, `Arrêt` (commande 0, refroidissement
+  libre) ou `Maintien` de la dernière cible jusqu'à `stop()`.
+
+Tous ces réglages sont des réglages de conduite : un programme se modifie
+pendant la cuisson sans couper les sorties. Une cible changée pendant son
+palier s'applique tout de suite. Si des segments sont retirés pendant leur
+exécution, le programme se termine.
+
+**Temps.** Le programme est figé pendant une pause (menu, timeout de mesure),
+une inhibition par la glue et une mesure invalide. Il ne dépend pas de
+l'horloge. `remainingSeconds()` estime le temps restant aux vitesses
+réglées ; un segment à pleine puissance n'y compte que pour son palier.
+
+**Défauts.** Le programme ne démarre pas sur une mesure invalide. Une mesure
+qui devient invalide pendant la cuisson fige le programme, et le régulateur
+suiveur applique sa règle de défaut (`Si défaut`). Le programme n'est pas
+sauvegardé : après une coupure de courant, il est arrêté.
 
 ## Utilisation
 
@@ -1221,7 +1348,8 @@ froide en ont une, **désactivée par défaut**, affichée seulement : menu
 
 Les types relatifs lisent la consigne active (rampe et programme compris) du
 régulateur de référence donné par `setReference()` ; sans référence, seuls
-`Max` et `Min` sont proposés.
+`Max` et `Min` sont proposés. Le seuil se règle de -200 à 1000 par défaut ;
+`setLimitRange()` change cette plage (un four à 1300 °C).
 
 - En [mode manuel](#mode-manuel), ils lisent la consigne réglée, programme
   compris, sans rampe : la surveillance continue pendant que l'opérateur a

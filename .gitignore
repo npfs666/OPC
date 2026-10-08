@@ -1,6 +1,7 @@
 .pio
 .vscode
 .continue
+.claude
 src/.garbo
 .gitignore
 __pycache__
