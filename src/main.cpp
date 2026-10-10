@@ -24,7 +24,7 @@
 
 namespace
 {
-    ThermostatInstallation installation;
+    TestInstallation installation;
     OPC opc(installation);
     SystemWatchdog systemWatchdog;
 

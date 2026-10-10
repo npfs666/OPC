@@ -2,6 +2,7 @@
 .vscode
 .continue
 .claude
+logs/
 src/.garbo
 .gitignore
 __pycache__
