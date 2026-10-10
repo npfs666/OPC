@@ -1308,7 +1308,9 @@ les régulateurs mettent leurs sorties en état sûr, comme avant.
   firmware relit le multiplexeur (MCP23017). Après un reset du MCP (parasite,
   chute de tension), ses broches repassent en entrée : un routage encore en
   place en fin d'acquisition prouve qu'il a tenu pendant toute la mesure.
-  Sinon, l'entrée passe en `ERREUR` pour ce cycle, le MCP est réinitialisé,
+  Une broche du MCP relue différente de sa commande (court-circuit, charge)
+  met aussi le routage en défaut (`Broche MCP non conforme` au journal).
+  Dans ces cas, l'entrée passe en `ERREUR` pour ce cycle, le MCP est réinitialisé,
   et le journal note `Défaut multiplexeur` puis `Multiplexeur rétabli`. Une
   erreur de bus isolée est rattrapée par une nouvelle tentative. L'état sûr
   arrive dès le cycle en défaut, sans attendre le timeout de mesure.

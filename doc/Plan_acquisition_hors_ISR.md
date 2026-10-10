@@ -425,8 +425,9 @@ Chaque étape compile et laisse une carte qui fonctionne.
      `Calibration > Diagnostic` : `Erreurs I2C MCP`, `Reinit. MCP`,
      `ADC muet`.
    - Calibration refusée si le routage n'est pas prouvé.
-   - `GPIO ≠ OLAT` : journalisé seulement (`PIN_MISMATCH_IS_FAULT = false`
-     dans `AnalogMux.cpp`), et seulement quand la configuration est en place.
+   - `GPIO ≠ OLAT`, compté seulement quand la configuration est en place :
+     bloquant (`PIN_MISMATCH_IS_FAULT = true` dans `AnalogMux.cpp`) depuis la
+     validation sur banc. D'abord journalisé seulement (décision 3).
      Après un reset, les broches sont en entrée : leur niveau ne suit plus
      la commande, mais « Défaut multiplexeur » le dit déjà.
    - ✅ Sur banc, `OPC_TEST_MCP_FAULT` : « Défaut multiplexeur » puis
@@ -438,9 +439,12 @@ Chaque étape compile et laisse une carte qui fonctionne.
      après le délai.
    - Essai sur banc préparé : `#define OPC_TEST_MCP_FAULT` dans
      `SensorBoard.cpp` simule un reset du MCP un cycle sur dix.
-   - ⬜ Sur banc : compteurs à 0 en fonctionnement normal, et aucune
-     « Broche MCP non conforme » dans tous les montages avant de rendre ce
-     contrôle bloquant.
+   - ✅ Sur banc le 10/10/2026 : PT100 en 2, 3 et 4 fils, 15 à 20 minutes,
+     aucune erreur ni « Broche MCP non conforme ». Le contrôle des broches
+     devient bloquant.
+   - ⬜ Sur banc : PT1000 et thermocouple. Leurs broches commandées à 1
+     (RREF16k5, TC_GND, TC_VCC) n'ont pas encore été relues à l'état haut.
+     En cas de faux défaut, repasser `PIN_MISMATCH_IS_FAULT` à `false`.
 4. ⬜ **Délai et récupération du bus `Wire1`.**
 5. ⬜ **Validation sur banc.**
    - Comparaison avec l'étape 0.

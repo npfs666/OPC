@@ -22,11 +22,12 @@ namespace
     constexpr uint8_t IOCON_VALUE = 0x00;
 
     /*
-     * Une broche relue différente de sa commande (court-circuit, charge) est
-     * seulement journalisée, le temps de valider ce contrôle sur la carte :
-     * une broche chargée donnerait sinon un défaut permanent.
+     * Une broche relue différente de sa commande (court-circuit, charge) met
+     * le routage en défaut. Validé sur banc en PT100 2, 3 et 4 fils ; à
+     * repasser à false si une broche chargée donnait un faux défaut
+     * permanent (le contrôle serait alors seulement journalisé).
      */
-    constexpr bool PIN_MISMATCH_IS_FAULT = false;
+    constexpr bool PIN_MISMATCH_IS_FAULT = true;
 }
 
 bool AnalogMux::begin(TwoWire& wire)

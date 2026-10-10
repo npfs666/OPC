@@ -333,20 +333,30 @@ namespace
         CHECK_FALSE(mux.confirm());
     }
 
-    void testPinMismatchLoggedOnly()
+    void testPinMismatchRejected()
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
         CHECK_TRUE(mux.begin(wire));
         CHECK_FALSE(mux.takePinMismatch());
 
-        // Broche SW_4 (GPA1) bloquée à 0 : signalée, mais pas bloquante.
+        // Broche SW_4 (GPA1) bloquée à 0 : deux essais, la réinitialisation
+        // et un dernier essai, tous refusés.
         wire.mcpStuckLowA = 0x02;
-        CHECK_TRUE(mux.apply(pt100Input(0)));
-        CHECK_TRUE(mux.confirm());
-        CHECK_TRUE(mux.counters().pinMismatches == 2);
+        CHECK_FALSE(mux.apply(pt100Input(0)));
+        CHECK_TRUE(mux.counters().pinMismatches == 3);
+        CHECK_TRUE(mux.counters().reinitializations == 1);
         CHECK_TRUE(mux.takePinMismatch());
         CHECK_FALSE(mux.takePinMismatch());
+
+        // Broche libérée : le routage suivant passe.
+        wire.mcpStuckLowA = 0;
+        CHECK_TRUE(mux.apply(pt100Input(0)));
+        CHECK_TRUE(mux.confirm());
+
+        // Broche bloquée pendant l'acquisition : la mesure est rejetée.
+        wire.mcpStuckLowA = 0x02;
+        CHECK_FALSE(mux.confirm());
     }
 }
 
@@ -373,6 +383,6 @@ void runAnalogMuxTests()
         testConfirmAfterReset);
     TestHarness::run("MCP23017 : relecture en fin d'acquisition",
         testConfirmRereadsOnce);
-    TestHarness::run("MCP23017 : broche non conforme journalisée",
-        testPinMismatchLoggedOnly);
+    TestHarness::run("MCP23017 : broche non conforme refusée",
+        testPinMismatchRejected);
 }
