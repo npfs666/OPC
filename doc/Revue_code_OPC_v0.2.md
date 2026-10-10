@@ -60,6 +60,13 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
    - `computeResistance` renvoie NaN pour une entrée thermocouple et pour une résistance ≤ 0.
    - Tests hôte ajoutés, et le test PT1000 a été mis à jour pour Callendar–Van Dusen.
 7. ✅ **Constante `DATARATE_1000_SPS`** : elle valait 0x05 au lieu de 0x06.
+26. ✅ **IRQ DRDY parasites accumulées comme échantillons** (`SensorBoard::adcInterrupt`). Ajouté le 10/10/2026, voir [Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md), étape 0.
+    - Quand l'ISR est retardée (écriture flash, pile USB : démarrage, lecteur USB monté par le PC), une IRQ peut suivre la précédente sans nouvelle conversion.
+    - DRDY est alors déjà haut, et l'ADS1120 renvoie `0xFFFF` (-1), accumulé comme un échantillon : -1/800 sur la moyenne par parasite.
+    - Mesuré : jusqu'à 31 parasites par cycle, soit -5 à -6 °C sur deux PT100. L'état restait `Ok`, car la valeur n'est pas saturée.
+    - Les mêmes lectures pouvaient fausser la température ADC (jonction froide) et le diagnostic d'étendue, et réduire le temps d'établissement.
+    - Correctif : l'ISR ignore l'IRQ si DRDY est déjà haut à l'entrée. La conversion suivante redonne un front.
+    - Vérifié sur banc, avec montages et démontages répétés du lecteur USB : jusqu'à 52 IRQ ignorées par cycle, et des mesures restées dans le bruit (0,03 point ADC).
 
 ### B. Risques de conception (à planifier)
 

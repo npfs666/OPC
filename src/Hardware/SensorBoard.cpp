@@ -278,6 +278,17 @@ void SensorBoard::adcInterrupt() {
 
     if( pauseInterrupts ) return;
 
+    /*
+     * Seul DRDY bas garantit une donnée neuve. Quand l'ISR a été retardée
+     * (écriture flash, pile USB), une IRQ peut suivre la précédente sans
+     * nouvelle conversion : DRDY est déjà haut et l'ADS1120 renvoie 0xFFFF.
+     * Lu, ce -1 serait accumulé comme un échantillon (-1/800 sur la moyenne,
+     * sans saturation donc sans défaut), ou pris pour la température ADC.
+     * La conversion suivante redonnera un front.
+     */
+    if (gpio_get(Board::Rp2040::ADC_DRDY))
+        return;
+
     //#define PRINT_CONVERSION_TIME
     #ifdef PRINT_CONVERSION_TIME
         uint32_t time = micros();
