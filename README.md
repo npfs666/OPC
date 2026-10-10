@@ -1544,4 +1544,4 @@ Les versions publiées avant ce changement restent disponibles sous licence MIT.
 
 Le matériel (dossier [hardware/](hardware/)) est sous licence **CERN-OHL-S v2** (`CERN-OHL-S-2.0`) ; voir [hardware/LICENSE](hardware/LICENSE).
 
-Les bibliothèques tierces gardent leur propre licence : Adafruit GFX, BME280, BMP5xx et MCP23017 (BSD), Adafruit ST7735/ST7789, BusIO, RTClib, ArduinoJson et PrintSize (MIT), Adafruit Unified Sensor (Apache-2.0), ArduinoMenu et le core Arduino-Pico (LGPL-2.1). Toutes sont compatibles avec la GPL v3.
+Les bibliothèques tierces gardent leur propre licence : Adafruit GFX, BME280 et BMP5xx (BSD), Adafruit ST7735/ST7789, BusIO, RTClib, ArduinoJson et PrintSize (MIT), Adafruit Unified Sensor (Apache-2.0), ArduinoMenu et le core Arduino-Pico (LGPL-2.1). Toutes sont compatibles avec la GPL v3.

@@ -63,7 +63,7 @@ SensorBoard::SensorBoard()
  */
 bool SensorBoard::init()
 {
-    const bool muxReady = mux.begin();
+    const bool muxReady = mux.begin(Wire1);
 
     // L'ADC est initialisé dans tous les cas pour laisser le SPI dans un état connu.
     adc.begin(Board::Rp2040::ADC_SPI,
@@ -126,6 +126,10 @@ void SensorBoard::setStandardTC() {
  */
 void SensorBoard::setWiringRoute(Sensor::Settings settings)
 {
+    // Montage et référence d'abord, voie coupée : la voie est connectée en
+    // dernier, une fois l'ADC configuré.
+    mux.write(AnalogRoute::forInput(settings));
+
     if (settings.type == Sensor::Type::Tc)
         settings.wiring = Sensor::Wiring::TwoWire;
 
@@ -133,8 +137,6 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
     {
     case Sensor::Wiring::TwoWire:
 
-        mux.set2Wire();
-        
         switch (settings.type)
         {
 
@@ -142,27 +144,23 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
             adc.setGain(Sensor::adcGain(settings));
             setStandardRTD();
             adc.setIDACcurrent(CURRENT_1000_UA);
-            mux.setPT100();
             break;
 
         case Sensor::Type::Pt1000:
             adc.setGain(Sensor::adcGain(settings));
             setStandardRTD();
             adc.setIDACcurrent(CURRENT_100_UA);
-            mux.setPT1000();
             break;
 
         case Sensor::Type::Tc:
             adc.setGain(thermocoupleGain(settings.thermocoupleType));
             setStandardTC();
-            mux.setTC();
         }
         break;
 
     case Sensor::Wiring::ThreeWire:
 
         setStandardRTD();
-        mux.set3Wire();
         adc.setIDAC2routing(IDAC_AIN2);
         adc.setGain(Sensor::adcGain(settings));
 
@@ -171,12 +169,10 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
 
         case Sensor::Type::Pt100:
             adc.setIDACcurrent(CURRENT_500_UA);
-            mux.setPT100();
             break;
 
         case Sensor::Type::Pt1000:
             adc.setIDACcurrent(CURRENT_50_UA);
-            mux.setPT1000();
             break;
         }
         break;
@@ -184,7 +180,6 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
     case Sensor::Wiring::FourWire:
 
         setStandardRTD();
-        mux.set4Wire();
         adc.setGain(Sensor::adcGain(settings));
 
         switch (settings.type)
@@ -192,12 +187,10 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
 
         case Sensor::Type::Pt100:
             adc.setIDACcurrent(CURRENT_1000_UA);
-            mux.setPT100();
             break;
 
         case Sensor::Type::Pt1000:
             adc.setIDACcurrent(CURRENT_100_UA);
-            mux.setPT1000();
             break;
         }
         break;
@@ -205,7 +198,7 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
         break;
     }
 
-    mux.enableChannel(curSensor);
+    mux.write(AnalogRoute::forInput(settings, curSensor));
 }
 
 
@@ -363,7 +356,8 @@ void SensorBoard::finishSensor()
 {
     rtd[curSensor]->compute();
 
-    mux.disableChannel(curSensor);
+    // Voie coupée, montage conservé jusqu'au routage suivant.
+    mux.write(AnalogRoute::forInput(rtd[curSensor]->settings));
     curSensor++;
 
     // Toutes les entrées sont mesurées : la température ADC est lue à
@@ -929,7 +923,7 @@ bool SensorBoard::readCalibrationSamples(
                 value,
                 CALIBRATION_SAMPLE_TIMEOUT_MS))
         {
-            stopCalibrationHardware(channel);
+            stopCalibrationHardware();
             Serial.println(
                 "Calibration failed: ADC timeout");
             return false;
@@ -950,7 +944,7 @@ bool SensorBoard::readCalibrationSamples(
                 value,
                 CALIBRATION_SAMPLE_TIMEOUT_MS))
         {
-            stopCalibrationHardware(channel);
+            stopCalibrationHardware();
             Serial.println(
                 "Calibration failed: ADC timeout");
             return false;
@@ -965,7 +959,7 @@ bool SensorBoard::readCalibrationSamples(
             maximum = value;
     }
 
-    stopCalibrationHardware(channel);
+    stopCalibrationHardware();
 
     if (minimum <= -ADC_CALIBRATION_LIMIT ||
         maximum >= ADC_CALIBRATION_LIMIT ||
@@ -984,10 +978,9 @@ bool SensorBoard::readCalibrationSamples(
     return true;
 }
 
-void SensorBoard::stopCalibrationHardware(
-    uint8_t channel)
+void SensorBoard::stopCalibrationHardware()
 {
-    mux.disableChannel(channel);
+    mux.write(AnalogRoute{});
     adc.setIDACcurrent(CURRENT_0_UA);
     adc.setIDAC1routing(IDAC_DISABLED);
     adc.setIDAC2routing(IDAC_DISABLED);
@@ -1023,8 +1016,7 @@ void SensorBoard::resetAcquisition()
     diagnosingRange = false;
     adc.setTemperatureMode(TEMP_OFF);
 
-    for (uint8_t i = 0; i < MAX_RTD; i++)
-        mux.disableChannel(i);
+    mux.write(AnalogRoute{});
 
     adc.setIDACcurrent(CURRENT_0_UA);
     adc.setIDAC1routing(IDAC_DISABLED);

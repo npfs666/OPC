@@ -3247,6 +3247,7 @@ void runHeatingCircuitTests();
 void runSetpointProgramTests();
 void runKilnTests();
 void runParameterJsonTests();
+void runAnalogMuxTests();
 
 int main()
 {
@@ -3457,6 +3458,7 @@ int main()
     runSetpointProgramTests();
     runKilnTests();
     runParameterJsonTests();
+    runAnalogMuxTests();
 
     return TestHarness::finish();
 }

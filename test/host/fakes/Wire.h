@@ -7,11 +7,13 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 class TwoWire
 {
 public:
-    static constexpr size_t REGISTER_COUNT = 0x13;
+    // DS3231 : 0x00 à 0x12. MCP23017 (IOCON.BANK = 0) : 0x00 à 0x15.
+    static constexpr size_t REGISTER_COUNT = 0x16;
 
     bool setSDA(uint8_t pin)
     {
@@ -122,6 +124,10 @@ public:
             }
         }
 
+        writeLog.emplace_back(
+            transmission.begin(),
+            transmission.begin() + transmissionLength);
+
         return 0;
     }
 
@@ -173,6 +179,9 @@ public:
 
     std::array<uint8_t, REGISTER_COUNT>
         registers = {};
+
+    // Écritures acceptées : registre de départ puis données.
+    std::vector<std::vector<uint8_t>> writeLog;
 
     uint8_t deviceAddress = 0x68;
     uint8_t sdaPin = 0;

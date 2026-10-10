@@ -3,135 +3,68 @@
 
 #include <Hardware/AnalogMux.h>
 
-#include <Arduino.h>
 #include <Hardware/pinout.h>
 
-bool AnalogMux::begin()
+namespace
 {
-    Wire1.setSDA(Board::Rp2040::I2C_SDA);
-    Wire1.setSCL(Board::Rp2040::I2C_SCL);
+    // Registres du MCP23017 avec IOCON.BANK = 0 (ports A et B entrelacés).
+    constexpr uint8_t REG_IODIRA = 0x00;
+    constexpr uint8_t REG_GPINTENB = 0x05; // IOCON si BANK = 1
+    constexpr uint8_t REG_IOCON = 0x0A;
+    constexpr uint8_t REG_OLATA = 0x14;
 
-    if (!mcp.begin_I2C(Board::Mcp23017::ADDRESS, &Wire1)) {
-        Serial.println("Error MCP init.");
+    // BANK = 0, adresses séquentielles (SEQOP = 0), interruptions inutilisées.
+    constexpr uint8_t IOCON_VALUE = 0x00;
+}
+
+bool AnalogMux::begin(TwoWire& wire)
+{
+    bus = &wire;
+
+    // Sans effet si le bus est déjà démarré (horloge).
+    wire.begin();
+
+    const AnalogRoute outputs = AnalogRoute::outputPins();
+    const AnalogRoute off;
+
+    const uint8_t latches[2] = {off.portA, off.portB};
+
+    // IODIR = 1 : entrée. Les broches inutilisées restent en entrée.
+    const uint8_t directions[2] = {
+        static_cast<uint8_t>(~outputs.portA),
+        static_cast<uint8_t>(~outputs.portB)};
+
+    /*
+     * IOCON est écrit deux fois. À 0x05, il remet BANK à 0 si le MCP était en
+     * BANK = 1 ; en BANK = 0, 0x05 est GPINTENB, qui reste à 0. Les sorties
+     * sont ensuite mises à 0 avant d'être activées : après un redémarrage
+     * sans reset du MCP, aucune broche ne repasse en sortie avec son ancien
+     * état. La première écriture sert aussi de test de présence.
+     */
+    return writeRegisters(REG_GPINTENB, &IOCON_VALUE, 1) &&
+           writeRegisters(REG_IOCON, &IOCON_VALUE, 1) &&
+           writeRegisters(REG_OLATA, latches, 2) &&
+           writeRegisters(REG_IODIRA, directions, 2);
+}
+
+bool AnalogMux::write(const AnalogRoute& route)
+{
+    const uint8_t latches[2] = {route.portA, route.portB};
+
+    return writeRegisters(REG_OLATA, latches, 2);
+}
+
+bool AnalogMux::writeRegisters(
+    uint8_t address,
+    const uint8_t* values,
+    uint8_t count)
+{
+    if (bus == nullptr)
         return false;
-    }
 
-    // Au démarrage le MCP23017 à tous ses pins en entrées.
-    mcp.pinMode(Board::Mcp23017::INPUT_1_EN, OUTPUT);
-    mcp.pinMode(Board::Mcp23017::INPUT_2_EN, OUTPUT);
-    mcp.pinMode(Board::Mcp23017::INPUT_3_EN, OUTPUT);
+    bus->beginTransmission(Board::Mcp23017::ADDRESS);
+    bus->write(address);
+    bus->write(values, count);
 
-    mcp.pinMode(Board::Mcp23017::SW_2_WIRE, OUTPUT);
-    mcp.pinMode(Board::Mcp23017::SW_2_3_WIRE, OUTPUT);
-    mcp.pinMode(Board::Mcp23017::SW_3_WIRE, OUTPUT);
-    mcp.pinMode(Board::Mcp23017::SW_4_WIRE, OUTPUT);
-
-    mcp.pinMode(Board::Mcp23017::RREF1k65, OUTPUT);
-    mcp.pinMode(Board::Mcp23017::RREF16k5, OUTPUT);
-
-
-    mcp.pinMode(Board::Mcp23017::TC_GND, OUTPUT);
-    mcp.pinMode(Board::Mcp23017::TC_VCC, OUTPUT);
-
-    disableChannel(0);
-    disableChannel(1);
-    disableChannel(2);
-
-    resetMeasurementMode();
-    resetMeasurementType();
-
-    return true;
-}
-
-void AnalogMux::enableChannel(uint8_t channel)
-{
-    switch(channel)
-    {
-        case 0:
-            mcp.digitalWrite(Board::Mcp23017::INPUT_1_EN, HIGH);
-            break;
-
-        case 1:
-            mcp.digitalWrite(Board::Mcp23017::INPUT_2_EN, HIGH);
-            break;
-
-        case 2:
-           mcp.digitalWrite(Board::Mcp23017::INPUT_3_EN, HIGH);
-            break;
-    }
-}
-
-void AnalogMux::disableChannel(uint8_t channel)
-{
-    switch(channel)
-    {
-        case 0:
-            mcp.digitalWrite(Board::Mcp23017::INPUT_1_EN, LOW);
-            break;
-
-        case 1:
-            mcp.digitalWrite(Board::Mcp23017::INPUT_2_EN, LOW);
-            break;
-
-        case 2:
-            mcp.digitalWrite(Board::Mcp23017::INPUT_3_EN, LOW);
-            break;
-    }
-}
-
-void AnalogMux::resetMeasurementMode()
-{
-    mcp.digitalWrite(Board::Mcp23017::SW_2_WIRE, LOW);
-    mcp.digitalWrite(Board::Mcp23017::SW_2_3_WIRE, LOW);
-    mcp.digitalWrite(Board::Mcp23017::SW_3_WIRE, LOW);
-    mcp.digitalWrite(Board::Mcp23017::SW_4_WIRE, LOW);
-}
-
-void AnalogMux::set2Wire() 
-{
-    resetMeasurementMode();
-    mcp.digitalWrite(Board::Mcp23017::SW_2_WIRE, HIGH);
-    mcp.digitalWrite(Board::Mcp23017::SW_2_3_WIRE, HIGH);
-}
-
-void AnalogMux::set3Wire()
-{
-    resetMeasurementMode();
-    mcp.digitalWrite(Board::Mcp23017::SW_2_3_WIRE, HIGH);
-    mcp.digitalWrite(Board::Mcp23017::SW_3_WIRE, HIGH);
-}
-
-void AnalogMux::set4Wire()
-{
-    resetMeasurementMode();
-    mcp.digitalWrite(Board::Mcp23017::SW_4_WIRE, HIGH);
-}
-
-
-
-void AnalogMux::resetMeasurementType()
-{
-    mcp.digitalWrite(Board::Mcp23017::TC_GND, LOW);
-    mcp.digitalWrite(Board::Mcp23017::TC_VCC, LOW);
-    mcp.digitalWrite(Board::Mcp23017::RREF1k65, LOW);
-    mcp.digitalWrite(Board::Mcp23017::RREF16k5, LOW);
-}
-
-void AnalogMux::setTC() 
-{
-    resetMeasurementType();
-    mcp.digitalWrite(Board::Mcp23017::TC_GND, HIGH);
-    mcp.digitalWrite(Board::Mcp23017::TC_VCC, HIGH);
-}
-
-void AnalogMux::setPT100()
-{
-    resetMeasurementType();
-    mcp.digitalWrite(Board::Mcp23017::RREF1k65, HIGH);
-}
-
-void AnalogMux::setPT1000()
-{
-    resetMeasurementType();
-    mcp.digitalWrite(Board::Mcp23017::RREF16k5, HIGH);
+    return bus->endTransmission() == 0;
 }

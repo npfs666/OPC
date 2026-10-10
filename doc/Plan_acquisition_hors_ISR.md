@@ -342,11 +342,30 @@ Chaque étape compile et laisse une carte qui fonctionne.
      viennent de la mesure elle-même (voir § 7).
    - ⬜ Moyenne et écart type sur des étalons en PT100 2, 3 et 4 fils, PT1000
      et thermocouple.
-1. ⬜ **Pilote MCP par registres et encodage du routage.**
-   - Tests sur PC : chaque combinaison donne les octets du § 4.
-   - Le pilote est encore appelé depuis l'ISR à ce stade, mais la panne « port
-     à 0xFF » disparaît et l'ISR raccourcit.
-   - Retrait de la bibliothèque Adafruit MCP23017 de `platformio.ini`.
+1. ✅ **Pilote MCP par registres et encodage du routage.**
+   - `AnalogRoute` (`src/Hardware/AnalogRoute.h`) : réglages + voie →
+     `{portA, portB}`, sans dépendance au bus.
+   - `AnalogMux` : initialisation (IOCON, sorties à 0, puis directions) et
+     `write(route)` en une transaction (`OLATA`, `OLATB`). Plus de
+     lecture-modification-écriture.
+   - `SensorBoard` : montage sans voie, configuration de l'ADC, puis voie.
+     En fin de voie, la voie est coupée et le montage gardé. Arrêt et
+     calibration : tout coupé (`AnalogRoute{}`).
+   - Tests sur PC (`test_analog_mux.cpp`) : octets du § 4 pour chaque
+     combinaison, séquence d'initialisation, écriture en une transaction,
+     MCP absent ou NACK. Le simulateur `Wire` couvre maintenant les
+     registres du MCP et garde le journal des écritures.
+   - La bibliothèque Adafruit MCP23017 est retirée de `platformio.ini`
+     (flash : 196 → 188 ko).
+   - Le pilote est encore appelé depuis l'ISR à ce stade, avec 3 transactions
+     par changement de voie au lieu de 22 à 28.
+   - ✅ Sur banc le 10/10/2026, `TestInstallation`, deux PT100 4 fils :
+     - mesures identiques à la référence : RTD1 100,059 Ω, RTD2 120,024 Ω ;
+     - avec `PRINT_CONVERSION_TIME`, la fin de série passe de 416 à 244 µs, et
+       la lecture de la température ADC suivie du routage de la voie 0 et de la
+       relance de 2 688 à 538 µs.
+   - ⬜ Sur banc : les autres valeurs du port A (2 et 3 fils, PT1000,
+     thermocouple) ne sont vérifiées que par les tests sur PC.
 2. ⬜ **Séquenceur dans `loop()`.**
    - ISR réduite, règle de partage du SPI.
    - Menu et calibration adaptés.

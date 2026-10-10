@@ -155,8 +155,7 @@ private:
         Sensor::Type type);
     void registerZeroCalibrationParameters(
         ParameterList& list);
-    void stopCalibrationHardware(
-        uint8_t channel);
+    void stopCalibrationHardware();
 
     // Lance la conversion de la température interne de l'ADC sans l'attendre.
     void startAdcTemperature();

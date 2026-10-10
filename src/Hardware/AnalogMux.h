@@ -5,35 +5,39 @@
 #define ANALOGMUX_H
 
 #include <cstdint>
-#include <Adafruit_MCP23X17.h>
+#include <Wire.h>
+#include <Hardware/AnalogRoute.h>
 
 /**
- * This class includes all the multiplexers.
- *  -> One is in front of the ADC to set up the 2,3,4 wire measurement.
- *  -> And three more (RTD_MAX), one per input channel.
+ * Multiplexeurs analogiques de la carte, commandés par le MCP23017 :
+ *  - un devant l'ADC pour le montage 2, 3 ou 4 fils et la référence ;
+ *  - un par voie d'entrée (MAX_RTD).
+ *
+ * Pilote par registres : chaque écriture donne l'état complet des deux
+ * ports (OLATA puis OLATB) en une transaction. Il n'y a plus de
+ * lecture-modification-écriture : une lecture ratée ne peut plus recopier
+ * un port entier à 0xFF.
  */
 class AnalogMux
 {
 public:
     // Retourne false si le MCP23017 ne répond pas : le routage est alors inconnu.
-    bool begin();
+    bool begin(TwoWire& wire);
 
-    void enableChannel(uint8_t channel);
-    void disableChannel(uint8_t channel);
-
-    void resetMeasurementMode();
-    void resetMeasurementType();
-
-    void set2Wire();
-    void set3Wire();
-    void set4Wire();
-    void setTC();
-
-    void setPT100();
-    void setPT1000();
+    /**
+     * Écrit le routage complet. Pour changer de montage sans relier deux
+     * configurations à une entrée, couper d'abord la voie (routage sans
+     * voie), puis la connecter. false si la transaction a échoué.
+     */
+    bool write(const AnalogRoute& route);
 
 private:
-    Adafruit_MCP23X17 mcp;
+    bool writeRegisters(
+        uint8_t address,
+        const uint8_t* values,
+        uint8_t count);
+
+    TwoWire* bus = nullptr;
 };
 
- #endif
+#endif
