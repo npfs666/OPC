@@ -175,6 +175,12 @@ void Sensor::compute()
     avgValue = result;
     lastAcquisition = status;
 }
+void Sensor::reject()
+{
+    reset();
+    lastAcquisition = MeasurementStatus::Invalid;
+}
+
 double_t Sensor::readValue() const
 {
     return avgValue;

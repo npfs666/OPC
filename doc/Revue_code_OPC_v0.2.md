@@ -49,7 +49,7 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 4. ✅ **Échec d'initialisation du MCP23017 ignoré**.
    - `AnalogMux::begin()` et `SensorBoard::init()` renvoient maintenant `bool`.
    - `OPC::initMeasurements()` refuse de démarrer si le MCP est absent.
-   - Reste ouvert : les erreurs I²C du MCP pendant l'acquisition, dans l'ISR, ne sont toujours pas vérifiées.
+   - ✅ Les erreurs I²C du MCP pendant l'acquisition sont traitées : routage relu avant et après chaque acquisition, nouvelle tentative, réinitialisation, entrée `Invalid` et journal (`AnalogMux::apply()` / `confirm()`). Voir [Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md), étape 3.
 5. ✅ **Démarrage raté = écran noir**.
    - Un échec de démarrage envoie `StartupFailed`, et le cœur UI affiche un écran « ERREUR DEMARRAGE » avec la cause (`StartupStatus.h`).
    - Le message est répété toutes les 5 s sur le port série.

@@ -157,7 +157,7 @@ public:
                registerPointer < registers.size())
         {
             receive[receiveLength++] =
-                registers[registerPointer++];
+                readRegister(registerPointer++);
         }
 
         return receiveLength;
@@ -183,6 +183,14 @@ public:
     // Écritures acceptées : registre de départ puis données.
     std::vector<std::vector<uint8_t>> writeLog;
 
+    /*
+     * MCP23017 : GPIO (0x12, 0x13) suit OLAT (0x14, 0x15) sur les broches en
+     * sortie (IODIR à 0), sauf les broches bloquées à 0.
+     */
+    bool mcpPinsFollowLatches = false;
+    uint8_t mcpStuckLowA = 0;
+    uint8_t mcpStuckLowB = 0;
+
     uint8_t deviceAddress = 0x68;
     uint8_t sdaPin = 0;
     uint8_t sclPin = 0;
@@ -194,6 +202,19 @@ public:
     bool started = false;
 
 private:
+    uint8_t readRegister(uint8_t address) const
+    {
+        if (!mcpPinsFollowLatches || (address != 0x12 && address != 0x13))
+            return registers[address];
+
+        const uint8_t port = address - 0x12;
+        const uint8_t outputs = static_cast<uint8_t>(~registers[port]);
+        const uint8_t stuckLow = port == 0 ? mcpStuckLowA : mcpStuckLowB;
+
+        return static_cast<uint8_t>(
+            registers[0x14 + port] & outputs & ~stuckLow);
+    }
+
     std::array<uint8_t, 32> transmission = {};
     std::array<uint8_t, 32> receive = {};
 

@@ -125,7 +125,7 @@ void SensorBoard::setStandardTC() {
  * Montage et référence d'abord, voie coupée, puis configuration de l'ADC
  * selon le montage. La voie est connectée en dernier.
  */
-void SensorBoard::routeInput(
+bool SensorBoard::routeInput(
     const Sensor::Settings& inputSettings,
     uint8_t channel)
 {
@@ -201,7 +201,12 @@ void SensorBoard::routeInput(
         break;
     }
 
-    mux.write(AnalogRoute::forInput(settings, channel));
+    return mux.apply(AnalogRoute::forInput(settings, channel));
+}
+
+bool SensorBoard::confirmInput()
+{
+    return mux.confirm();
 }
 
 void SensorBoard::disconnectInput(const Sensor::Settings& inputSettings)
@@ -243,6 +248,24 @@ void SensorBoard::endTemperature(int32_t raw)
     adcTemperature = ADS1120::rawToTemperature(raw);
 }
 
+void SensorBoard::failTemperature()
+{
+    adc.setTemperatureMode(TEMP_OFF);
+    adcTemperature = NAN;
+}
+
+void SensorBoard::resetConverter()
+{
+    // Registres aux valeurs par défaut ; le routage suivant reconfigure tout.
+    adc.reset();
+    delayMicroseconds(100);
+}
+
+uint32_t SensorBoard::milliseconds()
+{
+    return millis();
+}
+
 uint32_t SensorBoard::disableInterrupts()
 {
     return save_and_disable_interrupts();
@@ -276,6 +299,7 @@ void SensorBoard::stopAcquisition()
 {
     sequencer.stop();
     newMeasurement = false;
+    cycleFaults = CycleFaults{};
 
     adc.setConversionMode(CONVERSION_SINGLE_SHOT);
 
@@ -297,8 +321,39 @@ void SensorBoard::poll()
 {
     sequencer.poll();
 
-    if (sequencer.takeCycleCompleted())
-        newMeasurement = true;
+    if (!sequencer.takeCycleCompleted())
+        return;
+
+    const AcquisitionSequencer::CycleReport& report = sequencer.lastCycle();
+    cycleFaults.routing = report.routingFault;
+    cycleFaults.converter = report.converterTimeout;
+    cycleFaults.pinMismatch = mux.takePinMismatch();
+
+    diagnostics.mcpBusErrors = mux.counters().busErrors;
+    diagnostics.mcpReinitializations = mux.counters().reinitializations;
+    diagnostics.converterTimeouts = sequencer.converterTimeouts();
+
+    newMeasurement = true;
+
+    /*
+     * Essai sur banc : un cycle sur dix, reset simulé du MCP (broches en
+     * entrée) pendant la mesure de l'entrée 1, qui vient d'être routée.
+     * Attendu : entrée 1 Invalid pour ce cycle, « Défaut multiplexeur »,
+     * réinitialisation, puis « Multiplexeur rétabli » au cycle suivant.
+     */
+    //#define OPC_TEST_MCP_FAULT
+    #ifdef OPC_TEST_MCP_FAULT
+        static uint32_t testCycles = 0;
+
+        if (++testCycles % 10 == 0)
+        {
+            Wire1.beginTransmission(Board::Mcp23017::ADDRESS);
+            Wire1.write(0x00);  // IODIRA, IODIRB
+            Wire1.write(0xFF);
+            Wire1.write(0xFF);
+            Wire1.endTransmission();
+        }
+    #endif
 }
 
 void SensorBoard::adcInterrupt()
@@ -418,6 +473,7 @@ void SensorBoard::registerParameters(ParameterList& list)
         adcTemperature, "°C", true, 2);
 
     registerZeroCalibrationParameters(list);
+    registerDiagnosticParameters(list);
 
     registerCalibrationParameters(
         list,
@@ -492,6 +548,23 @@ void SensorBoard::registerCalibrationParameters(
         "°C",
         true);
 
+}
+
+void SensorBoard::registerDiagnosticParameters(
+    ParameterList& list)
+{
+    // Compteurs depuis le démarrage, non sauvegardés.
+    auto counters = list.forOwner(boardOwner(
+        "sensor_board.diagnostics", "Diagnostic", false));
+
+    constexpr int32_t COUNTER_MAX = INT32_MAX;
+
+    counters.addInteger("mcp_bus_errors", "Erreurs I2C MCP",
+        diagnostics.mcpBusErrors, 0, COUNTER_MAX, 1, nullptr, true);
+    counters.addInteger("mcp_resets", "Reinit. MCP",
+        diagnostics.mcpReinitializations, 0, COUNTER_MAX, 1, nullptr, true);
+    counters.addInteger("adc_timeouts", "ADC muet",
+        diagnostics.converterTimeouts, 0, COUNTER_MAX, 1, nullptr, true);
 }
 
 void SensorBoard::registerZeroCalibrationParameters(
@@ -836,7 +909,13 @@ bool SensorBoard::readCalibrationSamples(
         CALIBRATION_SAMPLES
     };
 
-    routeInput(calibrationSettings, channel);
+    if (!routeInput(calibrationSettings, channel))
+    {
+        stopCalibrationHardware();
+        Serial.println(
+            "Calibration failed: analog routing not verified");
+        return false;
+    }
 
     int32_t value = 0;
 

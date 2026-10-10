@@ -158,6 +158,11 @@ private:
     uint32_t lastEventsSave = 0;
     bool clockValidLogged = true;
 
+    // Défauts d'acquisition déjà inscrits au journal.
+    bool routingFaultLogged = false;
+    bool converterFaultLogged = false;
+    bool pinMismatchLogged = false;
+
     // Cœur contrôle : copie des événements importants pour l'écriture.
     EventEntry eventStaging[EventLog::CAPACITY];
     bool controlCycleStarted = false;
@@ -218,6 +223,10 @@ private:
     // Cœur contrôle : journal relu au démarrage, écrit par lots.
     void restoreEvents();
     void logStartup();
+
+    // Sous processDataMutex : apparition et disparition des défauts
+    // d'acquisition du dernier cycle.
+    void logAcquisitionFaults(uint32_t now);
     void saveEvents();
 
     // Cœur contrôle : réglages illisibles ou remis par défaut, au journal.

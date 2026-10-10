@@ -63,6 +63,14 @@ public:
     // Un cycle complet est mesuré. Remis à false par l'appelant.
     bool newMeasurement = false;
 
+    // Défauts vus pendant le dernier cycle complet.
+    struct CycleFaults
+    {
+        bool routing = false;     // routage non prouvé : entrée Invalid
+        bool converter = false;   // ADC muet : entrée Invalid
+        bool pinMismatch = false; // broche MCP relue ≠ commande (journal seul)
+    };
+
     SensorBoard();
     bool init();
     bool addSensor(Sensor& sensor);
@@ -81,6 +89,8 @@ public:
     void adcInterrupt();
 
     double_t getAdcTemperature();
+
+    const CycleFaults& lastCycleFaults() const { return cycleFaults; }
 
     double_t getColdJunctionTemperature() const;
     double_t computeVoltage(const Sensor& sensor) const;
@@ -101,15 +111,19 @@ public:
 private:
 
     // AcquisitionHardware : appelé par le séquenceur depuis loop().
-    void routeInput(
+    bool routeInput(
         const Sensor::Settings& settings,
         uint8_t channel) override;
+    bool confirmInput() override;
     void disconnectInput(const Sensor::Settings& settings) override;
     void stopConversions() override;
     void invertCurrents() override;
     void selectExtendedGain(const Sensor::Settings& settings) override;
     void beginTemperature() override;
     void endTemperature(int32_t raw) override;
+    void failTemperature() override;
+    void resetConverter() override;
+    uint32_t milliseconds() override;
     uint32_t disableInterrupts() override;
     void restoreInterrupts(uint32_t state) override;
     void restartConversions(bool continuous) override;
@@ -157,6 +171,8 @@ private:
         Sensor::Type type);
     void registerZeroCalibrationParameters(
         ParameterList& list);
+    void registerDiagnosticParameters(
+        ParameterList& list);
     void stopCalibrationHardware();
 
     static uint8_t thermocoupleGain(Physics::Thermocouple::Type type);
@@ -164,7 +180,17 @@ private:
     static double_t nominalReferenceResistance(
         Sensor::Type type);
 
+    // Compteurs depuis le démarrage, lus par le menu (lecture seule).
+    struct Diagnostics
+    {
+        uint32_t mcpBusErrors = 0;
+        uint32_t mcpReinitializations = 0;
+        uint32_t converterTimeouts = 0;
+    };
+
     AcquisitionSequencer sequencer;
+    CycleFaults cycleFaults;
+    Diagnostics diagnostics;
     uint8_t numSensors;  // number of RTD sensors in rtd array[]
     double_t adcTemperature;
     Settings calibrationBackup;

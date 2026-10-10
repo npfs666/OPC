@@ -5,6 +5,7 @@
 
 #include <Hardware/AcquisitionSequencer.h>
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -30,10 +31,27 @@ namespace
         int callsWhileArmed = 0;
         int restartsWithInterrupts = 0;
         bool interruptsDisabled = false;
+        uint32_t now = 0;
 
-        void routeInput(const Sensor::Settings&, uint8_t channel) override
+        // Prochains routages refusés (routage non prouvé).
+        int routeFailures = 0;
+        bool routeHolds = true;
+
+        bool routeInput(const Sensor::Settings&, uint8_t channel) override
         {
             record("route " + std::to_string(channel));
+
+            if (routeFailures == 0)
+                return true;
+
+            routeFailures--;
+            return false;
+        }
+
+        bool confirmInput() override
+        {
+            record("confirm");
+            return routeHolds;
         }
 
         void disconnectInput(const Sensor::Settings&) override
@@ -56,6 +74,10 @@ namespace
             temperatureRaw = raw;
             record("temperature off");
         }
+
+        void failTemperature() override { record("temperature failed"); }
+        void resetConverter() override { record("reset converter"); }
+        uint32_t milliseconds() override { return now; }
 
         uint32_t disableInterrupts() override
         {
@@ -146,7 +168,7 @@ namespace
 
         bench.sequencer.poll();
         CHECK_TRUE(bench.hardware.take() ==
-                   Calls({"stop", "disconnect", "route 1",
+                   Calls({"stop", "confirm", "disconnect", "route 1",
                           "restart continuous"}));
         CHECK_NEAR(first.readValue(), 1000.0, 1e-9);
         CHECK_TRUE(first.acquisitionStatus() == MeasurementStatus::Ok);
@@ -155,7 +177,7 @@ namespace
         bench.convert(2000, SERIES);
         bench.sequencer.poll();
         CHECK_TRUE(bench.hardware.take() ==
-                   Calls({"stop", "disconnect", "temperature on",
+                   Calls({"stop", "confirm", "disconnect", "temperature on",
                           "restart single"}));
         CHECK_NEAR(second.readValue(), 2000.0, 1e-9);
         CHECK_FALSE(bench.sequencer.takeCycleCompleted());
@@ -197,7 +219,7 @@ namespace
         bench.convert(1010, SERIES / 2);
         bench.sequencer.poll();
         CHECK_TRUE(bench.hardware.take() ==
-                   Calls({"stop", "disconnect", "temperature on",
+                   Calls({"stop", "confirm", "disconnect", "temperature on",
                           "restart single"}));
         CHECK_NEAR(sensor.readValue(), 1005.0, 1e-9);
 
@@ -225,7 +247,7 @@ namespace
         bench.convert(extendedValue);
         bench.sequencer.poll();
         CHECK_TRUE(bench.hardware.take() ==
-                   Calls({"stop", "disconnect", "temperature on",
+                   Calls({"stop", "confirm", "disconnect", "temperature on",
                           "restart single"}));
         CHECK_TRUE(sensor.acquisitionStatus() == expected);
 
@@ -301,6 +323,176 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
+    // PT100 4 fils, 2 échantillons : 15 + 100 conversions à 1 ms.
+    constexpr uint32_t PT100_DURATION_MS = RTD_SETTLING + SERIES;
+
+    void testRoutingFailureKeepsDuration()
+    {
+        Bench bench;
+        Sensor first;
+        Sensor second;
+        first.begin("first", Type::Pt100, Wiring::FourWire, SAMPLES, 0);
+        second.begin("second", Type::Pt100, Wiring::FourWire, SAMPLES, 0);
+        Sensor* inputs[] = {&first, &second};
+
+        // Routage non prouvé : rien n'est lancé sur l'ADC.
+        bench.hardware.routeFailures = 1;
+        bench.sequencer.start(inputs, 2);
+        CHECK_TRUE(bench.hardware.take() == Calls({"route 0"}));
+        CHECK_FALSE(bench.sequencer.isArmed());
+
+        // L'entrée garde sa durée normale avant d'être rejetée.
+        bench.hardware.now = PT100_DURATION_MS - 1;
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.hardware.take().empty());
+
+        bench.hardware.now = PT100_DURATION_MS;
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.hardware.take() ==
+                   Calls({"disconnect", "route 1", "restart continuous"}));
+        CHECK_TRUE(first.acquisitionStatus() == MeasurementStatus::Invalid);
+        CHECK_FALSE(std::isfinite(first.readValue()));
+
+        // Le cycle continue : seconde entrée, température.
+        bench.convert(0, RTD_SETTLING);
+        bench.convert(1000, SERIES);
+        bench.sequencer.poll();
+        bench.convert(3200);
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.sequencer.takeCycleCompleted());
+        CHECK_TRUE(bench.sequencer.lastCycle().routingFault);
+        CHECK_FALSE(bench.sequencer.lastCycle().converterTimeout);
+        CHECK_TRUE(second.acquisitionStatus() == MeasurementStatus::Ok);
+
+        // Cycle suivant sans défaut.
+        bench.convert(0, RTD_SETTLING);
+        bench.convert(1000, SERIES);
+        bench.sequencer.poll();
+        bench.convert(0, RTD_SETTLING);
+        bench.convert(1000, SERIES);
+        bench.sequencer.poll();
+        bench.convert(3200);
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.sequencer.takeCycleCompleted());
+        CHECK_FALSE(bench.sequencer.lastCycle().routingFault);
+        CHECK_TRUE(first.acquisitionStatus() == MeasurementStatus::Ok);
+
+        bench.checkHardwareDiscipline();
+    }
+
+    void testRoutingLostDuringAcquisition()
+    {
+        Bench bench;
+        Sensor sensor;
+        sensor.begin("sensor", Type::Pt100, Wiring::FourWire, SAMPLES, 0);
+        Sensor* inputs[] = {&sensor};
+
+        bench.sequencer.start(inputs, 1);
+        bench.convert(0, RTD_SETTLING);
+        bench.convert(1000, SERIES);
+
+        // Routage disparu en fin d'acquisition : la série est rejetée.
+        bench.hardware.routeHolds = false;
+        bench.sequencer.poll();
+        CHECK_TRUE(sensor.acquisitionStatus() == MeasurementStatus::Invalid);
+        CHECK_FALSE(std::isfinite(sensor.readValue()));
+
+        bench.convert(3200);
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.sequencer.takeCycleCompleted());
+        CHECK_TRUE(bench.sequencer.lastCycle().routingFault);
+
+        bench.checkHardwareDiscipline();
+    }
+
+    void testConverterTimeout()
+    {
+        Bench bench;
+        Sensor sensor;
+        sensor.begin("sensor", Type::Pt100, Wiring::FourWire, SAMPLES, 0);
+        Sensor* inputs[] = {&sensor};
+
+        bench.sequencer.start(inputs, 1);
+        bench.hardware.take();
+
+        // DRDY muet : deux fois la durée normale, plus une seconde.
+        const uint32_t timeout = 2 * PT100_DURATION_MS + 1000;
+        bench.hardware.now = timeout - 1;
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.hardware.take().empty());
+        CHECK_TRUE(bench.sequencer.isArmed());
+
+        bench.hardware.now = timeout;
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.hardware.take() ==
+                   Calls({"reset converter", "disconnect", "temperature on",
+                          "restart single"}));
+        CHECK_TRUE(sensor.acquisitionStatus() == MeasurementStatus::Invalid);
+        CHECK_TRUE(bench.sequencer.converterTimeouts() == 1);
+
+        // Température lue : le cycle se termine avec le défaut.
+        bench.convert(3200);
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.sequencer.takeCycleCompleted());
+        CHECK_TRUE(bench.sequencer.lastCycle().converterTimeout);
+        CHECK_FALSE(bench.sequencer.lastCycle().routingFault);
+
+        bench.checkHardwareDiscipline();
+    }
+
+    void testTemperatureTimeout()
+    {
+        Bench bench;
+        Sensor sensor;
+        sensor.begin("sensor", Type::Pt100, Wiring::FourWire, SAMPLES, 0);
+        Sensor* inputs[] = {&sensor};
+
+        bench.sequencer.start(inputs, 1);
+        bench.convert(0, RTD_SETTLING);
+        bench.convert(1000, SERIES);
+        bench.sequencer.poll();
+        bench.hardware.take();
+
+        // Conversion de température jamais arrivée.
+        bench.hardware.now = 2 * 50 + 1000;
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.hardware.take() ==
+                   Calls({"reset converter", "temperature failed", "route 0",
+                          "restart continuous"}));
+        CHECK_TRUE(bench.sequencer.takeCycleCompleted());
+        CHECK_TRUE(bench.sequencer.lastCycle().converterTimeout);
+
+        // La mesure de l'entrée, faite avant, reste valable.
+        CHECK_TRUE(sensor.acquisitionStatus() == MeasurementStatus::Ok);
+
+        bench.checkHardwareDiscipline();
+    }
+
+    void testEventBeatsTimeout()
+    {
+        Bench bench;
+        Sensor sensor;
+        sensor.begin("sensor", Type::Pt100, Wiring::FourWire, SAMPLES, 0);
+        Sensor* inputs[] = {&sensor};
+
+        bench.sequencer.start(inputs, 1);
+        bench.hardware.take();
+
+        // Série terminée, mais loop() n'est revenue qu'après le délai
+        // (sauvegarde en flash, par exemple) : pas de défaut.
+        bench.convert(0, RTD_SETTLING);
+        bench.convert(1000, SERIES);
+        bench.hardware.now = 10000;
+        bench.sequencer.poll();
+        CHECK_TRUE(bench.hardware.take() ==
+                   Calls({"stop", "confirm", "disconnect", "temperature on",
+                          "restart single"}));
+        CHECK_TRUE(sensor.acquisitionStatus() == MeasurementStatus::Ok);
+        CHECK_TRUE(bench.sequencer.converterTimeouts() == 0);
+
+        bench.checkHardwareDiscipline();
+    }
+
     void testWithoutInput()
     {
         Bench bench;
@@ -324,4 +516,13 @@ void runAcquisitionSequencerTests()
     TestHarness::run("acquisition : thermocouple", testThermocoupleSettling);
     TestHarness::run("acquisition : arrêt et reprise", testStopAndRestart);
     TestHarness::run("acquisition : sans entrée", testWithoutInput);
+    TestHarness::run("acquisition : routage refusé, durée normale gardée",
+        testRoutingFailureKeepsDuration);
+    TestHarness::run("acquisition : routage perdu pendant la série",
+        testRoutingLostDuringAcquisition);
+    TestHarness::run("acquisition : ADC muet", testConverterTimeout);
+    TestHarness::run("acquisition : température ADC muette",
+        testTemperatureTimeout);
+    TestHarness::run("acquisition : série finie après le délai",
+        testEventBeatsTimeout);
 }

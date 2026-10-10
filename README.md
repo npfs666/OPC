@@ -1151,6 +1151,7 @@ clic revient au menu.
 | Démarrage et sa cause | `Mise sous tension`, `Redémarrage (watchdog)`, `Redémarrage (baisse tension)` | oui |
 | Réglages remis par défaut au démarrage (voir [Configuration](#configuration-et-usb)) | `Par défaut : PID autotune`, `Config. non reprise : défauts` | oui |
 | Défaut de sonde et sa fin | `Temperature : RUPTURE`, `Temperature : OK` | oui |
+| Défaut d'acquisition de la carte et sa fin (voir [Défauts de mesure](#défauts-de-mesure)) | `Défaut multiplexeur`, `Multiplexeur rétabli`, `ADC muet`, `ADC rétabli`, `Broche MCP non conforme` | oui |
 | Alarme | `Alarme Temp. haute : ACTIVE`, `MEMORISEE`, `FIN` | oui |
 | Acquittement, remise à zéro, actions du menu | `Alarmes acquittées`, `RAZ compteurs Relais 1`, `Action : Mesurer N0 E1` | oui |
 | Entretien, heure perdue ou retrouvée | `Entretien Relais 1 (150000 man.)`, `Heure perdue` | oui |
@@ -1201,7 +1202,11 @@ la clé de configuration de chaque relais.
   et action `Calibrer Rref (E1)` avec un étalon branché en 4 fils sur
   l'entrée 1 ;
 - **Thermocouples** : `C.J. offset` pour corriger la soudure froide, avec
-  affichage de la température de l'ADC.
+  affichage de la température de l'ADC ;
+- **Diagnostic** : compteurs depuis le démarrage, en lecture seule et non
+  sauvegardés : `Erreurs I2C MCP` (transactions en échec avec le
+  multiplexeur), `Reinit. MCP` (réinitialisations du multiplexeur) et
+  `ADC muet` (étapes sans conversion dans le délai prévu).
 
 Une mesure de calibration instable ou hors plage est rejetée sans écraser la
 calibration existante.
@@ -1287,7 +1292,7 @@ les régulateurs mettent leurs sorties en état sûr, comme avant.
 | `Short` | `C-CIRCUIT` / `C-C` (rouge) | Résistance < 10 Ω (PT100), < 100 Ω (PT1000) |
 | `UnderRange` | `TROP BAS` / `BAS` (orange) | Sous l'étendue : RTD sous -200 °C, thermocouple sous son domaine NIST |
 | `OverRange` | `TROP HAUT` / `HAUT` (orange) | Au-dessus de l'étendue : RTD au-delà de sa plage (environ 280 ou 850 °C), thermocouple au-delà de son domaine NIST |
-| `Invalid` | `ERREUR` / `ERR` (rouge) | ADC saturé vers le bas (câblage inversé), jonction froide inconnue, calcul impossible |
+| `Invalid` | `ERREUR` / `ERR` (rouge) | ADC saturé vers le bas (câblage inversé), jonction froide inconnue, calcul impossible, routage de la carte non vérifié, ADC muet |
 
 - **Thermocouple** : la polarisation 1 MΩ (+ vers VCC, − vers GND) sature
   l'entrée quand le thermocouple est ouvert. Un court-circuit au bornier
@@ -1299,6 +1304,18 @@ les régulateurs mettent leurs sorties en état sûr, comme avant.
   plage large (environ 16 ms) les départage : lisible, l'entrée est
   `TROP HAUT` ; encore saturée, elle est en `RUPTURE`. Sur la plage
   `-200..850°C`, une saturation est forcément une rupture.
+- **Routage de la carte** : avant chaque acquisition et à la fin, le
+  firmware relit le multiplexeur (MCP23017). Après un reset du MCP (parasite,
+  chute de tension), ses broches repassent en entrée : un routage encore en
+  place en fin d'acquisition prouve qu'il a tenu pendant toute la mesure.
+  Sinon, l'entrée passe en `ERREUR` pour ce cycle, le MCP est réinitialisé,
+  et le journal note `Défaut multiplexeur` puis `Multiplexeur rétabli`. Une
+  erreur de bus isolée est rattrapée par une nouvelle tentative. L'état sûr
+  arrive dès le cycle en défaut, sans attendre le timeout de mesure.
+- **ADC muet** : une étape sans conversion dans deux fois sa durée normale,
+  plus une seconde, réinitialise l'ADC et met l'entrée en `ERREUR`
+  (`ADC muet` au journal). Sans température de l'ADC, la jonction froide des
+  thermocouples est inconnue pour ce cycle.
 - Les mesures calculées reprennent l'état de leur source : une température
   RTD affiche la rupture de sa résistance, une humidité psychrométrique celle
   de la sonde sèche ou humide.

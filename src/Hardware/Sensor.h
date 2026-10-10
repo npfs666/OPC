@@ -98,6 +98,12 @@ public:
     void reset();
     void add(int32_t value);
     void compute();
+
+    /**
+     * Acquisition rejetée (routage non prouvé, ADC muet) : pas de valeur et
+     * état Invalid, à la place de compute().
+     */
+    void reject();
     bool isAccumulationHalfWay();
     bool isAccumulationDone();
     double_t readValue() const;

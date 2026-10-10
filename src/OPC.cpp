@@ -251,6 +251,8 @@ bool OPC::newMeasurement()
     controller.updateMeasurementsAndRegulators(
         times);
 
+    logAcquisitionFaults(times);
+
     controller.captureSnapshot(
         sharedProcessSnapshot,
         times);
@@ -282,6 +284,42 @@ bool OPC::newMeasurement()
             InterCoreMessage::PrintDataAvailable));
 
     return true;
+}
+
+void OPC::logAcquisitionFaults(uint32_t now)
+{
+    const SensorBoard::CycleFaults& faults = input.lastCycleFaults();
+
+    struct Transition
+    {
+        bool present;
+        bool& logged;
+        const char* appeared;
+        const char* cleared;
+    };
+
+    const Transition transitions[] = {
+        {faults.routing, routingFaultLogged,
+            "Défaut multiplexeur", "Multiplexeur rétabli"},
+        {faults.converter, converterFaultLogged,
+            "ADC muet", "ADC rétabli"},
+        {faults.pinMismatch, pinMismatchLogged,
+            "Broche MCP non conforme", "Broches MCP conformes"},
+    };
+
+    for (const Transition& transition : transitions)
+    {
+        if (transition.present == transition.logged)
+            continue;
+
+        transition.logged = transition.present;
+        controller.logEvent(
+            now,
+            transition.present ? EventKind::Fault : EventKind::Info,
+            true,
+            "%s",
+            transition.present ? transition.appeared : transition.cleared);
+    }
 }
 
 void OPC::refreshClock()

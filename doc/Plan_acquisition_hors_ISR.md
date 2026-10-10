@@ -403,13 +403,44 @@ Chaque étape compile et laisse une carte qui fonctionne.
      100,07 Ω, stable), y compris aux changements de montage par le menu.
    - ⬜ Sur banc : montage du lecteur USB (IRQ ignorées), durée du cycle,
      calibration.
-3. ⬜ **Vérification et réaction aux défauts.**
-   - Encadrement, nouvelles tentatives, réinitialisation, `Invalid`, journal,
-     timeout d'étape, compteurs.
-   - Tests sur PC avec un faux MCP : NACK isolé rattrapé ; reset pendant
-     l'acquisition rejeté puis rattrapé ; MCP muet (toutes les voies
-     `Invalid`, cycle à durée normale, un seul événement) ; retour à la
-     normale ; `GPIO ≠ OLAT` inscrit sans invalider ; DRDY muet.
+3. ✅ **Vérification et réaction aux défauts.**
+   - `AnalogMux::apply()` : écriture et relecture, puis une nouvelle
+     tentative, puis réinitialisation complète et dernier essai.
+     `AnalogMux::confirm()` : relecture en fin d'acquisition, refaite une fois
+     si le bus échoue. Après un échec, le routage suivant commence par la
+     réinitialisation.
+   - Séquenceur :
+     - routage refusé : l'entrée garde sa durée normale, puis passe en
+       `Invalid` (`Sensor::reject()`) ;
+     - routage disparu en fin d'acquisition : la série est rejetée ;
+     - étape sans conversion dans 2 × sa durée + 1 s : ADC réinitialisé,
+       entrée `Invalid`. Pour la température ADC, jonction froide inconnue ;
+     - si la série s'est terminée juste avant le délai, l'événement
+       l'emporte sur le timeout ;
+     - bilan de chaque cycle (`CycleReport`).
+   - Journal : « Défaut multiplexeur » / « Multiplexeur rétabli », « ADC
+     muet » / « ADC rétabli », « Broche MCP non conforme » / « Broches MCP
+     conformes » (`OPC::logAcquisitionFaults()`).
+   - Compteurs en lecture seule, non sauvegardés, dans
+     `Calibration > Diagnostic` : `Erreurs I2C MCP`, `Reinit. MCP`,
+     `ADC muet`.
+   - Calibration refusée si le routage n'est pas prouvé.
+   - `GPIO ≠ OLAT` : journalisé seulement (`PIN_MISMATCH_IS_FAULT = false`
+     dans `AnalogMux.cpp`), et seulement quand la configuration est en place.
+     Après un reset, les broches sont en entrée : leur niveau ne suit plus
+     la commande, mais « Défaut multiplexeur » le dit déjà.
+   - ✅ Sur banc, `OPC_TEST_MCP_FAULT` : « Défaut multiplexeur » puis
+     « Multiplexeur rétabli », entrée 1 en `ERREUR` pendant un cycle.
+   - Tests sur PC : NACK isolé rattrapé, reset du MCP rattrapé avant la
+     mesure et rejeté pendant, MCP muet puis de retour, relecture en fin
+     d'acquisition, broche non conforme journalisée, routage refusé avec
+     durée normale gardée, ADC muet, température muette, série finie
+     après le délai.
+   - Essai sur banc préparé : `#define OPC_TEST_MCP_FAULT` dans
+     `SensorBoard.cpp` simule un reset du MCP un cycle sur dix.
+   - ⬜ Sur banc : compteurs à 0 en fonctionnement normal, et aucune
+     « Broche MCP non conforme » dans tous les montages avant de rendre ce
+     contrôle bloquant.
 4. ⬜ **Délai et récupération du bus `Wire1`.**
 5. ⬜ **Validation sur banc.**
    - Comparaison avec l'étape 0.

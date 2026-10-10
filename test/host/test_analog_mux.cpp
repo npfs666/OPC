@@ -55,7 +55,23 @@ namespace
     {
         TwoWire wire;
         wire.deviceAddress = Board::Mcp23017::ADDRESS;
+        wire.mcpPinsFollowLatches = true;
         return wire;
+    }
+
+    // Reset du MCP (ESD, chute de tension) : broches en entrée, sorties à 0.
+    void resetMcp(TwoWire& wire)
+    {
+        wire.registers[IODIRA] = 0xFF;
+        wire.registers[IODIRB] = 0xFF;
+        wire.registers[OLATA] = 0x00;
+        wire.registers[OLATB] = 0x00;
+    }
+
+    AnalogRoute pt100Input(uint8_t channel)
+    {
+        return AnalogRoute::forInput(
+            settingsFor(Type::Pt100, Wiring::FourWire), channel);
     }
 
     void testRouteTable()
@@ -208,6 +224,132 @@ namespace
     }
 }
 
+namespace
+{
+    void testApplyVerified()
+    {
+        TwoWire wire = mcpBus();
+        AnalogMux mux;
+        CHECK_TRUE(mux.begin(wire));
+        wire.writeLog.clear();
+
+        CHECK_TRUE(mux.apply(pt100Input(1)));
+
+        // Écriture, puis relecture à partir de IODIRA.
+        const std::vector<Bytes> expected = {{OLATA, 0x06, 0x02}, {IODIRA}};
+        CHECK_TRUE(wire.writeLog == expected);
+        CHECK_TRUE(mux.counters().busErrors == 0);
+        CHECK_TRUE(mux.counters().reinitializations == 0);
+        CHECK_TRUE(mux.counters().pinMismatches == 0);
+        CHECK_TRUE(mux.confirm());
+    }
+
+    void testApplyRetriesAfterNack()
+    {
+        TwoWire wire = mcpBus();
+        AnalogMux mux;
+        CHECK_TRUE(mux.begin(wire));
+
+        // NACK isolé : la nouvelle écriture suffit.
+        wire.nextTransmissionError = 2;
+        CHECK_TRUE(mux.apply(pt100Input(0)));
+        CHECK_TRUE(mux.counters().busErrors == 1);
+        CHECK_TRUE(mux.counters().reinitializations == 0);
+        CHECK_TRUE(wire.registers[OLATB] == 0x01);
+    }
+
+    void testApplyReinitializesAfterReset()
+    {
+        TwoWire wire = mcpBus();
+        AnalogMux mux;
+        CHECK_TRUE(mux.begin(wire));
+
+        // Broches en entrée : la réécriture seule ne suffit pas.
+        resetMcp(wire);
+        CHECK_TRUE(mux.apply(pt100Input(2)));
+        CHECK_TRUE(mux.counters().reinitializations == 1);
+        CHECK_TRUE(wire.registers[IODIRA] == 0x00);
+        CHECK_TRUE(wire.registers[IODIRB] == 0xF8);
+        CHECK_TRUE(wire.registers[OLATA] == 0x06);
+        CHECK_TRUE(wire.registers[OLATB] == 0x04);
+    }
+
+    void testApplyWithoutMcp()
+    {
+        TwoWire wire = mcpBus();
+        AnalogMux mux;
+        CHECK_TRUE(mux.begin(wire));
+
+        wire.connected = false;
+        CHECK_FALSE(mux.apply(pt100Input(0)));
+        CHECK_TRUE(mux.counters().reinitializations == 1);
+        CHECK_TRUE(mux.counters().busErrors > 0);
+
+        // De retour : état inconnu, la réinitialisation passe en premier.
+        wire.connected = true;
+        wire.writeLog.clear();
+        CHECK_TRUE(mux.apply(pt100Input(0)));
+        CHECK_TRUE(!wire.writeLog.empty() &&
+                   wire.writeLog.front() == Bytes({0x05, 0x00}));
+        CHECK_TRUE(mux.counters().reinitializations == 2);
+    }
+
+    void testConfirmAfterReset()
+    {
+        TwoWire wire = mcpBus();
+        AnalogMux mux;
+        CHECK_TRUE(mux.begin(wire));
+        CHECK_TRUE(mux.apply(pt100Input(0)));
+
+        // Reset pendant l'acquisition : la mesure n'est pas prouvée. Les
+        // broches en entrée ne sont pas comptées comme non conformes.
+        resetMcp(wire);
+        CHECK_FALSE(mux.confirm());
+        CHECK_FALSE(mux.takePinMismatch());
+        CHECK_TRUE(mux.counters().pinMismatches == 0);
+
+        // Le routage suivant commence par la réinitialisation.
+        wire.writeLog.clear();
+        CHECK_TRUE(mux.apply(pt100Input(1)));
+        CHECK_TRUE(!wire.writeLog.empty() &&
+                   wire.writeLog.front() == Bytes({0x05, 0x00}));
+        CHECK_TRUE(mux.counters().reinitializations == 1);
+    }
+
+    void testConfirmRereadsOnce()
+    {
+        TwoWire wire = mcpBus();
+        AnalogMux mux;
+        CHECK_TRUE(mux.begin(wire));
+        CHECK_TRUE(mux.apply(pt100Input(0)));
+
+        // Lecture incomplète isolée : relue une fois.
+        wire.shortRead = true;
+        CHECK_TRUE(mux.confirm());
+        CHECK_TRUE(mux.counters().busErrors == 1);
+
+        // Bus muet : mesure non prouvée.
+        wire.connected = false;
+        CHECK_FALSE(mux.confirm());
+    }
+
+    void testPinMismatchLoggedOnly()
+    {
+        TwoWire wire = mcpBus();
+        AnalogMux mux;
+        CHECK_TRUE(mux.begin(wire));
+        CHECK_FALSE(mux.takePinMismatch());
+
+        // Broche SW_4 (GPA1) bloquée à 0 : signalée, mais pas bloquante.
+        wire.mcpStuckLowA = 0x02;
+        CHECK_TRUE(mux.apply(pt100Input(0)));
+        CHECK_TRUE(mux.confirm());
+        CHECK_TRUE(mux.counters().pinMismatches == 2);
+        CHECK_TRUE(mux.takePinMismatch());
+        CHECK_FALSE(mux.takePinMismatch());
+    }
+}
+
 void runAnalogMuxTests()
 {
     TestHarness::run("routage analogique : octets des ports", testRouteTable);
@@ -221,4 +363,16 @@ void runAnalogMuxTests()
     TestHarness::run("MCP23017 : routage en une transaction",
         testWriteIsOneTransaction);
     TestHarness::run("MCP23017 : écriture refusée", testWriteFailure);
+    TestHarness::run("MCP23017 : routage vérifié", testApplyVerified);
+    TestHarness::run("MCP23017 : NACK isolé rattrapé",
+        testApplyRetriesAfterNack);
+    TestHarness::run("MCP23017 : réinitialisé après un reset",
+        testApplyReinitializesAfterReset);
+    TestHarness::run("MCP23017 : muet puis de retour", testApplyWithoutMcp);
+    TestHarness::run("MCP23017 : reset pendant l'acquisition",
+        testConfirmAfterReset);
+    TestHarness::run("MCP23017 : relecture en fin d'acquisition",
+        testConfirmRereadsOnce);
+    TestHarness::run("MCP23017 : broche non conforme journalisée",
+        testPinMismatchLoggedOnly);
 }
