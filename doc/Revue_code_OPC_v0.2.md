@@ -68,6 +68,12 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
     - Correctif : l'ISR ignore l'IRQ si DRDY est déjà haut à l'entrée. La conversion suivante redonne un front.
     - Vérifié sur banc, avec montages et démontages répétés du lecteur USB : jusqu'à 52 IRQ ignorées par cycle, et des mesures restées dans le bruit (0,03 point ADC).
 
+27. ✅ **BMP580 muet affiché comme valide** (`PressureBMP580`). Ajouté le 10/10/2026, trouvé par l'essai SDA à la masse ([Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md), étape 4).
+    - `Adafruit_BMP5xx::readPressure()` ignore l'échec de `performReading()` et renvoie la dernière pression lue.
+    - Bus bloqué ou capteur muet : la pression restait figée et valide, et l'humidité psychrométrique en dépend.
+    - Correctif : lecture par `performReading()`, mesure invalide en cas d'échec. `pressureSeaLevel()` fait aussi une seule lecture pour la pression et la température.
+    - Vérifié sur banc (SDA à la masse) : `BMP580 : ERREUR` pendant le court-circuit, puis `BMP580 : OK`.
+
 ### B. Risques de conception (à planifier)
 
 8. ✅ **ISR DRDY longue** (`SensorBoard::adcInterrupt`).

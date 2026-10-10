@@ -461,6 +461,8 @@ Chaque étape compile et laisse une carte qui fonctionne.
    - Constat : le BMP580 a gardé sa dernière pression, affichée comme
      valide, pendant tout le court-circuit. `readPressure()` de la
      bibliothèque Adafruit ignore l'échec de la lecture (revue, point 27).
+     Corrigé par une lecture avec `performReading()`. Revérifié sur banc :
+     `BMP580 : ERREUR` pendant le court-circuit, puis `BMP580 : OK`.
 5. ⬜ **Validation sur banc.**
    - Comparaison avec l'étape 0.
    - SDA à la masse quelques secondes : défaut, état sûr, retour sans

@@ -28,11 +28,11 @@ void PressureBMP580::begin(
 double_t PressureBMP580::pressureSeaLevel(
     int16_t altitude)
 {
-    if (bmp580 == nullptr)
+    if (bmp580 == nullptr || !bmp580->performReading())
         return NAN;
 
     const double_t pressure =
-        bmp580->readPressure() *
+        bmp580->pressure *
         100.0;
 
     if (!std::isfinite(pressure) ||
@@ -43,7 +43,7 @@ double_t PressureBMP580::pressureSeaLevel(
     }
 
     const double_t temperature =
-        bmp580->readTemperature();
+        bmp580->temperature;
 
     if (!std::isfinite(temperature))
         return NAN;
@@ -69,14 +69,18 @@ uint8_t PressureBMP580::printDecimals() const
 
 void PressureBMP580::update()
 {
-    if (bmp580 == nullptr)
+    /*
+     * readPressure() garde la dernière valeur quand la lecture échoue (bus
+     * bloqué, capteur muet) : seul performReading() dit si elle a abouti.
+     */
+    if (bmp580 == nullptr || !bmp580->performReading())
     {
         setValid(false);
         return;
     }
 
     const double_t value =
-        bmp580->readPressure() *
+        bmp580->pressure *
         100.0;
 
     if (!std::isfinite(value) ||
