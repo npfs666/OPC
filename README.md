@@ -71,6 +71,13 @@ mise en sécurité des sorties.
 Le brochage est dans
 [Pinout_v0.2.h](src/Hardware/Boards/Pinout_v0.2.h).
 
+Le bus I²C relie le multiplexeur des entrées (MCP23017), l'horloge, le
+BMP581 et le connecteur d'extension. Un bus bloqué (SDA tenue à 0, par un
+module d'extension par exemple) est débloqué par 9 impulsions sur SCL puis un
+STOP, au démarrage et après chaque transaction de plus de 10 ms. Pendant le
+blocage, les entrées analogiques passent en `ERREUR`
+(voir [Défauts de mesure](#défauts-de-mesure)), sans redémarrage.
+
 ### Borniers
 
 **Alimentation et entrées TOR** (J6, carte puissance) :

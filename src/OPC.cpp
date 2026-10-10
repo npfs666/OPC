@@ -23,6 +23,47 @@ namespace
     // Taille de texte 2 : 12 px par caractère sur 240 px de large.
     constexpr size_t STARTUP_ERROR_LINE_LENGTH = 18;
 
+    // Délai d'une transaction I²C. La plus longue, la relecture du MCP23017
+    // (22 octets), dure environ 0,6 ms à 400 kHz.
+    constexpr uint32_t I2C_TIMEOUT_MS = 10;
+
+    /**
+     * Libère le bus I²C si un circuit tient SDA à 0 : il a été interrompu au
+     * milieu d'une lecture, par exemple par un redémarrage de la carte. Au
+     * plus 9 impulsions sur SCL lui font terminer son octet, puis un STOP
+     * remet le bus au repos. Les lignes ne sont jamais tirées à 1 : relâchées,
+     * les résistances de rappel les remontent.
+     */
+    void releaseI2CBus(uint8_t sda, uint8_t scl)
+    {
+        constexpr uint32_t HALF_PERIOD_US = 5; // 100 kHz
+
+        pinMode(sda, INPUT_PULLUP);
+        pinMode(scl, INPUT_PULLUP);
+        delayMicroseconds(HALF_PERIOD_US);
+
+        if (digitalRead(sda) == HIGH)
+            return;
+
+        for (uint8_t pulse = 0;
+             pulse < 9 && digitalRead(sda) == LOW;
+             pulse++)
+        {
+            digitalWrite(scl, LOW);
+            pinMode(scl, OUTPUT);
+            delayMicroseconds(HALF_PERIOD_US);
+            pinMode(scl, INPUT_PULLUP);
+            delayMicroseconds(HALF_PERIOD_US);
+        }
+
+        // STOP : SDA remonte pendant que SCL est haut.
+        digitalWrite(sda, LOW);
+        pinMode(sda, OUTPUT);
+        delayMicroseconds(HALF_PERIOD_US);
+        pinMode(sda, INPUT_PULLUP);
+        delayMicroseconds(HALF_PERIOD_US);
+    }
+
     /**
      * Affiche un texte UTF-8 sur plusieurs lignes, en coupant de préférence
      * aux espaces. Retourne l'ordonnée de la ligne suivante.
@@ -169,9 +210,18 @@ void OPC::initDisplay()
 
 void OPC::initI2C() {
 
+    releaseI2CBus(Board::Rp2040::I2C_SDA, Board::Rp2040::I2C_SCL);
+
     Wire1.setSDA(Board::Rp2040::I2C_SDA);
     Wire1.setSCL(Board::Rp2040::I2C_SCL);
     Wire1.setClock(400000);
+
+    /*
+     * Délai court, puis déblocage du bus par le cœur (9 impulsions sur SCL,
+     * STOP) à chaque dépassement : un bus bloqué ne fige plus loop() jusqu'au
+     * watchdog. Le défaut se voit sur le multiplexeur, l'horloge et le BMP580.
+     */
+    Wire1.setTimeout(I2C_TIMEOUT_MS, true);
 }
 
 void OPC::initBMP580()

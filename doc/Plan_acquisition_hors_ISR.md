@@ -445,7 +445,22 @@ Chaque étape compile et laisse une carte qui fonctionne.
    - ⬜ Sur banc : PT1000 et thermocouple. Leurs broches commandées à 1
      (RREF16k5, TC_GND, TC_VCC) n'ont pas encore été relues à l'état haut.
      En cas de faux défaut, repasser `PIN_MISMATCH_IS_FAULT` à `false`.
-4. ⬜ **Délai et récupération du bus `Wire1`.**
+4. ✅ **Délai et récupération du bus `Wire1`.**
+   - `Wire1.setTimeout(10, true)` dans `OPC::initI2C()` : délai de 10 ms par
+     transaction, puis déblocage par le cœur Arduino-Pico (`end()`,
+     9 impulsions sur SCL, STOP, `begin()`).
+   - Déblocage au démarrage, avant la première transaction
+     (`releaseI2CBus()` dans `OPC.cpp`) : un circuit interrompu au milieu
+     d'une lecture par un redémarrage peut tenir SDA à 0.
+   - ✅ Sur banc le 10/10/2026, SDA à la masse quelques secondes :
+     - entrées en `ERREUR` et « Défaut multiplexeur » dès le cycle en cours ;
+     - « Heure perdue », puis « Heure retrouvée » ;
+     - après le court-circuit, RTD2 revient au cycle suivant, puis RTD1 et
+       « Multiplexeur rétabli » ;
+     - aucun redémarrage.
+   - Constat : le BMP580 a gardé sa dernière pression, affichée comme
+     valide, pendant tout le court-circuit. `readPressure()` de la
+     bibliothèque Adafruit ignore l'échec de la lecture (revue, point 27).
 5. ⬜ **Validation sur banc.**
    - Comparaison avec l'étape 0.
    - SDA à la masse quelques secondes : défaut, état sûr, retour sans
