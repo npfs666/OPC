@@ -117,6 +117,8 @@ protection (33 V).
 | 4 | NC | Côté B, 2e fil | Courant − | NC |
 
 En 3 fils, les deux fils du même côté de la sonde vont sur les bornes 3 et 4.
+La borne 1 doit rester libre : une sonde câblée en 4 fils mais réglée en 3 fils
+donne une mesure fausse et instable (jusqu'à −20 %), sans défaut signalé.
 En 4 fils, les bornes 1 et 2 vont d'un côté de la sonde, et les bornes 3 et
 4 de l'autre.
 

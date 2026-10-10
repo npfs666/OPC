@@ -364,8 +364,16 @@ Chaque étape compile et laisse une carte qui fonctionne.
      - avec `PRINT_CONVERSION_TIME`, la fin de série passe de 416 à 244 µs, et
        la lecture de la température ADC suivie du routage de la voie 0 et de la
        relance de 2 688 à 538 µs.
-   - ⬜ Sur banc : les autres valeurs du port A (2 et 3 fils, PT1000,
-     thermocouple) ne sont vérifiées que par les tests sur PC.
+   - ✅ Sur banc, 2 fils (`0x15`) : 16 083,5 points, stable, soit environ
+     1,2 Ω de plus qu'en 4 fils (fils et commutateurs, normal en 2 fils).
+   - ✅ Sur banc, 3 fils (`0x25`) : stable et cohérent avec une sonde câblée
+     en 3 fils. Avec une sonde câblée en 4 fils, mais réglée en 3 fils, la
+     mesure est fausse et instable avec les deux firmwares, l'ancien comme le
+     nouveau : 80 à 96 % de la valeur, et un niveau différent à chaque
+     cycle. En 3 fils, la borne 1 doit rester libre. Ce n'est pas un défaut
+     du firmware.
+   - ⬜ Sur banc : PT1000 et thermocouple ne sont vérifiés que par les tests
+     sur PC.
 2. ⬜ **Séquenceur dans `loop()`.**
    - ISR réduite, règle de partage du SPI.
    - Menu et calibration adaptés.
