@@ -72,9 +72,11 @@ fi
     "${project_dir}/test/host/test_kiln.cpp" \
     "${project_dir}/test/host/test_parameter_json.cpp" \
     "${project_dir}/test/host/test_analog_mux.cpp" \
+    "${project_dir}/test/host/test_acquisition_sequencer.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
+    "${project_dir}/src/Hardware/AcquisitionSequencer.cpp" \
     "${project_dir}/src/Hardware/AnalogMux.cpp" \
     "${project_dir}/src/Hardware/AnalogRoute.cpp" \
     "${project_dir}/src/Hardware/Sensor.cpp" \

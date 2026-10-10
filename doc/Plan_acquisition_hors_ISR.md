@@ -375,13 +375,34 @@ Chaque étape compile et laisse une carte qui fonctionne.
      câblage (bilan, P1).
    - ⬜ Sur banc : PT1000 et thermocouple ne sont vérifiés que par les tests
      sur PC.
-2. ⬜ **Séquenceur dans `loop()`.**
-   - ISR réduite, règle de partage du SPI.
-   - Menu et calibration adaptés.
-   - Suppression de `SharedBusGuard`.
-   - Tests sur PC : ordre nominal, inversion 3 fils, diagnostic d'étendue,
-     aucune configuration de l'ADC pendant que l'ISR est armée, arrêt et départ
-     par le menu.
+2. ✅ **Séquenceur dans `loop()`.**
+   - `AcquisitionSequencer` (`src/Hardware/AcquisitionSequencer.h`) : machine
+     d'états sans dépendance au matériel. Elle voit l'ADC et les multiplexeurs
+     par l'interface `AcquisitionHardware`, que `SensorBoard` implémente.
+   - ISR réduite : armée, DRDY bas, lecture, `onConversion()`. Elle ignore
+     les conversions d'établissement, accumule, et se désarme à mi-série
+     (3 fils), en fin de série ou après une conversion unique.
+   - `OPC::acquisitionPoll()`, en tête de `loop()`, enchaîne : inversion des
+     courants, diagnostic d'étendue, voie suivante, température de l'ADC,
+     cycle suivant.
+   - Règle de partage du SPI : le séquenceur ne touche au matériel que si
+     l'ISR est désarmée. La relance (START/SYNC, acquittement du front DRDY)
+     et l'armement se font ensemble, interruptions coupées (environ 25 µs).
+     Sinon, le front d'une conversion unique faite entre les deux serait
+     perdu.
+   - Menu et calibration : `stopAcquisition()` et `startAcquisition()`
+     remplacent `pause()`, `resetAcquisition()` et `startContinuous()`.
+   - `SharedBusGuard` est supprimé : Wire1 n'est plus utilisé depuis une
+     interruption.
+   - Tests sur PC (`test_acquisition_sequencer.cpp`) : cycle de deux
+     entrées, inversion 3 fils, diagnostic d'étendue (hors étendue et
+     ouverte), thermocouple, arrêt et reprise, sans entrée. Un double du
+     matériel vérifie qu'aucun appel n'arrive ISR armée, et que la relance se
+     fait interruptions coupées.
+   - ✅ Sur banc le 10/10/2026 : 2, 3 et 4 fils corrects (3 fils :
+     100,07 Ω, stable), y compris aux changements de montage par le menu.
+   - ⬜ Sur banc : montage du lecteur USB (IRQ ignorées), durée du cycle,
+     calibration.
 3. ⬜ **Vérification et réaction aux défauts.**
    - Encadrement, nouvelles tentatives, réinitialisation, `Invalid`, journal,
      timeout d'étape, compteurs.

@@ -4,6 +4,7 @@
 #include <Hardware/SensorBoard.h>
 
 #include <hardware/gpio.h>
+#include <hardware/sync.h>
 #include <hmi/ParameterList.h>
 
 #include <cmath>
@@ -26,7 +27,6 @@ namespace
     constexpr int32_t MAX_SAMPLE_SPREAD_COUNTS = 256;
     constexpr double_t REFERENCE_TOLERANCE = 0.05;
     constexpr double_t ADC_FULL_SCALE = 32768.0;
-    constexpr int32_t ADC_POSITIVE_SATURATION = 32767;
 
     // Calibrations propres à la carte : /board.json, voir ParameterOwner.
     ParameterOwner boardOwner(
@@ -43,11 +43,11 @@ namespace
 
 
 SensorBoard::SensorBoard()
+    : sequencer(*this)
 {
     beginConfiguration("sensor_board");
     numSensors = 0;
     newMeasurement = false;
-    pauseInterrupts = true;
     adcTemperature = NAN;
 
     for (uint8_t i = 0; i < MAX_RTD; i++)
@@ -122,12 +122,15 @@ void SensorBoard::setStandardTC() {
 
 
 /**
- * Sets up the ADC and multiplexer according each RTD settings
+ * Montage et référence d'abord, voie coupée, puis configuration de l'ADC
+ * selon le montage. La voie est connectée en dernier.
  */
-void SensorBoard::setWiringRoute(Sensor::Settings settings)
+void SensorBoard::routeInput(
+    const Sensor::Settings& inputSettings,
+    uint8_t channel)
 {
-    // Montage et référence d'abord, voie coupée : la voie est connectée en
-    // dernier, une fois l'ADC configuré.
+    Sensor::Settings settings = inputSettings;
+
     mux.write(AnalogRoute::forInput(settings));
 
     if (settings.type == Sensor::Type::Tc)
@@ -198,78 +201,110 @@ void SensorBoard::setWiringRoute(Sensor::Settings settings)
         break;
     }
 
-    mux.write(AnalogRoute::forInput(settings, curSensor));
+    mux.write(AnalogRoute::forInput(settings, channel));
 }
 
+void SensorBoard::disconnectInput(const Sensor::Settings& inputSettings)
+{
+    mux.write(AnalogRoute::forInput(inputSettings));
+}
 
+void SensorBoard::stopConversions()
+{
+    adc.setConversionMode(CONVERSION_SINGLE_SHOT);
+}
 
 /**
- * @brief Invert the IDAC current source in 3-Wire measurement, to cancel their différences (current chopping)
- * 
+ * 3 fils : inversion des sources de courant, pour supprimer leur inégalité
+ * (current chopping).
  */
-void SensorBoard::invert3WireIDAC()
+void SensorBoard::invertCurrents()
 {
     adc.setIDAC1routing(IDAC_AIN2);
     adc.setIDAC2routing(IDAC_AIN3_REFN1);
 }
 
-
-
-// Starts continuous conversion of the ADC
-void SensorBoard::startContinuous()
+void SensorBoard::selectExtendedGain(const Sensor::Settings& inputSettings)
 {
-    if (numSensors == 0 || rtd[0] == nullptr) 
-        return;
+    Sensor::Settings extended = inputSettings;
+    extended.range = Sensor::Range::Extended;
 
-    pauseInterrupts = true;
-
-    // Init first read
-    curSensor = 0;
-
-    setWiringRoute(rtd[curSensor]->settings);
-
-    adc.setConversionMode(CONVERSION_CONTINUOUS);
-    discardConversions = conversionsToDiscard();
-    adc.startSync();
-
-    gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
-
-    pauseInterrupts = false;
+    adc.setGain(Sensor::adcGain(extended));
 }
 
-
-
-// Pauses conversion
-void SensorBoard::pause() {
-    pauseInterrupts = true;
-    adc.setConversionMode(CONVERSION_SINGLE_SHOT);
+void SensorBoard::beginTemperature()
+{
+    adc.setTemperatureMode(TEMP_ON);
 }
 
+void SensorBoard::endTemperature(int32_t raw)
+{
+    adc.setTemperatureMode(TEMP_OFF);
+    adcTemperature = ADS1120::rawToTemperature(raw);
+}
 
+uint32_t SensorBoard::disableInterrupts()
+{
+    return save_and_disable_interrupts();
+}
 
-// Restarts conversion
-void SensorBoard::restart() {
+void SensorBoard::restoreInterrupts(uint32_t state)
+{
+    restore_interrupts(state);
+}
 
-    adc.setConversionMode(CONVERSION_CONTINUOUS);
-    discardConversions = conversionsToDiscard();
+void SensorBoard::restartConversions(bool continuous)
+{
+    adc.setConversionMode(
+        continuous ? CONVERSION_CONTINUOUS : CONVERSION_SINGLE_SHOT);
 
-    /**
-     * Une conversion synchrone, notamment la température interne de l'ADC,
-     * peut laisser un front DRDY en attente. Il doit être acquitté avant
-     * d'accepter les mesures du canal suivant.
+    /*
+     * Une conversion faite avant la relance, notamment une conversion
+     * unique, peut laisser un front DRDY en attente : il est acquitté.
      */
     adc.startSync();
-
     gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
-
-    pauseInterrupts = false;
 }
 
+void SensorBoard::startAcquisition()
+{
+    stopAcquisition();
+    sequencer.start(rtd, numSensors);
+}
 
+void SensorBoard::stopAcquisition()
+{
+    sequencer.stop();
+    newMeasurement = false;
 
-void SensorBoard::adcInterrupt() {
+    adc.setConversionMode(CONVERSION_SINGLE_SHOT);
 
-    if( pauseInterrupts ) return;
+    // Une mesure de température ADC interrompue ne doit pas laisser l'ADC
+    // en mode capteur interne pour le cycle suivant.
+    adc.setTemperatureMode(TEMP_OFF);
+
+    mux.write(AnalogRoute{});
+
+    adc.setIDACcurrent(CURRENT_0_UA);
+    adc.setIDAC1routing(IDAC_DISABLED);
+    adc.setIDAC2routing(IDAC_DISABLED);
+
+    for (uint8_t i = 0; i < numSensors; i++)
+        rtd[i]->reset();
+}
+
+void SensorBoard::poll()
+{
+    sequencer.poll();
+
+    if (sequencer.takeCycleCompleted())
+        newMeasurement = true;
+}
+
+void SensorBoard::adcInterrupt()
+{
+    if (!sequencer.isArmed())
+        return;
 
     /*
      * Seul DRDY bas garantit une donnée neuve. Quand l'ISR a été retardée
@@ -287,120 +322,11 @@ void SensorBoard::adcInterrupt() {
         uint32_t time = micros();
     #endif
 
-    int32_t value = adc.readADC();
-
-    // Fin de cycle : conversion single-shot de la température interne terminée.
-    if (measuringAdcTemperature)
-    {
-        adc.setTemperatureMode(TEMP_OFF);
-        adcTemperature = ADS1120::rawToTemperature(value);
-        measuringAdcTemperature = false;
-        newMeasurement = true;
-
-        // curSensor vaut déjà 0 : départ du cycle suivant.
-        setWiringRoute(rtd[curSensor]->settings);
-        restart();
-
-        #ifdef PRINT_CONVERSION_TIME
-            Serial.println((micros()-time));
-        #endif
-        return;
-    }
-
-    if (discardConversions > 0)
-    {
-        discardConversions--;
-        return;
-    }
-
-    // Conversion de diagnostic : lisible au gain large, l'entrée est
-    // seulement au-delà de l'étendue précise ; encore saturée, elle est ouverte.
-    if (diagnosingRange)
-    {
-        diagnosingRange = false;
-        rtd[curSensor]->setRangeDiagnostic(
-            value < ADC_POSITIVE_SATURATION);
-        pause();
-        finishSensor();
-        return;
-    }
-	
-    rtd[curSensor]->add(value);
-
-    // Cas particulier de la mesure en 3 fils (current chopping) : 
-	// inversion des sources d'exitation de courant à la moitié de la série, pour supprimer leur inégalité de courant
-	if ( rtd[curSensor]->isAccumulationHalfWay() )
-	{
-        pause();
-		invert3WireIDAC();
-        restart();
-	}
-
-    // If all samples of one RTD are measured, compute the result
-    if ( rtd[curSensor]->isAccumulationDone() )
-	{
-        pause();
-
-        if (rtd[curSensor]->needsRangeDiagnostic())
-            startRangeDiagnostic();
-        else
-            finishSensor();
-    }
+    sequencer.onConversion(adc.readADC());
 
     #ifdef PRINT_CONVERSION_TIME
         Serial.println((micros()-time));
     #endif
-}
-
-void SensorBoard::finishSensor()
-{
-    rtd[curSensor]->compute();
-
-    // Voie coupée, montage conservé jusqu'au routage suivant.
-    mux.write(AnalogRoute::forInput(rtd[curSensor]->settings));
-    curSensor++;
-
-    // Toutes les entrées sont mesurées : la température ADC est lue à
-    // l'IRQ suivante, qui signalera newMeasurement et relancera le cycle.
-    if (curSensor == numSensors)
-    {
-        curSensor = 0;
-        startAdcTemperature();
-    }
-    else
-    {
-        setWiringRoute(rtd[curSensor]->settings);
-
-        // relance de la conversion continue
-        restart();
-    }
-}
-
-void SensorBoard::startRangeDiagnostic()
-{
-    // pause() a déjà repassé l'ADC en single-shot. Même voie et même
-    // routage, seul le gain change ; restart() ignore les conversions
-    // d'établissement (environ 16 ms en tout, uniquement après une saturation).
-    Sensor::Settings extended = rtd[curSensor]->settings;
-    extended.range = Sensor::Range::Extended;
-
-    adc.setGain(Sensor::adcGain(extended));
-    diagnosingRange = true;
-    restart();
-}
-
-void SensorBoard::startAdcTemperature()
-{
-    // pause() a déjà repassé l'ADC en single-shot.
-    adc.setTemperatureMode(TEMP_ON);
-    measuringAdcTemperature = true;
-    discardConversions = 0;
-
-    adc.startSync();
-
-    gpio_acknowledge_irq(Board::Rp2040::ADC_DRDY, GPIO_IRQ_EDGE_FALL);
-
-    pauseInterrupts = false;
 }
 
 
@@ -900,8 +826,7 @@ bool SensorBoard::readCalibrationSamples(
     if (channel >= MAX_RTD)
         return false;
 
-    resetAcquisition();
-    curSensor = channel;
+    stopAcquisition();
 
     // Étendue précise par défaut : N0 et Rref sont pris au gain de référence.
     Sensor::Settings calibrationSettings{
@@ -911,7 +836,7 @@ bool SensorBoard::readCalibrationSamples(
         CALIBRATION_SAMPLES
     };
 
-    setWiringRoute(calibrationSettings);
+    routeInput(calibrationSettings, channel);
 
     int32_t value = 0;
 
@@ -995,35 +920,3 @@ double_t SensorBoard::nominalReferenceResistance(
             : 1650.0;
 }
 
-uint16_t SensorBoard::conversionsToDiscard() const
-{
-    const Sensor* sensor = rtd[curSensor];
-    if (sensor != nullptr && sensor->settings.type != Sensor::Type::Tc)
-        return RTD_DISCARDED_CONVERSIONS;
-
-    return 1;
-}
-
-void SensorBoard::resetAcquisition()
-{
-    pauseInterrupts = true;
-    newMeasurement = false;
-    discardConversions = 0;
-
-    // Une mesure de température ADC interrompue ne doit pas laisser l'ADC
-    // en mode capteur interne pour le cycle suivant.
-    measuringAdcTemperature = false;
-    diagnosingRange = false;
-    adc.setTemperatureMode(TEMP_OFF);
-
-    mux.write(AnalogRoute{});
-
-    adc.setIDACcurrent(CURRENT_0_UA);
-    adc.setIDAC1routing(IDAC_DISABLED);
-    adc.setIDAC2routing(IDAC_DISABLED);
-
-    curSensor = 0;
-
-    for (uint8_t i = 0; i < numSensors; i++)
-        rtd[i]->reset();
-}

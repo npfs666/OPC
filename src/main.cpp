@@ -118,6 +118,9 @@ void loop()
         opc.handleControlMessage(
             static_cast<InterCoreMessage>(message));
 
+    // Séquencement de l'acquisition (routage, voies), hors de l'ISR DRDY.
+    opc.acquisitionPoll();
+
     // Mettre en place le calcul des measurement, car ici on est pas dans l'ISR donc on a le temps.
     opc.newMeasurement();
 

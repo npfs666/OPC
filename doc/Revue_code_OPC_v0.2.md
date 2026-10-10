@@ -14,9 +14,9 @@ Légende : ✅ corrigé · ⬜ à faire
   - Les deux cœurs échangent des messages par la FIFO (`InterCoreMessages.h`) et partagent les données sous le mutex `processDataMutex`.
 - **Chaîne de traitement** : `SensorBoard`, puis `Measurement`, `Regulator`, `Actuator` et `Output`, sous l'orchestration de `ProcessControl`. L'écran lit une copie des mesures (`ProcessSnapshot`).
 - **Acquisition**
-  - L'ISR DRDY de l'ADS1120 (`SensorBoard::adcInterrupt`) accumule N échantillons par entrée.
-  - Quand une entrée a tous ses échantillons, l'ISR change le routage par le MCP23017 (I²C Wire1) et relance la conversion.
-  - À la fin d'un cycle complet, l'ISR lit la température interne de l'ADC (utilisée comme jonction froide) et positionne `newMeasurement`.
+  - L'ISR DRDY de l'ADS1120 (`SensorBoard::adcInterrupt`) lit la conversion et la passe à `AcquisitionSequencer`, qui accumule N échantillons par entrée.
+  - Le séquencement se fait dans `loop()` (`OPC::acquisitionPoll()`) : routage par le MCP23017 (I²C Wire1), relance des conversions, voie suivante.
+  - À la fin d'un cycle complet, la température interne de l'ADC (utilisée comme jonction froide) est lue, puis `newMeasurement` est positionné.
   - En 3 fils, les sources de courant (IDAC) sont inversées à mi-série (*chopping*).
 - **Paramètres**
   - Chaque objet s'enregistre dans `ParameterList` par un `ParameterOwner` (catégorie et propriétaire).
@@ -70,11 +70,11 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 
 ### B. Risques de conception (à planifier)
 
-8. ⬜ (partiellement ✅) **ISR DRDY longue** (`SensorBoard::adcInterrupt`).
+8. ✅ **ISR DRDY longue** (`SensorBoard::adcInterrupt`).
    - ✅ Les `delay(2)` de `ADS1120::sendCommand` ont été supprimés.
    - ✅ Wire1 passé à 400 kHz (`OPC.cpp`).
    - ✅ La température ADC n'est plus attendue dans l'ISR : elle devient la dernière étape du cycle (`startAdcTemperature`), lue à l'IRQ DRDY suivante.
-   - ⬜ Il faudrait sortir le séquencement de l'ISR : l'ISR lit l'échantillon, une machine d'états dans `loop()` gère le routage.
+   - ✅ Le séquencement est sorti de l'ISR (`AcquisitionSequencer`, testé sur PC) : l'ISR lit l'échantillon, et une machine d'états dans `loop()` gère le routage. `SharedBusGuard` est supprimé. Voir [Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md), étape 2.
 9. ✅ **Précision PT100** : la conversion passe maintenant par Callendar–Van Dusen avec Newton-Raphson (`PT100::getResistanceToTemperatureNewton`).
    - Mesure faite sur l'ancienne table : erreur de 15 mK à 100 °C, 71 mK à 266 °C, et aucune mesure au-delà de 266 °C.
    - ✅ Test hôte ajouté sur les points IEC 60751 (`testPT100CallendarVanDusen`).

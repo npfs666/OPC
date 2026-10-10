@@ -221,6 +221,11 @@ void OPC::handleISRButton()
     encoder.onButtonISR();
 }
 
+void OPC::acquisitionPoll()
+{
+    input.poll();
+}
+
 bool OPC::newMeasurement()
 {
     // Sans entrée analogique, l'ADC ne cadence rien : cycle fixe.
@@ -243,12 +248,8 @@ bool OPC::newMeasurement()
     if (!controlOutputsEnabled)
         controller.resume(times);
 
-    {
-        // Lecture BMP580 sur Wire1, partagé avec l'ISR ADC.
-        SensorBoard::SharedBusGuard busGuard;
-        controller.updateMeasurementsAndRegulators(
-            times);
-    }
+    controller.updateMeasurementsAndRegulators(
+        times);
 
     controller.captureSnapshot(
         sharedProcessSnapshot,
@@ -288,15 +289,11 @@ void OPC::refreshClock()
     lastClockRefresh = millis();
 
     RTC::DateTime dateTime;
-    bool readOk;
     bool oscillatorRunning = false;
-    {
-        SensorBoard::SharedBusGuard busGuard;
-        readOk = clock.readDateTime(dateTime);
+    bool readOk = clock.readDateTime(dateTime);
 
-        if (readOk && !clock.isTimeValid(oscillatorRunning))
-            readOk = false;
-    }
+    if (readOk && !clock.isTimeValid(oscillatorRunning))
+        readOk = false;
 
     // Une erreur I2C isolée ne doit pas arrêter les programmations : la
     // dernière heure lue reste utilisée quelques secondes.
@@ -512,7 +509,7 @@ bool OPC::initMeasurements()
     logStartup();
     logConfigurationRestore(restoreResult);
 
-    input.startContinuous();
+    input.startAcquisition();
     controlCycleStarted = true;
 
     return true;
@@ -1236,10 +1233,7 @@ void OPC::handleControlMessage(
         __dmb();
         if (menuSessionOpen)
         {
-            {
-                SensorBoard::SharedBusGuard busGuard;
-                clock.onMenuOpened();
-            }
+            clock.onMenuOpened();
             parameterEditor.capture(RTC::MENU_OWNER_KEY);
         }
         __dmb();
@@ -1252,10 +1246,7 @@ void OPC::handleControlMessage(
         __dmb();
         bool saved = false;
         if (menuSessionOpen)
-        {
-            SensorBoard::SharedBusGuard busGuard;
             saved = clock.applyMenuParameters(parameterEditor);
-        }
         __dmb();
         rp2040.fifo.push(interCoreMessageValue(saved
             ? InterCoreMessage::ClockParametersApplied
@@ -1309,10 +1300,7 @@ void OPC::handleControlMessage(
 
         mutex_enter_blocking(&processDataMutex);
         userInstall.onMenuOpened();
-        {
-            SensorBoard::SharedBusGuard busGuard;
-            clock.onMenuOpened();
-        }
+        clock.onMenuOpened();
         parameterEditor.capture();
         menuSessionOpen = true;
         mutex_exit(&processDataMutex);
@@ -1435,8 +1423,7 @@ void OPC::handleControlMessage(
             break;
         }
 
-        input.pause();
-        input.resetAcquisition();
+        input.stopAcquisition();
         acquisitionPausedForMenu = true;
 
         const bool settingsChanged = parameterEditor.hasChanges();
@@ -1560,8 +1547,7 @@ void OPC::handleControlMessage(
                 "Menu action rejected");
         }
 
-        input.resetAcquisition();
-        input.startContinuous();
+        input.startAcquisition();
 
         acquisitionPausedForMenu = false;
         menuSessionOpen = false;

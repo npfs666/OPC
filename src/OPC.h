@@ -62,6 +62,9 @@ public:
     void handleUIMessage(
         InterCoreMessage message);
 
+    // Étape suivante de l'acquisition, hors ISR (voir SensorBoard::poll()).
+    void acquisitionPoll();
+
     bool newMeasurement();
 
     void handleISRRotenc();

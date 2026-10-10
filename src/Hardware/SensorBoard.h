@@ -8,42 +8,22 @@
 #include<Hardware/pinout.h>
 #include<Hardware/Sensor.h>
 #include<Drivers/ADS1120.h>
+#include<Hardware/AcquisitionSequencer.h>
 #include<Hardware/AnalogMux.h>
 #include <Configurable.h>
 #include <hmi/MenuBuilder.h>
-#include <hardware/irq.h>
 
-class SensorBoard: public Configurable {
+/**
+ * Carte de mesure : ADS1120, multiplexeurs et entrées.
+ *
+ * L'ISR DRDY ne fait que lire la conversion. Le séquencement (routage,
+ * inversion des courants, diagnostic d'étendue, température de l'ADC) se
+ * fait dans loop() par poll(), voir AcquisitionSequencer. Wire1 n'est donc
+ * jamais utilisé depuis une interruption.
+ */
+class SensorBoard: public Configurable, private AcquisitionHardware {
 
 public:
-
-    /**
-     * L'ISR DRDY commande le MCP23017 sur Wire1, bus partagé avec le DS3231
-     * et le BMP580. Ce garde masque les IRQ GPIO du cœur courant pendant un
-     * accès Wire1 hors ISR. Le front DRDY reste mémorisé et l'ISR s'exécute
-     * dès la levée du masque.
-     */
-    class SharedBusGuard
-    {
-    public:
-        SharedBusGuard()
-            : wasEnabled(irq_is_enabled(IO_IRQ_BANK0))
-        {
-            irq_set_enabled(IO_IRQ_BANK0, false);
-        }
-
-        ~SharedBusGuard()
-        {
-            if (wasEnabled)
-                irq_set_enabled(IO_IRQ_BANK0, true);
-        }
-
-        SharedBusGuard(const SharedBusGuard&) = delete;
-        SharedBusGuard& operator=(const SharedBusGuard&) = delete;
-
-    private:
-        const bool wasEnabled;
-    };
 
     struct CalibrationProfile
     {
@@ -79,22 +59,28 @@ public:
     ADS1120   adc;  // ADC
     AnalogMux mux;  // Front end multiplexers
     Sensor* rtd[MAX_RTD]; // Sensor array
-    
-    volatile bool newMeasurement=false;    // ADC has finished accumulating values, data is readable
-    
+
+    // Un cycle complet est mesuré. Remis à false par l'appelant.
+    bool newMeasurement = false;
+
     SensorBoard();
     bool init();
     bool addSensor(Sensor& sensor);
     uint8_t sensorCount() const { return numSensors; }
-    void startContinuous();
-    void pause();
-    void restart();
-    void invert3WireIDAC();
+
+    // Acquisition de toutes les entrées, puis de la température de l'ADC.
+    void startAcquisition();
+
+    // ADC en single-shot, multiplexeurs et sources de courant coupés.
+    void stopAcquisition();
+
+    // loop() : étape suivante de l'acquisition.
+    void poll();
+
+    // ISR DRDY : lit la conversion si le séquenceur l'attend.
     void adcInterrupt();
-    void setStandardRTD();
-    void setStandardTC();
+
     double_t getAdcTemperature();
-    void setWiringRoute(Sensor::Settings settings);
 
     double_t getColdJunctionTemperature() const;
     double_t computeVoltage(const Sensor& sensor) const;
@@ -111,9 +97,25 @@ public:
         MenuBuilder::ActionId actionId);
     void onMenuActionSaveFailed(
         MenuBuilder::ActionId actionId);
-    void resetAcquisition();
 
 private:
+
+    // AcquisitionHardware : appelé par le séquenceur depuis loop().
+    void routeInput(
+        const Sensor::Settings& settings,
+        uint8_t channel) override;
+    void disconnectInput(const Sensor::Settings& settings) override;
+    void stopConversions() override;
+    void invertCurrents() override;
+    void selectExtendedGain(const Sensor::Settings& settings) override;
+    void beginTemperature() override;
+    void endTemperature(int32_t raw) override;
+    uint32_t disableInterrupts() override;
+    void restoreInterrupts(uint32_t state) override;
+    void restartConversions(bool continuous) override;
+
+    void setStandardRTD();
+    void setStandardTC();
 
     struct CalibrationSamples
     {
@@ -157,32 +159,13 @@ private:
         ParameterList& list);
     void stopCalibrationHardware();
 
-    // Lance la conversion de la température interne de l'ADC sans l'attendre.
-    void startAdcTemperature();
-
     static uint8_t thermocoupleGain(Physics::Thermocouple::Type type);
 
     static double_t nominalReferenceResistance(
         Sensor::Type type);
 
-    // Termine l'acquisition de la voie courante et passe à la suivante.
-    void finishSensor();
-
-    // Conversion au gain de l'étendue large après une saturation en
-    // étendue précise (voir Sensor::needsRangeDiagnostic()).
-    void startRangeDiagnostic();
-
-    // Nombre de conversions à ignorer après un changement de configuration.
-    uint16_t conversionsToDiscard() const;
-
-    uint8_t curSensor;   // cur sensor index
+    AcquisitionSequencer sequencer;
     uint8_t numSensors;  // number of RTD sensors in rtd array[]
-    volatile bool pauseInterrupts = true;
-    volatile uint16_t discardConversions = 0;
-    // Dernière étape du cycle : la prochaine IRQ DRDY lit la température ADC.
-    volatile bool measuringAdcTemperature = false;
-    // La prochaine conversion utile est la conversion de diagnostic.
-    volatile bool diagnosingRange = false;
     double_t adcTemperature;
     Settings calibrationBackup;
     bool calibrationBackupValid = false;

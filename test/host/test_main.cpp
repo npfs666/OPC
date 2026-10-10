@@ -3248,6 +3248,7 @@ void runSetpointProgramTests();
 void runKilnTests();
 void runParameterJsonTests();
 void runAnalogMuxTests();
+void runAcquisitionSequencerTests();
 
 int main()
 {
@@ -3459,6 +3460,7 @@ int main()
     runKilnTests();
     runParameterJsonTests();
     runAnalogMuxTests();
+    runAcquisitionSequencerTests();
 
     return TestHarness::finish();
 }
