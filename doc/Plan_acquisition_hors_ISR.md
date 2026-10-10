@@ -366,12 +366,13 @@ Chaque étape compile et laisse une carte qui fonctionne.
        relance de 2 688 à 538 µs.
    - ✅ Sur banc, 2 fils (`0x15`) : 16 083,5 points, stable, soit environ
      1,2 Ω de plus qu'en 4 fils (fils et commutateurs, normal en 2 fils).
-   - ✅ Sur banc, 3 fils (`0x25`) : stable et cohérent avec une sonde câblée
-     en 3 fils. Avec une sonde câblée en 4 fils, mais réglée en 3 fils, la
-     mesure est fausse et instable avec les deux firmwares, l'ancien comme le
-     nouveau : 80 à 96 % de la valeur, et un niveau différent à chaque
-     cycle. En 3 fils, la borne 1 doit rester libre. Ce n'est pas un défaut
-     du firmware.
+   - ✅ Sur banc, 3 fils (`0x25`) : 100,07 Ω, stable (100,06 Ω en 4 fils),
+     y compris avec une sonde câblée en 4 fils. Une première série d'essais
+     donnait 80 à 96 % de la valeur, avec un niveau différent à chaque cycle,
+     quel que soit le firmware. La cause était un fil mal tenu dans le bornier
+     et des contacts oxydés, pas le firmware. Un mauvais contact fausse donc
+     la mesure sans aucun défaut signalé : c'est un cas pour le diagnostic du
+     câblage (bilan, P1).
    - ⬜ Sur banc : PT1000 et thermocouple ne sont vérifiés que par les tests
      sur PC.
 2. ⬜ **Séquenceur dans `loop()`.**
