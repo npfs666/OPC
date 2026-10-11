@@ -7,6 +7,7 @@
 #include <ProcessControl.h>
 #include <hmi/EventLogScreen.h>
 
+#include <cstdio>
 #include <cstring>
 
 namespace
@@ -24,7 +25,7 @@ namespace
         return clock;
     }
 
-    void testOrderAndCapacity()
+    TEST_CASE("journal : ordre et capacite")
     {
         EventLog log;
         const ClockSample clock = clockAt(14, 32, 5);
@@ -46,7 +47,7 @@ namespace
         CHECK_TRUE(log.at(EventLog::CAPACITY) == nullptr);
     }
 
-    void testCoalescing()
+    TEST_CASE("journal : regroupement des rafales")
     {
         EventLog log;
         const ClockSample clock = clockAt(8, 0, 0);
@@ -82,7 +83,7 @@ namespace
         CHECK_TRUE(deep.count() == 6);
     }
 
-    void testPrintAndSaveFlags()
+    TEST_CASE("journal : port serie et sauvegarde")
     {
         EventLog log;
         const ClockSample clock = clockAt(9, 15, 0);
@@ -114,7 +115,7 @@ namespace
         CHECK_TRUE(std::strcmp(copies[1].text, "Alarme X : ACTIVE") == 0);
     }
 
-    void testFormats()
+    TEST_CASE("journal : formats affiches")
     {
         EventLog log;
         log.add(125000, clockAt(14, 32, 5), EventKind::Fault, true, "T : RUPTURE");
@@ -135,7 +136,7 @@ namespace
         CHECK_TRUE(std::strcmp(text, "+42 s") == 0);
     }
 
-    void testCsvRoundTrip()
+    TEST_CASE("journal : CSV et relecture")
     {
         EventLog log;
         log.add(125000, clockAt(14, 32, 5), EventKind::Alarm, true,
@@ -179,7 +180,7 @@ namespace
         CHECK_TRUE(stream.printedLineCount == 0);
     }
 
-    void testProcessEvents()
+    TEST_CASE("journal : evenements du processus")
     {
         ProcessControl process;
         process.updateClock(clockAt(10, 0, 0));
@@ -200,7 +201,7 @@ namespace
                    EventLog::TEXT_SIZE - 1);
     }
 
-    void testScreenHelpers()
+    TEST_CASE("journal : visionneuse")
     {
         char lines[EventLogScreen::MAX_TEXT_LINES][EventLogScreen::LINE_CHARS + 1];
 
@@ -245,15 +246,4 @@ namespace
         fault.kind = EventKind::Fault;
         CHECK_TRUE(EventLogScreen::color(fault) == 0xF800);
     }
-}
-
-void runEventLogTests()
-{
-    TestHarness::run("journal : ordre et capacite", testOrderAndCapacity);
-    TestHarness::run("journal : regroupement des rafales", testCoalescing);
-    TestHarness::run("journal : port serie et sauvegarde", testPrintAndSaveFlags);
-    TestHarness::run("journal : formats affiches", testFormats);
-    TestHarness::run("journal : CSV et relecture", testCsvRoundTrip);
-    TestHarness::run("journal : evenements du processus", testProcessEvents);
-    TestHarness::run("journal : visionneuse", testScreenHelpers);
 }

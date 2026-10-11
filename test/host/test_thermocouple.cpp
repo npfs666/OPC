@@ -23,7 +23,7 @@ namespace
         Tc::Type::N, Tc::Type::R, Tc::Type::S, Tc::Type::T
     };
 
-    void testReferenceTables()
+    TEST_CASE("thermocouples : tables NIST")
     {
         for (const auto& point : THERMOCOUPLE_REFERENCES)
         {
@@ -49,7 +49,7 @@ namespace
         }
     }
 
-    void testRangesAndInversion()
+    TEST_CASE("thermocouples : domaines et inversion")
     {
         for (const auto type : TYPES)
         {
@@ -82,7 +82,7 @@ namespace
         CHECK_NEAR(Tc::measurementRange(Tc::Type::B).minimum, 250.0, 0.0);
     }
 
-    void testCompensation()
+    TEST_CASE("thermocouples : jonction froide")
     {
         // Tensions issues des tables NIST, pas des fonctions testées.
         CHECK_NEAR(Tc::compensatedTemperature(Tc::Type::K, 4.096 - 0.798, 20.0), 100.0, 0.03);
@@ -103,7 +103,7 @@ namespace
         }
     }
 
-    void testInvalidInputs()
+    TEST_CASE("thermocouples : entrees invalides")
     {
         const auto unknown = static_cast<Tc::Type>(255);
         CHECK_TRUE(std::isnan(Tc::referenceRange(unknown).minimum));
@@ -124,7 +124,7 @@ namespace
         CHECK_TRUE(std::isnan(Tc::compensatedTemperature(Tc::Type::K, 0.0, -271.0)));
     }
 
-    void testMeasurement()
+    TEST_CASE("TemperatureTC : offset et validite")
     {
         SensorBoard board;
         Sensor sensor;
@@ -198,7 +198,7 @@ namespace
         CHECK_NEAR(temperature.getValue(), 20.0, 0.00001);
     }
 
-    void testSensorAcquisition()
+    TEST_CASE("Sensor : acquisition et saturation")
     {
         Sensor sensor;
         sensor.begin("TC", Sensor::Type::Tc, Sensor::Wiring::TwoWire, 2, 0);
@@ -223,7 +223,7 @@ namespace
         CHECK_TRUE(std::isnan(sensor.readValue()));
     }
 
-    void testProcessIntegration()
+    TEST_CASE("TemperatureTC : processus et snapshot")
     {
         SensorBoard board;
         Sensor sensor;
@@ -255,15 +255,4 @@ namespace
         if (captured != nullptr)
             CHECK_FALSE(captured->valid);
     }
-}
-
-void runThermocoupleTests()
-{
-    TestHarness::run("thermocouples : tables NIST", testReferenceTables);
-    TestHarness::run("thermocouples : domaines et inversion", testRangesAndInversion);
-    TestHarness::run("thermocouples : jonction froide", testCompensation);
-    TestHarness::run("thermocouples : entrees invalides", testInvalidInputs);
-    TestHarness::run("TemperatureTC : offset et validite", testMeasurement);
-    TestHarness::run("Sensor : acquisition et saturation", testSensorAcquisition);
-    TestHarness::run("TemperatureTC : processus et snapshot", testProcessIntegration);
 }

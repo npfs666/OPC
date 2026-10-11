@@ -72,7 +72,7 @@ namespace
         }
     };
 
-    void testStartupAndRegulation()
+    TEST_CASE("Chauffage démarrage et régulation")
     {
         HeatingBench bench;
         CHECK_TRUE(bench.started);
@@ -98,7 +98,7 @@ namespace
         CHECK_TRUE(bench.movesDuring(600, false));
     }
 
-    void testSchedule()
+    TEST_CASE("Chauffage programme confort / réduit")
     {
         // 29 °C : sous le départ confort (32,5), au-dessus du réduit (27).
         HeatingBench bench;
@@ -117,7 +117,7 @@ namespace
         CHECK_FALSE(bench.opening());
     }
 
-    void testHomeSetpoint()
+    TEST_CASE("Chauffage consigne d'accueil")
     {
         HeatingBench bench;
 
@@ -137,7 +137,7 @@ namespace
         CHECK_TRUE(bench.movesDuring(900, true));
     }
 
-    void testSummerAndOverrun()
+    TEST_CASE("Chauffage arrêt été et post-circulation")
     {
         HeatingBench bench;
         bench.start(30.0);
@@ -155,7 +155,7 @@ namespace
         CHECK_FALSE(bench.opening());
     }
 
-    void testSensorFaults()
+    TEST_CASE("Chauffage défauts de sonde")
     {
         HeatingBench bench;
         bench.start(25.0);
@@ -174,13 +174,4 @@ namespace
         CHECK_FALSE(bench.opening());
         CHECK_TRUE(bench.pumpOn());
     }
-}
-
-void runHeatingCircuitTests()
-{
-    TestHarness::run("Chauffage démarrage et régulation", testStartupAndRegulation);
-    TestHarness::run("Chauffage programme confort / réduit", testSchedule);
-    TestHarness::run("Chauffage consigne d'accueil", testHomeSetpoint);
-    TestHarness::run("Chauffage arrêt été et post-circulation", testSummerAndOverrun);
-    TestHarness::run("Chauffage défauts de sonde", testSensorFaults);
 }

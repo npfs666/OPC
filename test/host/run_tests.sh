@@ -4,6 +4,15 @@
 
 set -euo pipefail
 
+# --build-only : compile sans lancer (tâche utilisée par C++ TestMate).
+# Les autres arguments vont à doctest, par exemple -tc="PID*" ou -ltc.
+build_only=0
+if [ "${1:-}" = "--build-only" ]
+then
+    build_only=1
+    shift
+fi
+
 project_dir="$(
     cd "$(dirname "${BASH_SOURCE[0]}")/../.."
     pwd
@@ -42,6 +51,7 @@ fi
     -I"${project_dir}/test/host" \
     -I"${project_dir}/src" \
     -isystem "${arduinojson_dir}" \
+    "${project_dir}/test/host/doctest_main.cpp" \
     "${project_dir}/test/host/test_main.cpp" \
     "${project_dir}/test/host/test_thermocouple.cpp" \
     "${project_dir}/test/host/test_pwm.cpp" \
@@ -136,4 +146,9 @@ fi
     "${project_dir}/examples/MinimalInstallation/MinimalInstallation.cpp" \
     -o "${binary}"
 
-"${binary}"
+if [ "${build_only}" = 1 ]
+then
+    exit 0
+fi
+
+"${binary}" "$@"

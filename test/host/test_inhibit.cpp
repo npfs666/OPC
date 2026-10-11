@@ -59,7 +59,7 @@ namespace
         thermostat.update(0);
     }
 
-    void testThermostat()
+    TEST_CASE("inhibition : thermostat")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -93,7 +93,7 @@ namespace
         CHECK_NEAR(thermostat.readCommand(), 1.0, 0.0);
     }
 
-    void testManualFirst()
+    TEST_CASE("inhibition : manuel prioritaire")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -114,7 +114,7 @@ namespace
         CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
     }
 
-    void testInterlockFirst()
+    TEST_CASE("inhibition : verrouillage prioritaire")
     {
         // Un verrouillage par alarme passe avant l'inhibition : état sûr.
         ControlledTemperature temperature;
@@ -139,7 +139,7 @@ namespace
         CHECK_FALSE(thermostat.isCommandValid());
     }
 
-    void testLoopBreakSuspended()
+    TEST_CASE("inhibition : boucle ouverte suspendue")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -171,7 +171,7 @@ namespace
         CHECK_TRUE(alarm.isActive());
     }
 
-    void testRelativeAlarmSuspended()
+    TEST_CASE("inhibition : alarme relative suspendue")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -220,7 +220,7 @@ namespace
         temperature.set(45.0);
     }
 
-    void testPIDRestartsLikeEnable()
+    TEST_CASE("inhibition : PID repart comme une réactivation")
     {
         ControlledTemperature temperature;
         PID pid;
@@ -255,7 +255,7 @@ namespace
         CHECK_TRUE(pid.readCommand() < integrated);
     }
 
-    void testPIDAutoTune()
+    TEST_CASE("inhibition : PID et autotune")
     {
         ControlledTemperature temperature;
         PID pid;
@@ -279,7 +279,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.40, 1e-9);
     }
 
-    void testSchedule()
+    TEST_CASE("inhibition : programme horaire")
     {
         ClockSample clock;
         clock.dateTime.dayOfWeek = MONDAY;
@@ -311,7 +311,7 @@ namespace
         CHECK_NEAR(schedule.readCommand(), 1.0, 0.0);
     }
 
-    void testComparatorAndTimer()
+    TEST_CASE("inhibition : comparateur et temporisation")
     {
         ControlledTemperature temperature;
         Comparator comparator;
@@ -360,7 +360,7 @@ namespace
         alarm.settings.latching = false;
     }
 
-    void testAlarmNotInhibitable()
+    TEST_CASE("inhibition : alarme non inhibable")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -377,7 +377,7 @@ namespace
         CHECK_TRUE(alarm.isActive());
     }
 
-    void testAlarmInhibited()
+    TEST_CASE("inhibition : alarme inhibée")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -412,7 +412,7 @@ namespace
         CHECK_FALSE(alarm.isActive());
     }
 
-    void testAlarmFaultNotMasked()
+    TEST_CASE("inhibition : défaut de sonde jamais masqué")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -429,7 +429,7 @@ namespace
         CHECK_TRUE(alarm.isActive());
     }
 
-    void testAlarmLatchedStays()
+    TEST_CASE("inhibition : alarme mémorisée conservée")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -458,7 +458,7 @@ namespace
         CHECK_FALSE(alarm.isActive());
     }
 
-    void testLoopBreakInhibited()
+    TEST_CASE("inhibition : boucle ouverte inhibée")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -520,7 +520,7 @@ namespace
         }
     };
 
-    void testImmediateEffect()
+    TEST_CASE("inhibition : effet immédiat et reprise")
     {
         ControlledTemperature temperature;
         temperature.set(18.0);
@@ -557,23 +557,4 @@ namespace
         CHECK_TRUE(actuator.seenValid);
         CHECK_NEAR(actuator.seen, 0.0, 0.0);
     }
-}
-
-void runInhibitTests()
-{
-    TestHarness::run("inhibition : thermostat", testThermostat);
-    TestHarness::run("inhibition : manuel prioritaire", testManualFirst);
-    TestHarness::run("inhibition : verrouillage prioritaire", testInterlockFirst);
-    TestHarness::run("inhibition : boucle ouverte suspendue", testLoopBreakSuspended);
-    TestHarness::run("inhibition : alarme relative suspendue", testRelativeAlarmSuspended);
-    TestHarness::run("inhibition : PID repart comme une réactivation", testPIDRestartsLikeEnable);
-    TestHarness::run("inhibition : PID et autotune", testPIDAutoTune);
-    TestHarness::run("inhibition : programme horaire", testSchedule);
-    TestHarness::run("inhibition : comparateur et temporisation", testComparatorAndTimer);
-    TestHarness::run("inhibition : effet immédiat et reprise", testImmediateEffect);
-    TestHarness::run("inhibition : alarme non inhibable", testAlarmNotInhibitable);
-    TestHarness::run("inhibition : alarme inhibée", testAlarmInhibited);
-    TestHarness::run("inhibition : défaut de sonde jamais masqué", testAlarmFaultNotMasked);
-    TestHarness::run("inhibition : alarme mémorisée conservée", testAlarmLatchedStays);
-    TestHarness::run("inhibition : boucle ouverte inhibée", testLoopBreakInhibited);
 }

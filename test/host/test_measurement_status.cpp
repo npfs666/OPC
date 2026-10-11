@@ -33,7 +33,7 @@ namespace
         sensor.compute();
     }
 
-    void testLabels()
+    TEST_CASE("etat de mesure : libelles")
     {
         CHECK_TRUE(std::strcmp(measurementStatusLabel(Status::Open), "RUPTURE") == 0);
         CHECK_TRUE(std::strcmp(measurementStatusLabel(Status::Open, 4), "RUPT") == 0);
@@ -48,7 +48,7 @@ namespace
         }
     }
 
-    void testSensorAcquisitionStatus()
+    TEST_CASE("etat de mesure : acquisition")
     {
         Sensor sensor("RTD", Sensor::Type::Pt100,
                       Sensor::Wiring::FourWire, 16, 0.0f);
@@ -81,7 +81,7 @@ namespace
         CHECK_TRUE(sensor.acquisitionStatus() == Status::NotReady);
     }
 
-    void testRangeGains()
+    TEST_CASE("etendue RTD : gains")
     {
         Sensor::Settings settings{
             Sensor::Type::Pt100, Sensor::Wiring::FourWire, 0.0, 16};
@@ -103,7 +103,7 @@ namespace
         CHECK_TRUE(Sensor::adcGain(settings) == 4);
     }
 
-    void testRangeDiagnostic()
+    TEST_CASE("etendue RTD : diagnostic de saturation")
     {
         Sensor sensor("RTD", Sensor::Type::Pt100,
                       Sensor::Wiring::FourWire, 16, 0.0f);
@@ -158,7 +158,7 @@ namespace
         CHECK_TRUE(temperature.getStatus() == Status::OverRange);
     }
 
-    void testResistanceClassification()
+    TEST_CASE("etat de mesure : resistance RTD")
     {
         SensorBoard board;
         Sensor sensor("RTD", Sensor::Type::Pt100,
@@ -215,7 +215,7 @@ namespace
         CHECK_TRUE(unbound.getStatus() == Status::Invalid);
     }
 
-    void testRtdTemperaturePropagation()
+    TEST_CASE("etat de mesure : propagation RTD")
     {
         SensorBoard board;
         Sensor sensor("RTD", Sensor::Type::Pt100,
@@ -247,7 +247,7 @@ namespace
         CHECK_NEAR(temperature.getValue(), 100.0, 0.005);
     }
 
-    void testThermocoupleStatus()
+    TEST_CASE("etat de mesure : thermocouple")
     {
         SensorBoard board;
         Sensor sensor;
@@ -293,7 +293,7 @@ namespace
         CHECK_TRUE(temperature.getStatus() == Status::NotReady);
     }
 
-    void testDisplayFormat()
+    TEST_CASE("etat de mesure : affichage")
     {
         char text[32];
 
@@ -355,7 +355,7 @@ namespace
         CHECK_TRUE(std::strlen(small) == 4);
     }
 
-    void testStatusEventsAndSnapshot()
+    TEST_CASE("etat de mesure : journal et snapshot")
     {
         SensorBoard board;
         Sensor sensor;
@@ -415,17 +415,4 @@ namespace
         CHECK_TRUE(events.at(1) != nullptr &&
                    std::strcmp(events.at(1)->text, "TC : RUPTURE") == 0);
     }
-}
-
-void runMeasurementStatusTests()
-{
-    TestHarness::run("etat de mesure : libelles", testLabels);
-    TestHarness::run("etat de mesure : acquisition", testSensorAcquisitionStatus);
-    TestHarness::run("etendue RTD : gains", testRangeGains);
-    TestHarness::run("etendue RTD : diagnostic de saturation", testRangeDiagnostic);
-    TestHarness::run("etat de mesure : resistance RTD", testResistanceClassification);
-    TestHarness::run("etat de mesure : propagation RTD", testRtdTemperaturePropagation);
-    TestHarness::run("etat de mesure : thermocouple", testThermocoupleStatus);
-    TestHarness::run("etat de mesure : affichage", testDisplayFormat);
-    TestHarness::run("etat de mesure : journal et snapshot", testStatusEventsAndSnapshot);
 }

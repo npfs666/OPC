@@ -143,7 +143,7 @@ namespace
     constexpr uint16_t SAMPLES = 2;
     constexpr int SERIES = SAMPLES * RTD_OVERSAMPLING;
 
-    void testNominalCycle()
+    TEST_CASE("acquisition : cycle de deux entrées")
     {
         Bench bench;
         Sensor first;
@@ -196,7 +196,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testThreeWireChopping()
+    TEST_CASE("acquisition : 3 fils, inversion à mi-série")
     {
         Bench bench;
         Sensor sensor;
@@ -254,7 +254,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testRangeDiagnostic()
+    TEST_CASE("acquisition : diagnostic d'étendue")
     {
         // Lisible au gain large : au-delà de l'étendue précise.
         runRangeDiagnostic(20000, MeasurementStatus::OverRange);
@@ -263,7 +263,7 @@ namespace
         runRangeDiagnostic(32767, MeasurementStatus::Open);
     }
 
-    void testThermocoupleSettling()
+    TEST_CASE("acquisition : thermocouple")
     {
         Bench bench;
         Sensor sensor;
@@ -284,7 +284,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testStopAndRestart()
+    TEST_CASE("acquisition : arrêt et reprise")
     {
         Bench bench;
         Sensor sensor;
@@ -326,7 +326,7 @@ namespace
     // PT100 4 fils, 2 échantillons : 15 + 100 conversions à 1 ms.
     constexpr uint32_t PT100_DURATION_MS = RTD_SETTLING + SERIES;
 
-    void testRoutingFailureKeepsDuration()
+    TEST_CASE("acquisition : routage refusé, durée normale gardée")
     {
         Bench bench;
         Sensor first;
@@ -380,7 +380,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testRoutingLostDuringAcquisition()
+    TEST_CASE("acquisition : routage perdu pendant la série")
     {
         Bench bench;
         Sensor sensor;
@@ -405,7 +405,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testConverterTimeout()
+    TEST_CASE("acquisition : ADC muet")
     {
         Bench bench;
         Sensor sensor;
@@ -440,7 +440,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testTemperatureTimeout()
+    TEST_CASE("acquisition : température ADC muette")
     {
         Bench bench;
         Sensor sensor;
@@ -468,7 +468,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testEventBeatsTimeout()
+    TEST_CASE("acquisition : série finie après le délai")
     {
         Bench bench;
         Sensor sensor;
@@ -493,7 +493,7 @@ namespace
         bench.checkHardwareDiscipline();
     }
 
-    void testWithoutInput()
+    TEST_CASE("acquisition : sans entrée")
     {
         Bench bench;
 
@@ -505,24 +505,4 @@ namespace
         bench.sequencer.poll();
         CHECK_TRUE(bench.hardware.take().empty());
     }
-}
-
-void runAcquisitionSequencerTests()
-{
-    TestHarness::run("acquisition : cycle de deux entrées", testNominalCycle);
-    TestHarness::run("acquisition : 3 fils, inversion à mi-série",
-        testThreeWireChopping);
-    TestHarness::run("acquisition : diagnostic d'étendue", testRangeDiagnostic);
-    TestHarness::run("acquisition : thermocouple", testThermocoupleSettling);
-    TestHarness::run("acquisition : arrêt et reprise", testStopAndRestart);
-    TestHarness::run("acquisition : sans entrée", testWithoutInput);
-    TestHarness::run("acquisition : routage refusé, durée normale gardée",
-        testRoutingFailureKeepsDuration);
-    TestHarness::run("acquisition : routage perdu pendant la série",
-        testRoutingLostDuringAcquisition);
-    TestHarness::run("acquisition : ADC muet", testConverterTimeout);
-    TestHarness::run("acquisition : température ADC muette",
-        testTemperatureTimeout);
-    TestHarness::run("acquisition : série finie après le délai",
-        testEventBeatsTimeout);
 }

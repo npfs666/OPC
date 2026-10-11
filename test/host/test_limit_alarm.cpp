@@ -91,7 +91,7 @@ namespace
         return alarm.isActive();
     }
 
-    void testAbsoluteTypes()
+    TEST_CASE("alarmes : seuils absolus")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -112,7 +112,7 @@ namespace
         CHECK_FALSE(activeAt(alarm, temperature, 11.1));
     }
 
-    void testRelativeTypes()
+    TEST_CASE("alarmes : ecarts a la consigne")
     {
         ControlledTemperature temperature;
         SetpointSource source;
@@ -153,7 +153,7 @@ namespace
         CHECK_FALSE(activeAt(orphan, temperature, 500.0));
     }
 
-    void testDelay()
+    TEST_CASE("alarmes : temporisation")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -171,7 +171,7 @@ namespace
         CHECK_TRUE(activeAt(alarm, temperature, 90.0, 23000));
     }
 
-    void testStartupMasking()
+    TEST_CASE("alarmes : masquage au demarrage")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -220,7 +220,7 @@ namespace
         CHECK_TRUE(activeAt(band, temperature, 60.0));
     }
 
-    void testLatchingAndAcknowledge()
+    TEST_CASE("alarmes : memorisation et acquittement")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -256,7 +256,7 @@ namespace
         CHECK_TRUE(alarm.isCommandValid());
     }
 
-    void testAcknowledgeInput()
+    TEST_CASE("alarmes : entree d'acquittement")
     {
         constexpr uint8_t PIN = Board::Rp2040::DIGITAL_INPUT_1;
         FakeDigitalIO::levels[PIN] = LOW;
@@ -286,7 +286,7 @@ namespace
         FakeDigitalIO::levels[PIN] = LOW;
     }
 
-    void testSensorFault()
+    TEST_CASE("alarmes : defaut de sonde")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -317,7 +317,7 @@ namespace
         CHECK_NEAR(alarm.readCommand(), 0.0, 0.0);
     }
 
-    void testParameters()
+    TEST_CASE("alarmes : parametres")
     {
         ControlledTemperature temperature;
         SetpointSource source;
@@ -361,7 +361,7 @@ namespace
         CHECK_TRUE(relative.validateParameters(editor));
     }
 
-    void testProcessIntegration()
+    TEST_CASE("alarmes : processus, journal et bandeau")
     {
         ControlledTemperature temperature;
         LimitAlarm high;
@@ -440,7 +440,7 @@ namespace
         CHECK_TRUE(log.printedLineCount == 6);
     }
 
-    void testLongCondition()
+    TEST_CASE("alarmes : condition de plus de 49 jours")
     {
         ControlledTemperature temperature;
         LimitAlarm alarm;
@@ -461,18 +461,4 @@ namespace
         CHECK_FALSE(activeAt(alarm, temperature, 90.0, 16999));
         CHECK_TRUE(activeAt(alarm, temperature, 90.0, 17000));
     }
-}
-
-void runLimitAlarmTests()
-{
-    TestHarness::run("alarmes : seuils absolus", testAbsoluteTypes);
-    TestHarness::run("alarmes : ecarts a la consigne", testRelativeTypes);
-    TestHarness::run("alarmes : temporisation", testDelay);
-    TestHarness::run("alarmes : masquage au demarrage", testStartupMasking);
-    TestHarness::run("alarmes : memorisation et acquittement", testLatchingAndAcknowledge);
-    TestHarness::run("alarmes : entree d'acquittement", testAcknowledgeInput);
-    TestHarness::run("alarmes : defaut de sonde", testSensorFault);
-    TestHarness::run("alarmes : parametres", testParameters);
-    TestHarness::run("alarmes : processus, journal et bandeau", testProcessIntegration);
-    TestHarness::run("alarmes : condition de plus de 49 jours", testLongCondition);
 }

@@ -179,7 +179,7 @@ namespace
         }
     };
 
-    void testCalibrationAndTracking()
+    TEST_CASE("Vanne 3 points recalage et poursuite")
     {
         Bench bench;
         bench.begin(false, true);
@@ -220,7 +220,7 @@ namespace
         CHECK_TRUE(bench.safe());
     }
 
-    void testReversalPause()
+    TEST_CASE("Vanne 3 points inversion et butée")
     {
         Bench bench;
         bench.begin(false, true);
@@ -256,7 +256,7 @@ namespace
         CHECK_TRUE(bench.safe());
     }
 
-    void testFallbackAndResume()
+    TEST_CASE("Vanne 3 points repli fermeture et reprise")
     {
         // Fermer enregistré en premier : le repli doit couper Ouvrir avant.
         Bench bench;
@@ -294,7 +294,7 @@ namespace
         CHECK_TRUE(bench.safe());
     }
 
-    void testFrozenFallback()
+    TEST_CASE("Vanne 3 points repli figé")
     {
         Bench bench;
         bench.begin(false, false);
@@ -311,7 +311,7 @@ namespace
         CHECK_NEAR(bench.actual, bench.valve.position(), 0.002);
     }
 
-    void testRunDirection()
+    TEST_CASE("Vanne 3 points câblage Marche / Sens")
     {
         Bench bench;
         bench.begin(true, true);
@@ -362,7 +362,7 @@ namespace
         CHECK_FALSE(isOn(bench.second));
     }
 
-    void testMinimumTimes()
+    TEST_CASE("Vanne 3 points temps minimaux du relais")
     {
         // Les temps minimaux allongent les impulsions ; l'estimation suit
         // l'état réellement appliqué.
@@ -385,7 +385,7 @@ namespace
         CHECK_TRUE(bench.safe());
     }
 
-    void testConnectAndMenu()
+    TEST_CASE("Vanne 3 points raccordement et menu")
     {
         FixedRegulator regulator;
         regulator.begin("regulator");
@@ -426,15 +426,4 @@ namespace
         safeCommand.numberValue = 1.0;
         CHECK_TRUE(valve.validateParameters(editor));
     }
-}
-
-void runThreePointTests()
-{
-    TestHarness::run("Vanne 3 points recalage et poursuite", testCalibrationAndTracking);
-    TestHarness::run("Vanne 3 points inversion et butée", testReversalPause);
-    TestHarness::run("Vanne 3 points repli fermeture et reprise", testFallbackAndResume);
-    TestHarness::run("Vanne 3 points repli figé", testFrozenFallback);
-    TestHarness::run("Vanne 3 points câblage Marche / Sens", testRunDirection);
-    TestHarness::run("Vanne 3 points temps minimaux du relais", testMinimumTimes);
-    TestHarness::run("Vanne 3 points raccordement et menu", testConnectAndMenu);
 }

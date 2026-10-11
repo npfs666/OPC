@@ -14,7 +14,7 @@
 
 namespace
 {
-    void testEditorSteps()
+    TEST_CASE("consigne accueil : pas et acceleration")
     {
         HomeSetpointEditor editor;
         CHECK_FALSE(editor.isActive());
@@ -49,7 +49,7 @@ namespace
         CHECK_FALSE(editor.hasChanged());
     }
 
-    void testEditorLimitsAndGrid()
+    TEST_CASE("consigne accueil : limites et grille")
     {
         HomeSetpointEditor editor;
 
@@ -67,7 +67,7 @@ namespace
         CHECK_NEAR(editor.value(), 20.1, 1e-9);
     }
 
-    void testEditorInactivity()
+    TEST_CASE("consigne accueil : inactivite")
     {
         HomeSetpointEditor editor;
         editor.begin(20.0, 0.0, 200.0, 0.1, 0);
@@ -133,7 +133,7 @@ namespace
         using Installation::setHomeSetpoint;
     };
 
-    void testInstallationHomeSetpoint()
+    TEST_CASE("consigne accueil : installation")
     {
         SetpointInstallation installation;
         CHECK_TRUE(installation.registerParameters());
@@ -163,12 +163,4 @@ namespace
             std::numeric_limits<double_t>::quiet_NaN()));
         CHECK_NEAR(installation.setpoint, 0.0, 1e-9);
     }
-}
-
-void runHomeSetpointTests()
-{
-    TestHarness::run("consigne accueil : pas et acceleration", testEditorSteps);
-    TestHarness::run("consigne accueil : limites et grille", testEditorLimitsAndGrid);
-    TestHarness::run("consigne accueil : inactivite", testEditorInactivity);
-    TestHarness::run("consigne accueil : installation", testInstallationHomeSetpoint);
 }

@@ -56,7 +56,7 @@ namespace
         return setpoint;
     }
 
-    void testCurve()
+    TEST_CASE("Loi d'eau courbe et ambiance")
     {
         ControlledTemperature outdoor("ext");
         HeatingCurve curve;
@@ -97,7 +97,7 @@ namespace
         CHECK_FALSE(curve.readSetpoint(setpoint));
     }
 
-    void testSummerFrostAndFallback()
+    TEST_CASE("Loi d'eau été, hors-gel et secours")
     {
         ControlledTemperature outdoor("ext");
         HeatingCurve curve;
@@ -134,7 +134,7 @@ namespace
         CHECK_NEAR(curve.outdoorTemperature(), 15.9, 1e-9);
     }
 
-    void testFilter()
+    TEST_CASE("Loi d'eau filtre extérieur")
     {
         ControlledTemperature outdoor("ext");
         HeatingCurve curve;
@@ -154,7 +154,7 @@ namespace
         CHECK_NEAR(curve.outdoorTemperature(), 10.0 * (1.0 - std::exp(-1.0)), 0.05);
     }
 
-    void testSchedule()
+    TEST_CASE("Loi d'eau programme")
     {
         ClockSample clock;
         clock.dateTime.dayOfWeek = MONDAY;
@@ -205,7 +205,7 @@ namespace
         CHECK_FALSE(curve.isCommandValid());
     }
 
-    void testPIDFollowsCurve()
+    TEST_CASE("PID consigne d'exécution")
     {
         ControlledTemperature outdoor("ext");
         ControlledTemperature flow("depart");
@@ -257,7 +257,7 @@ namespace
         CHECK_TRUE(list.find("pid", "kp") != nullptr);
     }
 
-    void testThermostatFollowsCurve()
+    TEST_CASE("Thermostat consigne d'exécution")
     {
         ControlledTemperature outdoor("ext");
         ControlledTemperature flow("depart");
@@ -290,7 +290,7 @@ namespace
         CHECK_NEAR(boiler.readCommand(), 0.0, 0.0);
     }
 
-    void testMenu()
+    TEST_CASE("Loi d'eau menu")
     {
         ControlledTemperature outdoor("ext");
         HeatingCurve curve;
@@ -320,15 +320,4 @@ namespace
         maxFlow.numberValue = 20.0;
         CHECK_FALSE(curve.validateParameters(editor));
     }
-}
-
-void runHeatingCurveTests()
-{
-    TestHarness::run("Loi d'eau courbe et ambiance", testCurve);
-    TestHarness::run("Loi d'eau été, hors-gel et secours", testSummerFrostAndFallback);
-    TestHarness::run("Loi d'eau filtre extérieur", testFilter);
-    TestHarness::run("Loi d'eau programme", testSchedule);
-    TestHarness::run("PID consigne d'exécution", testPIDFollowsCurve);
-    TestHarness::run("Thermostat consigne d'exécution", testThermostatFollowsCurve);
-    TestHarness::run("Loi d'eau menu", testMenu);
 }

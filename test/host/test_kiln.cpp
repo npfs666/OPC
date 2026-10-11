@@ -101,7 +101,7 @@ namespace
         }
     };
 
-    void testIdle()
+    TEST_CASE("Four à l'arrêt et menu")
     {
         KilnBench bench;
         CHECK_TRUE(bench.started);
@@ -132,7 +132,7 @@ namespace
         CHECK_TRUE(menu.findAction(KilnInstallation::SKIP_ACTION) != nullptr);
     }
 
-    void testFiring()
+    TEST_CASE("Four cuisson complète")
     {
         KilnBench bench;
         bench.oneSegment(600.0, 60.0, 2);
@@ -154,7 +154,7 @@ namespace
         CHECK_TRUE(bench.logged("terminée"));
     }
 
-    void testOverTemperature()
+    TEST_CASE("Four surchauffe")
     {
         KilnBench bench;
         bench.oneSegment(0.0, 1250.0, 60);
@@ -181,7 +181,7 @@ namespace
         CHECK_TRUE(bench.contactorClosed());
     }
 
-    void testDeviation()
+    TEST_CASE("Four écart haut")
     {
         KilnBench bench;
         bench.oneSegment(60.0, 600.0, 0);
@@ -209,7 +209,7 @@ namespace
         CHECK_TRUE(bench.contactorClosed());
     }
 
-    void testCoolingSegment()
+    TEST_CASE("Four refroidissement libre")
     {
         // Refroidissement libre de 900 à 600 °C : le four au-dessus de la
         // consigne n'est pas une alarme.
@@ -227,7 +227,7 @@ namespace
         CHECK_FALSE(bench.logged("Écart haut"));
     }
 
-    void testThermocoupleFault()
+    TEST_CASE("Four défaut thermocouple")
     {
         KilnBench bench;
         bench.oneSegment(0.0, 1000.0, 60);
@@ -254,14 +254,4 @@ namespace
         bench.advance(2);
         CHECK_FALSE(bench.action(KilnInstallation::START_ACTION));
     }
-}
-
-void runKilnTests()
-{
-    TestHarness::run("Four à l'arrêt et menu", testIdle);
-    TestHarness::run("Four cuisson complète", testFiring);
-    TestHarness::run("Four surchauffe", testOverTemperature);
-    TestHarness::run("Four écart haut", testDeviation);
-    TestHarness::run("Four refroidissement libre", testCoolingSegment);
-    TestHarness::run("Four défaut thermocouple", testThermocoupleFault);
 }

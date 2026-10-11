@@ -99,7 +99,7 @@ namespace
         return JsonObject();
     }
 
-    void testScopeSplit()
+    TEST_CASE("ParameterJson scope split")
     {
         Fixture fixture;
         CHECK_FALSE(fixture.list.hasError());
@@ -122,7 +122,7 @@ namespace
         CHECK_FALSE(hasEntry(board.as<JsonArrayConst>(), "reading"));
     }
 
-    void testRoundTrip()
+    TEST_CASE("ParameterJson round trip")
     {
         Fixture fixture;
         fixture.setpoint = 22.5;
@@ -164,7 +164,7 @@ namespace
         CHECK_TRUE(restored.zero == -12);
     }
 
-    void testBoardIndependentOfInstallationFile()
+    TEST_CASE("ParameterJson board independent of installation")
     {
         Fixture fixture;
         fixture.setpoint = 30.0;
@@ -210,7 +210,7 @@ namespace
         }
     }
 
-    void testTolerantRead()
+    TEST_CASE("ParameterJson tolerant read")
     {
         Fixture fixture;
         fixture.setpoint = 25.0;
@@ -264,7 +264,7 @@ namespace
         CHECK_FALSE(restored.enabled);
     }
 
-    void testInvalidValueResetsOwner()
+    TEST_CASE("ParameterJson invalid value resets owner")
     {
         Fixture fixture;
         JsonDocument document;
@@ -296,7 +296,7 @@ namespace
         CHECK_TRUE(restored.zero == 42);
     }
 
-    void testRejectsNonArray()
+    TEST_CASE("ParameterJson rejects non array")
     {
         Fixture fixture;
         ParameterEditor editor;
@@ -314,18 +314,4 @@ namespace
             document["missing"], fixture.list, editor,
             Scope::Board, state));
     }
-}
-
-void runParameterJsonTests()
-{
-    TestHarness::run("ParameterJson scope split", testScopeSplit);
-    TestHarness::run("ParameterJson round trip", testRoundTrip);
-    TestHarness::run(
-        "ParameterJson board independent of installation",
-        testBoardIndependentOfInstallationFile);
-    TestHarness::run("ParameterJson tolerant read", testTolerantRead);
-    TestHarness::run(
-        "ParameterJson invalid value resets owner",
-        testInvalidValueResetsOwner);
-    TestHarness::run("ParameterJson rejects non array", testRejectsNonArray);
 }

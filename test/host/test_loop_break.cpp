@@ -107,7 +107,7 @@ namespace
         return alarm.isActive();
     }
 
-    void testDetectionTime()
+    TEST_CASE("boucle ouverte : temps de detection")
     {
         ControlledTemperature temperature;
         LoopRegulator regulator;
@@ -127,7 +127,7 @@ namespace
         CHECK_TRUE(alarm.detectionTimeMs() == 120000);
     }
 
-    void testHighSaturation()
+    TEST_CASE("boucle ouverte : butee haute")
     {
         ControlledTemperature temperature;
         LoopRegulator regulator;
@@ -158,7 +158,7 @@ namespace
         CHECK_TRUE(activeAt(alarm, temperature, 30.5, 300001));
     }
 
-    void testProgressRestartsWindow()
+    TEST_CASE("boucle ouverte : progression")
     {
         ControlledTemperature temperature;
         LoopRegulator regulator;
@@ -179,7 +179,7 @@ namespace
         CHECK_TRUE(activeAt(alarm, temperature, 41.5, now + 100000));
     }
 
-    void testNotArmed()
+    TEST_CASE("boucle ouverte : surveillance suspendue")
     {
         ControlledTemperature temperature;
         LoopRegulator regulator;
@@ -216,7 +216,7 @@ namespace
         CHECK_FALSE(regulator.isInterlocked());
     }
 
-    void testLowSaturationAndCooling()
+    TEST_CASE("boucle ouverte : butee basse et froid")
     {
         ControlledTemperature temperature;
         LoopRegulator regulator;
@@ -252,7 +252,7 @@ namespace
         CHECK_FALSE(activeAt(coldOk, temperature, 56.0, 180000));
     }
 
-    void testOptions()
+    TEST_CASE("boucle ouverte : options")
     {
         ControlledTemperature temperature;
         LoopRegulator regulator;
@@ -298,7 +298,7 @@ namespace
         CHECK_TRUE(parameters.find("loop", "safe_state") != nullptr);
     }
 
-    void testPIDInterlock()
+    TEST_CASE("boucle ouverte : verrouillage du PID")
     {
         ControlledTemperature temperature;
         PID pid;
@@ -350,7 +350,7 @@ namespace
         CHECK_FALSE(alarm.isActive());
     }
 
-    void testSafeStateAlwaysLatches()
+    TEST_CASE("boucle ouverte : mise en sécurité mémorisée")
     {
         // Thermostat de chauffage, résistance grillée : la mesure reste à
         // 30 °C pour 50 °C de consigne. Mise en sécurité sans mémorisation.
@@ -418,7 +418,7 @@ namespace
         CHECK_FALSE(alarm.isActive());
     }
 
-    void testLongSaturation()
+    TEST_CASE("boucle ouverte : saturation de plus de 49 jours")
     {
         ControlledTemperature temperature;
         LoopRegulator regulator;
@@ -435,17 +435,4 @@ namespace
         CHECK_TRUE(activeAt(alarm, temperature, 30.0, 3000000000UL));
         CHECK_TRUE(activeAt(alarm, temperature, 30.0, 5000));
     }
-}
-
-void runLoopBreakTests()
-{
-    TestHarness::run("boucle ouverte : temps de detection", testDetectionTime);
-    TestHarness::run("boucle ouverte : butee haute", testHighSaturation);
-    TestHarness::run("boucle ouverte : progression", testProgressRestartsWindow);
-    TestHarness::run("boucle ouverte : surveillance suspendue", testNotArmed);
-    TestHarness::run("boucle ouverte : butee basse et froid", testLowSaturationAndCooling);
-    TestHarness::run("boucle ouverte : options", testOptions);
-    TestHarness::run("boucle ouverte : verrouillage du PID", testPIDInterlock);
-    TestHarness::run("boucle ouverte : mise en sécurité mémorisée", testSafeStateAlwaysLatches);
-    TestHarness::run("boucle ouverte : saturation de plus de 49 jours", testLongSaturation);
 }

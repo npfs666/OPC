@@ -17,7 +17,7 @@ namespace
     constexpr size_t RESISTANCE = 0;
     constexpr size_t TEMPERATURE = 1;
 
-    void testStartsAndMeasures()
+    TEST_CASE("exemple minimal : démarrage et mesure")
     {
         TemplateBench<MinimalInstallation> bench;
         CHECK_TRUE(bench.started);
@@ -43,7 +43,7 @@ namespace
         CHECK_TRUE(resistance != nullptr && resistance->valid);
     }
 
-    void testSensorFault()
+    TEST_CASE("exemple minimal : défaut de sonde")
     {
         TemplateBench<MinimalInstallation> bench;
         bench.setTemperature(0, 21.5);
@@ -61,18 +61,11 @@ namespace
             temperature->status == MeasurementStatus::Short);
     }
 
-    void testParameters()
+    TEST_CASE("exemple minimal : paramètres")
     {
         // Réglages de la sonde, plus ceux communs à toute installation.
         TemplateBench<MinimalInstallation> bench;
         CHECK_FALSE(bench.installation.getParameters().hasError());
         CHECK_TRUE(bench.parameter("menu", "inactivity_timeout") != nullptr);
     }
-}
-
-void runMinimalInstallationTests()
-{
-    TestHarness::run("exemple minimal : démarrage et mesure", testStartsAndMeasures);
-    TestHarness::run("exemple minimal : défaut de sonde", testSensorFault);
-    TestHarness::run("exemple minimal : paramètres", testParameters);
 }

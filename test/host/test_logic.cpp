@@ -180,7 +180,7 @@ namespace
         }
     };
 
-    void testCallOrder()
+    TEST_CASE("glue : ordre d'appel")
     {
         Bench bench;
         TestRegulator regulator;
@@ -202,7 +202,7 @@ namespace
         CHECK_NEAR(bench.actuator.seen, 1.0, 0.0);
     }
 
-    void testWrittenValues()
+    TEST_CASE("glue : valeurs écrites")
     {
         Bench bench;
 
@@ -235,7 +235,7 @@ namespace
         CHECK_TRUE(bench.events() == events);
     }
 
-    void testMissingWrite()
+    TEST_CASE("glue : commande non écrite")
     {
         Bench bench;
         bench.cycle(1000);
@@ -271,7 +271,7 @@ namespace
         CHECK_TRUE(bench.events() == events + 2);
     }
 
-    void testMeasurementDependency()
+    TEST_CASE("glue : dépendance à une mesure")
     {
         Bench bench;
         ControlledTemperature temperature;
@@ -316,7 +316,7 @@ namespace
         CHECK_FALSE(bench.command.isCommandValid());
     }
 
-    void testNotReadyNeverHolds()
+    TEST_CASE("glue : mesure pas prête")
     {
         Bench bench;
         ControlledTemperature temperature;
@@ -333,7 +333,7 @@ namespace
         CHECK_FALSE(bench.command.isCommandValid());
     }
 
-    void testInputAndBlockDependencies()
+    TEST_CASE("glue : dépendances entrée et bloc")
     {
         Bench bench;
         DigitalInput input;
@@ -366,7 +366,7 @@ namespace
         CHECK_FALSE(bench.command.dependsOn(extra));
     }
 
-    void testManualMode()
+    TEST_CASE("glue : mode manuel")
     {
         Bench bench;
         ControlledTemperature temperature;
@@ -397,7 +397,7 @@ namespace
         CHECK_FALSE(bench.command.isCommandValid());
     }
 
-    void testManualModeRemoved()
+    TEST_CASE("glue : mode manuel retiré")
     {
         Bench bench;
         bench.command.disableManualMode();
@@ -410,7 +410,7 @@ namespace
         CHECK_NEAR(bench.command.readCommand(), 0.0, 0.0);
     }
 
-    void testParameters()
+    TEST_CASE("glue : paramètres")
     {
         Parameter storage[8];
         ParameterList list;
@@ -451,7 +451,7 @@ namespace
         CHECK_TRUE(list.count() == 0);
     }
 
-    void testResume()
+    TEST_CASE("glue : reprise")
     {
         Bench bench;
         bench.cycle(1000);
@@ -470,7 +470,7 @@ namespace
         CHECK_TRUE(bench.events() == events);
     }
 
-    void testInterlock()
+    TEST_CASE("glue : verrouillage par alarme")
     {
         Bench bench;
         LockingAlarm alarm;
@@ -486,7 +486,7 @@ namespace
         CHECK_FALSE(bench.actuator.seenValid);
     }
 
-    void testWithoutLogic()
+    TEST_CASE("glue : commande sans glue")
     {
         // Commande enregistrée sans glue : jamais écrite, donc état sûr.
         ProcessControl process;
@@ -498,20 +498,4 @@ namespace
         CHECK_FALSE(command.isCommandValid());
         CHECK_TRUE(process.eventLog().count() == 1);
     }
-}
-
-void runLogicTests()
-{
-    TestHarness::run("glue : ordre d'appel", testCallOrder);
-    TestHarness::run("glue : valeurs écrites", testWrittenValues);
-    TestHarness::run("glue : commande non écrite", testMissingWrite);
-    TestHarness::run("glue : dépendance à une mesure", testMeasurementDependency);
-    TestHarness::run("glue : mesure pas prête", testNotReadyNeverHolds);
-    TestHarness::run("glue : dépendances entrée et bloc", testInputAndBlockDependencies);
-    TestHarness::run("glue : mode manuel", testManualMode);
-    TestHarness::run("glue : mode manuel retiré", testManualModeRemoved);
-    TestHarness::run("glue : paramètres", testParameters);
-    TestHarness::run("glue : reprise", testResume);
-    TestHarness::run("glue : verrouillage par alarme", testInterlock);
-    TestHarness::run("glue : commande sans glue", testWithoutLogic);
 }

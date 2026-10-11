@@ -380,7 +380,7 @@ namespace
         }
     };
 
-    void testBMEMeasurementPropagation()
+    TEST_CASE("validation des mesures BME280")
     {
         Adafruit_BME280 bme;
 
@@ -479,7 +479,7 @@ namespace
         CHECK_FALSE(pressure.isValid());
     }
 
-    void testPT100Interpolation()
+    TEST_CASE("interpolation PT100")
     {
         CHECK_NEAR(
             PT100::getResistanceToTemperature(
@@ -513,7 +513,7 @@ namespace
                         200.01)));
     }
 
-    void testPT100CallendarVanDusen()
+    TEST_CASE("Callendar-Van Dusen PT100 (Newton)")
     {
         // Valeurs de référence IEC 60751 (PT100).
         const struct { double ohms; double celsius; } points[] = {
@@ -542,7 +542,7 @@ namespace
         }
     }
 
-    void testResistanceValidity()
+    TEST_CASE("validité de la mesure de résistance")
     {
         SensorBoard board;
         Sensor sensor("RTD", Sensor::Type::Pt100,
@@ -569,7 +569,7 @@ namespace
         }
     }
 
-    void testRTDTemperatureConversion()
+    TEST_CASE("conversion temperature PT100/PT1000")
     {
         SensorBoard board;
         Sensor sensor("RTD", Sensor::Type::Pt1000,
@@ -628,7 +628,7 @@ namespace
         CHECK_FALSE(temperature.isValid());
     }
 
-    void testPsychrometrics()
+    TEST_CASE("psychrométrie")
     {
         CHECK_NEAR(
             Physics::Psychrometrics::getRH(
@@ -661,7 +661,7 @@ namespace
                     50.0) > 0.0);
     }
 
-    void testSetpointRamp()
+    TEST_CASE("rampe de consigne")
     {
         SetpointRamp ramp;
         ramp.begin();
@@ -729,7 +729,7 @@ namespace
                 "falling_rate") != nullptr);
     }
 
-    void testThermostatSetpointRamp()
+    TEST_CASE("rampe thermostat")
     {
         FakeTemperature temperature;
         Thermostat thermostat;
@@ -769,7 +769,7 @@ namespace
             0.0001);
     }
 
-    void testPIDSetpointRamp()
+    TEST_CASE("rampe PID")
     {
         FakeTemperature measurement;
         PID pid;
@@ -794,7 +794,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.1, 0.0001);
     }
 
-    void testHeatingThermostat()
+    TEST_CASE("thermostat chauffage")
     {
         FakeTemperature temperature;
         Thermostat thermostat;
@@ -861,7 +861,7 @@ namespace
         CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
     }
 
-    void testCoolingThermostat()
+    TEST_CASE("thermostat refroidissement")
     {
         FakeTemperature temperature;
         Thermostat thermostat;
@@ -897,7 +897,7 @@ namespace
         CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
     }
 
-    void testThermostatSetpointLimits()
+    TEST_CASE("thermostat : plage de consigne")
     {
         FakeTemperature temperature;
 
@@ -957,7 +957,7 @@ namespace
         CHECK_TRUE(listAfter.hasError());
     }
 
-    void testPID()
+    TEST_CASE("PID")
     {
         FakeTemperature measurement;
         PID pid;
@@ -994,7 +994,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testCoolingPID()
+    TEST_CASE("PID refroidissement")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1037,7 +1037,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testPIDModeChangeResetsController()
+    TEST_CASE("changement de mode PID")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1064,7 +1064,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.0, 0.0001);
     }
 
-    void testCoolingPIDDerivative()
+    TEST_CASE("dérivée PID refroidissement")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1096,7 +1096,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.335, 0.0001);
     }
 
-    void testCoolingPIDAntiWindup()
+    TEST_CASE("anti-windup PID refroidissement")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1132,7 +1132,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.4, 0.0001);
     }
 
-    void testPIDRejectsInvalidMode()
+    TEST_CASE("rejet mode PID invalide")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1171,7 +1171,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testPIDAutoTuneRejectsInvalidDirection()
+    TEST_CASE("rejet sens autotune invalide")
     {
         PIDAutoTune autoTune;
         PIDAutoTune::Settings settings;
@@ -1195,7 +1195,7 @@ namespace
         CHECK_FALSE(autoTune.hasCommand());
     }
 
-    void testPIDAutotune()
+    TEST_CASE("autotune PID")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1300,7 +1300,7 @@ namespace
         CHECK_FALSE(pid.setOutputLimits(0.9, 0.1));
     }
 
-    void testCoolingPIDAutotune()
+    TEST_CASE("autotune PID refroidissement")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1410,7 +1410,7 @@ namespace
             0.0);
     }
 
-    void testPIDAutotuneRules()
+    TEST_CASE("règles de réglage autotune")
     {
         const struct
         {
@@ -1456,7 +1456,7 @@ namespace
         CHECK_TRUE(pid.setTunings(0.6 * 1.3, 1800.0, 450.0));
     }
 
-    void testPIDBumplessResume()
+    TEST_CASE("PID reprise sans à-coup")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1519,7 +1519,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.11, 0.0001);
     }
 
-    void testPIDSetpointLimits()
+    TEST_CASE("PID plage de consigne et gains Ti/Td")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1544,7 +1544,7 @@ namespace
         CHECK_TRUE(parameters.find("pid", "ki") == nullptr);
     }
 
-    void testCoolingPIDAutotuneUsesPhysicalLimits()
+    TEST_CASE("limites autotune PID refroidissement")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1575,7 +1575,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testPIDAutotuneStopsOnInvalidMeasurement()
+    TEST_CASE("sécurité autotune PID")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1604,7 +1604,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testPIDAutotuneTimeoutIncludesWaiting()
+    TEST_CASE("timeout attente autotune PID")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1636,7 +1636,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testPIDAutotuneRejectsUnstableCycles()
+    TEST_CASE("rejet oscillations PID instables")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1698,7 +1698,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testPIDAutotuneInterruptedByResume()
+    TEST_CASE("interruption autotune PID")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1724,7 +1724,7 @@ namespace
         CHECK_FALSE(pid.isCommandValid());
     }
 
-    void testPIDAutotuneWaitingSurvivesResume()
+    TEST_CASE("attente autotune PID après menu")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1753,7 +1753,7 @@ namespace
         CHECK_TRUE(pid.isCommandValid());
     }
 
-    void testPIDAutotuneParametersAreOptIn()
+    TEST_CASE("paramètres autotune PID optionnels")
     {
         FakeTemperature measurement;
         PID pid;
@@ -1867,7 +1867,7 @@ namespace
         CHECK_FALSE(editor.validate());
     }
 
-    void testRelaySafeStateLock()
+    TEST_CASE("verrouillage sécurité relais")
     {
         RelayOutput relay;
 
@@ -1934,7 +1934,7 @@ namespace
         CHECK_NEAR(relay.appliedCommand(), 0.0, 0.0);
     }
 
-    void testDS3231RegisterDriver()
+    TEST_CASE("driver registres DS3231")
     {
         TwoWire wire;
         DS3231 driver;
@@ -2021,7 +2021,7 @@ namespace
         return false;
     }
 
-    void testRTCInterface()
+    TEST_CASE("interface RTC DS3231")
     {
         TwoWire wire;
 
@@ -2251,7 +2251,7 @@ namespace
         CHECK_TRUE(wire.registers[0x06] == 0x30);
     }
 
-    void testRTCMenuApply()
+    TEST_CASE("enregistrement du menu horloge")
     {
         TwoWire wire;
         RTC clock;
@@ -2383,7 +2383,7 @@ namespace
         return dateTime;
     }
 
-    void testRTCTimeZone()
+    TEST_CASE("fuseau horaire et heure d'été RTC")
     {
         TwoWire wire;
         RTC clock;
@@ -2469,7 +2469,7 @@ namespace
         CHECK_TRUE(local.hour == 0 && local.minute == 0);
     }
 
-    void testUnavailableAdcMenuReading()
+    TEST_CASE("menu ADC indisponible au demarrage")
     {
         Parameter storage[4];
         ParameterList list;
@@ -2510,7 +2510,7 @@ namespace
             invalidSetting, -10, 10, 0.01, 2, "°C"));
     }
 
-    void testParameterEditor()
+    TEST_CASE("éditeur de paramètres")
     {
         Parameter storage[8];
         ParameterList list;
@@ -2606,7 +2606,7 @@ namespace
         CHECK_FALSE(editor.validate());
     }
 
-    void testLiveMenuDrafts()
+    TEST_CASE("brouillons pendant la régulation")
     {
         Parameter storage[5];
         ParameterList list;
@@ -2692,7 +2692,7 @@ namespace
         }
     };
 
-    void testTolerantRestore()
+    TEST_CASE("restauration tolérante")
     {
         Parameter storage[4];
         ParameterList list;
@@ -2752,7 +2752,7 @@ namespace
         CHECK_NEAR(z, 60.0, 0.0);
     }
 
-    void testPIDSetpointOutsideAutoTuneRange()
+    TEST_CASE("consigne PID hors plage d'autotune")
     {
         // Template PID : plage d'essai 0..60 °C, consigne permise -50..250.
         FakeTemperature measurement;
@@ -2811,7 +2811,7 @@ namespace
         CHECK_TRUE(inputMin != nullptr && inputMin->data.number.minimum == -50.0);
     }
 
-    void testMenuStructure()
+    TEST_CASE("structure du menu")
     {
         MenuTestInstallation installation;
         MenuBuilder menu;
@@ -3032,7 +3032,7 @@ namespace
                 MenuBuilder::INVALID_GROUP);
     }
 
-    void testInstallationIdentity()
+    TEST_CASE("identité de l'installation")
     {
         MenuTestInstallation installation;
 
@@ -3046,7 +3046,7 @@ namespace
                 installation.configurationKey()) != 0);
     }
 
-    void testStartupErrorReporting()
+    TEST_CASE("erreurs de démarrage")
     {
         // Chaque cause de refus de démarrage a un titre et un détail affichables.
         const StartupError errors[] = {
@@ -3074,7 +3074,7 @@ namespace
             strcmp(installation.failureReason(), "Relais non relié") == 0);
     }
 
-    void testOutputStateUpdatedBeforeSnapshot()
+    TEST_CASE("état sortie avant snapshot")
     {
         ProcessControl process;
         FakeInputMeasurement input;
@@ -3140,7 +3140,7 @@ namespace
             0.0);
     }
 
-    void testOutputConnections()
+    TEST_CASE("connexion des sorties")
     {
         ProcessControl process;
         FakeRegulator regulator;
@@ -3173,7 +3173,7 @@ namespace
             secondOutput));
     }
 
-    void testSystemWatchdogRequiresBothCores()
+    TEST_CASE("watchdog des deux coeurs")
     {
         rp2040.resetFakeState();
         rp2040.resetReason =
@@ -3217,250 +3217,4 @@ namespace
 
         CHECK_TRUE(rp2040.watchdogResetCount == 2);
     }
-}
-
-void runThermocoupleTests();
-void runPWMTests();
-void runDigitalInputTests();
-void runScheduleTests();
-void runMeasurementStatusTests();
-void runRelayTimingTests();
-void runInputFilterTests();
-void runFaultFallbackTests();
-void runHomeSetpointTests();
-void runLimitAlarmTests();
-void runManualModeTests();
-void runCounterTests();
-void runLoopBreakTests();
-void runEventLogTests();
-void runLogicTests();
-void runComparatorTests();
-void runSolarTests();
-void runDelayTimerTests();
-void runInhibitTests();
-void runConditionAlarmTests();
-void runColdRoomTests();
-void runMinimalInstallationTests();
-void runThreePointTests();
-void runHeatingCurveTests();
-void runHeatingCircuitTests();
-void runSetpointProgramTests();
-void runKilnTests();
-void runParameterJsonTests();
-void runAnalogMuxTests();
-void runAcquisitionSequencerTests();
-
-int main()
-{
-    TestHarness::run(
-        "validation des mesures BME280",
-        testBMEMeasurementPropagation);
-
-    TestHarness::run(
-        "interpolation PT100",
-        testPT100Interpolation);
-
-    TestHarness::run(
-        "Callendar-Van Dusen PT100 (Newton)",
-        testPT100CallendarVanDusen);
-
-    TestHarness::run(
-        "validité de la mesure de résistance",
-        testResistanceValidity);
-
-    TestHarness::run(
-        "conversion temperature PT100/PT1000",
-        testRTDTemperatureConversion);
-
-    TestHarness::run(
-        "psychrométrie",
-        testPsychrometrics);
-
-    TestHarness::run(
-        "rampe de consigne",
-        testSetpointRamp);
-
-    TestHarness::run(
-        "rampe thermostat",
-        testThermostatSetpointRamp);
-
-    TestHarness::run(
-        "rampe PID",
-        testPIDSetpointRamp);
-
-    TestHarness::run(
-        "thermostat chauffage",
-        testHeatingThermostat);
-
-    TestHarness::run(
-        "thermostat refroidissement",
-        testCoolingThermostat);
-
-    TestHarness::run(
-        "thermostat : plage de consigne",
-        testThermostatSetpointLimits);
-
-    TestHarness::run(
-        "PID",
-        testPID);
-
-    TestHarness::run(
-        "PID refroidissement",
-        testCoolingPID);
-
-    TestHarness::run(
-        "changement de mode PID",
-        testPIDModeChangeResetsController);
-
-    TestHarness::run(
-        "dérivée PID refroidissement",
-        testCoolingPIDDerivative);
-
-    TestHarness::run(
-        "anti-windup PID refroidissement",
-        testCoolingPIDAntiWindup);
-
-    TestHarness::run(
-        "rejet mode PID invalide",
-        testPIDRejectsInvalidMode);
-
-    TestHarness::run(
-        "rejet sens autotune invalide",
-        testPIDAutoTuneRejectsInvalidDirection);
-
-    TestHarness::run(
-        "autotune PID",
-        testPIDAutotune);
-
-    TestHarness::run(
-        "autotune PID refroidissement",
-        testCoolingPIDAutotune);
-
-    TestHarness::run(
-        "règles de réglage autotune",
-        testPIDAutotuneRules);
-
-    TestHarness::run(
-        "PID reprise sans à-coup",
-        testPIDBumplessResume);
-
-    TestHarness::run(
-        "PID plage de consigne et gains Ti/Td",
-        testPIDSetpointLimits);
-
-    TestHarness::run(
-        "limites autotune PID refroidissement",
-        testCoolingPIDAutotuneUsesPhysicalLimits);
-
-    TestHarness::run(
-        "sécurité autotune PID",
-        testPIDAutotuneStopsOnInvalidMeasurement);
-
-    TestHarness::run(
-        "timeout attente autotune PID",
-        testPIDAutotuneTimeoutIncludesWaiting);
-
-    TestHarness::run(
-        "rejet oscillations PID instables",
-        testPIDAutotuneRejectsUnstableCycles);
-
-    TestHarness::run(
-        "interruption autotune PID",
-        testPIDAutotuneInterruptedByResume);
-
-    TestHarness::run(
-        "attente autotune PID après menu",
-        testPIDAutotuneWaitingSurvivesResume);
-
-    TestHarness::run(
-        "paramètres autotune PID optionnels",
-        testPIDAutotuneParametersAreOptIn);
-
-    TestHarness::run(
-        "verrouillage sécurité relais",
-        testRelaySafeStateLock);
-
-    TestHarness::run(
-        "driver registres DS3231",
-        testDS3231RegisterDriver);
-
-    TestHarness::run(
-        "interface RTC DS3231",
-        testRTCInterface);
-
-    TestHarness::run(
-        "enregistrement du menu horloge",
-        testRTCMenuApply);
-
-    TestHarness::run(
-        "fuseau horaire et heure d'été RTC",
-        testRTCTimeZone);
-
-    TestHarness::run("menu ADC indisponible au demarrage", testUnavailableAdcMenuReading);
-    TestHarness::run(
-        "éditeur de paramètres",
-        testParameterEditor);
-
-    TestHarness::run("brouillons pendant la régulation", testLiveMenuDrafts);
-    TestHarness::run("restauration tolérante", testTolerantRestore);
-    TestHarness::run(
-        "consigne PID hors plage d'autotune",
-        testPIDSetpointOutsideAutoTuneRange);
-
-    TestHarness::run(
-        "structure du menu",
-        testMenuStructure);
-
-    TestHarness::run(
-        "identité de l'installation",
-        testInstallationIdentity);
-
-    TestHarness::run(
-        "erreurs de démarrage",
-        testStartupErrorReporting);
-
-    TestHarness::run(
-        "état sortie avant snapshot",
-        testOutputStateUpdatedBeforeSnapshot);
-
-    TestHarness::run(
-        "connexion des sorties",
-        testOutputConnections);
-
-    TestHarness::run(
-        "watchdog des deux coeurs",
-        testSystemWatchdogRequiresBothCores);
-
-    runThermocoupleTests();
-    runPWMTests();
-    runDigitalInputTests();
-    runScheduleTests();
-    runMeasurementStatusTests();
-    runRelayTimingTests();
-    runInputFilterTests();
-    runFaultFallbackTests();
-    runHomeSetpointTests();
-    runLimitAlarmTests();
-    runManualModeTests();
-    runCounterTests();
-    runLoopBreakTests();
-    runEventLogTests();
-    runLogicTests();
-    runComparatorTests();
-    runSolarTests();
-    runDelayTimerTests();
-    runInhibitTests();
-    runConditionAlarmTests();
-    runColdRoomTests();
-    runMinimalInstallationTests();
-    runThreePointTests();
-    runHeatingCurveTests();
-    runHeatingCircuitTests();
-    runSetpointProgramTests();
-    runKilnTests();
-    runParameterJsonTests();
-    runAnalogMuxTests();
-    runAcquisitionSequencerTests();
-
-    return TestHarness::finish();
 }

@@ -37,7 +37,7 @@ namespace
         }
     };
 
-    void testOnDelay()
+    TEST_CASE("temporisation : retard à la montée")
     {
         DelayTimer timer;
         timer.begin("retard", "Retard", Mode::OnDelay, 10);
@@ -62,7 +62,7 @@ namespace
         CHECK_TRUE(timer.run(true, 23000));
     }
 
-    void testOffDelay()
+    TEST_CASE("temporisation : retard à la descente")
     {
         // Post-circulation de 3 min.
         DelayTimer timer;
@@ -90,7 +90,7 @@ namespace
         CHECK_FALSE(timer.run(false, 383000));
     }
 
-    void testZeroDelay()
+    TEST_CASE("temporisation : délai nul")
     {
         DelayTimer onDelay;
         onDelay.begin("a", "A", Mode::OnDelay, 0);
@@ -103,7 +103,7 @@ namespace
         CHECK_FALSE(offDelay.run(false, 1));
     }
 
-    void testWraparound()
+    TEST_CASE("temporisation : débordement de millis()")
     {
         // Délai à cheval sur le débordement de millis().
         const uint32_t start = UINT32_MAX - 2000;
@@ -130,7 +130,7 @@ namespace
         CHECK_FALSE(post.run(false, 2000));
     }
 
-    void testResumeKeepsTiming()
+    TEST_CASE("temporisation : reprise")
     {
         // Intervalle de 6 h : une pause du menu ne le repousse pas.
         DelayTimer interval;
@@ -151,7 +151,7 @@ namespace
         CHECK_TRUE(interval.remainingMs(21601000UL) == 21600000UL);
     }
 
-    void testSource()
+    TEST_CASE("temporisation : source")
     {
         // Post-circulation reliée à un régulateur, sans glue.
         TestSource source;
@@ -211,7 +211,7 @@ namespace
         }
     };
 
-    void testPostCirculationAfterScheduledStop()
+    TEST_CASE("temporisation : post-circulation après un arrêt programmé")
     {
         // Chauffe programmée 06:00-08:00, arrêt hors plage, post-circulation
         // de 3 min reliée au thermostat.
@@ -278,7 +278,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.0, 0.0);
     }
 
-    void testParameters()
+    TEST_CASE("temporisation : paramètres")
     {
         Parameter storage[4];
         ParameterList list;
@@ -317,18 +317,4 @@ namespace
         tooLong.registerParameters(list);
         CHECK_TRUE(list.hasError());
     }
-}
-
-void runDelayTimerTests()
-{
-    TestHarness::run("temporisation : retard à la montée", testOnDelay);
-    TestHarness::run("temporisation : retard à la descente", testOffDelay);
-    TestHarness::run("temporisation : délai nul", testZeroDelay);
-    TestHarness::run("temporisation : débordement de millis()", testWraparound);
-    TestHarness::run("temporisation : reprise", testResumeKeepsTiming);
-    TestHarness::run("temporisation : source", testSource);
-    TestHarness::run(
-        "temporisation : post-circulation après un arrêt programmé",
-        testPostCirculationAfterScheduledStop);
-    TestHarness::run("temporisation : paramètres", testParameters);
 }

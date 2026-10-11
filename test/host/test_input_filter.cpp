@@ -30,7 +30,7 @@ namespace
         return output;
     }
 
-    void testSecondOrderResponse()
+    TEST_CASE("filtre d'entree : reponse du 2e ordre")
     {
         // H = 1 / (1 + τs)² : y(t) = 1 − e^(−t/τ) (1 + t/τ).
         for (double ratio : {0.5, 1.0, 2.0, 5.0})
@@ -45,7 +45,7 @@ namespace
         CHECK_NEAR(stepResponse(10.0, 10.0, 0.8), 0.2642, 0.03);
     }
 
-    void testFilterEdgeCases()
+    TEST_CASE("filtre d'entree : cas limites")
     {
         SecondOrderFilter filter;
         CHECK_FALSE(filter.isStarted());
@@ -65,7 +65,7 @@ namespace
         CHECK_NEAR(filter.update(7.0, 1.0, 10.0), 7.0, 0);
     }
 
-    void testFilteredTemperature()
+    TEST_CASE("filtre d'entree : temperature RTD")
     {
         SensorBoard board;
         Sensor sensor("RTD", Sensor::Type::Pt100,
@@ -118,11 +118,4 @@ namespace
         process.updateMeasurementsAndRegulators(now += 1000);
         CHECK_NEAR(temperature.getValue(), 0.0, 1e-6);
     }
-}
-
-void runInputFilterTests()
-{
-    TestHarness::run("filtre d'entree : reponse du 2e ordre", testSecondOrderResponse);
-    TestHarness::run("filtre d'entree : cas limites", testFilterEdgeCases);
-    TestHarness::run("filtre d'entree : temperature RTD", testFilteredTemperature);
 }

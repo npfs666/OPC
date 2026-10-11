@@ -62,7 +62,7 @@ namespace
         relay.begin();
     }
 
-    void testWithoutMinimumTimes()
+    TEST_CASE("relais : sans temps mini")
     {
         setTime(5000);
         RelayOutput relay;
@@ -78,7 +78,7 @@ namespace
         CHECK_TRUE(FakeDigitalIO::levels[PIN_1] == LOW);
     }
 
-    void testMinimumTimes()
+    TEST_CASE("relais : marche et arret mini")
     {
         // Mise en service à t = 1 s : l'arrêt mini protège le démarrage.
         setTime(1000);
@@ -126,7 +126,7 @@ namespace
         CHECK_TRUE(relayIsOn(relay));
     }
 
-    void testSafeStateBypassesMinimumOnTime()
+    TEST_CASE("relais : etat sur prioritaire")
     {
         setTime(0);
         RelayOutput relay;
@@ -159,7 +159,7 @@ namespace
         CHECK_TRUE(relayIsOn(pump));
     }
 
-    void testSettingsApplyKeepsTimer()
+    TEST_CASE("relais : validation menu et broche")
     {
         setTime(0);
         RelayOutput relay;
@@ -197,7 +197,7 @@ namespace
         CHECK_TRUE(FakeDigitalIO::levels[PIN_2] == HIGH);
     }
 
-    void testRelayParameters()
+    TEST_CASE("relais : parametres")
     {
         RelayOutput relay;
         relay.begin("relay", "Relais", PIN_1, true, false);
@@ -214,7 +214,7 @@ namespace
         CHECK_TRUE(minOff != nullptr);
     }
 
-    void testWaitingSnapshot()
+    TEST_CASE("relais : attente dans le snapshot")
     {
         setTime(0);
         FixedRegulator regulator;
@@ -293,7 +293,7 @@ namespace
         return onTime;
     }
 
-    void testMinimumPulse()
+    TEST_CASE("actionneur temporel : impulsion mini")
     {
         // Sans impulsion mini : durée proportionnelle.
         CHECK_TRUE(onTimeOverPeriod(0.03, 0) == 300);
@@ -309,7 +309,7 @@ namespace
         CHECK_TRUE(onTimeOverPeriod(1.0, 500) == 10000);
     }
 
-    void testMinimumPulseKeepsImmediateSwitching()
+    TEST_CASE("actionneur temporel : basculement immediat")
     {
         // Autotune : commande 0/1 en milieu de période, basculement immédiat.
         setTime(0);
@@ -342,7 +342,7 @@ namespace
         CHECK_FALSE(relayIsOn(relay));
     }
 
-    void testMinimumPulseValidation()
+    TEST_CASE("actionneur temporel : validation")
     {
         FixedRegulator regulator;
         regulator.begin("regulator");
@@ -389,17 +389,4 @@ namespace
         minPulse->integerValue = 5100;
         CHECK_FALSE(actuator.validateParameters(editor));
     }
-}
-
-void runRelayTimingTests()
-{
-    TestHarness::run("relais : sans temps mini", testWithoutMinimumTimes);
-    TestHarness::run("relais : marche et arret mini", testMinimumTimes);
-    TestHarness::run("relais : etat sur prioritaire", testSafeStateBypassesMinimumOnTime);
-    TestHarness::run("relais : validation menu et broche", testSettingsApplyKeepsTimer);
-    TestHarness::run("relais : parametres", testRelayParameters);
-    TestHarness::run("relais : attente dans le snapshot", testWaitingSnapshot);
-    TestHarness::run("actionneur temporel : impulsion mini", testMinimumPulse);
-    TestHarness::run("actionneur temporel : basculement immediat", testMinimumPulseKeepsImmediateSwitching);
-    TestHarness::run("actionneur temporel : validation", testMinimumPulseValidation);
 }

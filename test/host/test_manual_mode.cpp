@@ -58,7 +58,7 @@ namespace
             pid.update(now);
     }
 
-    void testPIDTracking()
+    TEST_CASE("manuel : suivi de la sortie PID")
     {
         ControlledTemperature temperature;
         PID pid;
@@ -76,7 +76,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), automatic, 1e-9);
     }
 
-    void testPIDManualOutput()
+    TEST_CASE("manuel : sortie PID fixee")
     {
         ControlledTemperature temperature;
         PID pid;
@@ -108,7 +108,7 @@ namespace
         CHECK_FALSE(pid.startAutoTune(25000));
     }
 
-    void testPIDBumplessReturn()
+    TEST_CASE("manuel : retour PID sans a-coup")
     {
         ControlledTemperature temperature;
         PID pid;
@@ -148,7 +148,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.40, 0.01);
     }
 
-    void testThermostatManual()
+    TEST_CASE("manuel : thermostat force")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -189,7 +189,7 @@ namespace
         CHECK_NEAR(thermostat.readCommand(), 0.0, 0.0);
     }
 
-    void testRelativeAlarmsInManual()
+    TEST_CASE("manuel : alarmes relatives actives")
     {
         // Chambre froide : 3 °C, alarme à consigne + 4 K, sans tempo.
         ControlledTemperature temperature;
@@ -242,7 +242,7 @@ namespace
         CHECK_NEAR(setpoint, 50.0, 0.0);
     }
 
-    void testScheduledSetpointInManual()
+    TEST_CASE("manuel : consigne programmee")
     {
         // Programme 08:00-18:00, consigne réduite 16 °C hors plage.
         ControlledTemperature temperature;
@@ -299,7 +299,7 @@ namespace
                 ScheduledSetpoint::State::Reduced);
     }
 
-    void testManualParametersAreNotSaved()
+    TEST_CASE("manuel : reglages non sauvegardes")
     {
         ControlledTemperature temperature;
 
@@ -346,7 +346,7 @@ namespace
         return nullptr;
     }
 
-    void testLiveParameters()
+    TEST_CASE("menu : reglages de conduite")
     {
         ControlledTemperature temperature;
 
@@ -400,16 +400,4 @@ namespace
         kpDraft->numberValue += 0.5;
         CHECK_FALSE(editor.hasOnlyLiveChanges());
     }
-}
-
-void runManualModeTests()
-{
-    TestHarness::run("manuel : suivi de la sortie PID", testPIDTracking);
-    TestHarness::run("manuel : sortie PID fixee", testPIDManualOutput);
-    TestHarness::run("manuel : retour PID sans a-coup", testPIDBumplessReturn);
-    TestHarness::run("manuel : thermostat force", testThermostatManual);
-    TestHarness::run("manuel : alarmes relatives actives", testRelativeAlarmsInManual);
-    TestHarness::run("manuel : consigne programmee", testScheduledSetpointInManual);
-    TestHarness::run("manuel : reglages non sauvegardes", testManualParametersAreNotSaved);
-    TestHarness::run("menu : reglages de conduite", testLiveParameters);
 }

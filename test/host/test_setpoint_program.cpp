@@ -96,7 +96,7 @@ namespace
         }
     };
 
-    void testIdleAndStart()
+    TEST_CASE("Programme : arrêt et départ")
     {
         Bench bench;
         bench.setSegment(0, 120.0, 100.0, 10);
@@ -134,7 +134,7 @@ namespace
         CHECK_TRUE(bench.program.segmentCount() == 1);
     }
 
-    void testRampAndSoak()
+    TEST_CASE("Programme : rampe et palier")
     {
         Bench bench;
         bench.setSegment(0, 120.0, 100.0, 10);
@@ -171,7 +171,7 @@ namespace
         CHECK_TRUE(bench.program.elapsedSeconds() == 50 * 60);
     }
 
-    void testHoldback()
+    TEST_CASE("Programme : écart maxi")
     {
         Bench bench;
         bench.setSegment(0, 120.0, 100.0, 10);
@@ -211,7 +211,7 @@ namespace
         CHECK_TRUE(bench.program.state() == State::Finished);
     }
 
-    void testFullPowerAndCooling()
+    TEST_CASE("Programme : pleine puissance et descente")
     {
         Bench bench;
         bench.program.settings.programs[0].segmentCount = 3;
@@ -252,7 +252,7 @@ namespace
         CHECK_NEAR(bench.setpoint(), 490.0, 1e-6);
     }
 
-    void testDelaySkipAndEnd()
+    TEST_CASE("Programme : départ différé, saut, maintien")
     {
         Bench bench;
         bench.program.settings.programs[0].segmentCount = 2;
@@ -304,7 +304,7 @@ namespace
         CHECK_TRUE(bench.program.state() == State::Ramp);
     }
 
-    void testFreezes()
+    TEST_CASE("Programme : pause, défaut, inhibition")
     {
         Bench bench;
         bench.setSegment(0, 60.0, 100.0, 0);
@@ -350,7 +350,7 @@ namespace
         CHECK_TRUE(bench.program.segment() == 1);
     }
 
-    void testPIDFollows()
+    TEST_CASE("Programme : PID suiveur")
     {
         Bench bench;
         bench.setSegment(0, 60.0, 100.0, 0);
@@ -392,7 +392,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), 0.0, 1e-12);
     }
 
-    void testParameters()
+    TEST_CASE("Programme : paramètres")
     {
         Bench bench(3);
         bench.program.setLimits(0.0, 1300.0, 999.0);
@@ -427,16 +427,4 @@ namespace
         CHECK_TRUE(list.find("prog.p3.s8", "soak") != nullptr);
         CHECK_TRUE(list.find("prog.p4.s1", "target") == nullptr);
     }
-}
-
-void runSetpointProgramTests()
-{
-    TestHarness::run("Programme : arrêt et départ", testIdleAndStart);
-    TestHarness::run("Programme : rampe et palier", testRampAndSoak);
-    TestHarness::run("Programme : écart maxi", testHoldback);
-    TestHarness::run("Programme : pleine puissance et descente", testFullPowerAndCooling);
-    TestHarness::run("Programme : départ différé, saut, maintien", testDelaySkipAndEnd);
-    TestHarness::run("Programme : pause, défaut, inhibition", testFreezes);
-    TestHarness::run("Programme : PID suiveur", testPIDFollows);
-    TestHarness::run("Programme : paramètres", testParameters);
 }

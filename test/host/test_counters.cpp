@@ -47,7 +47,7 @@ namespace
         relay.poll(millis());
     }
 
-    void testSwitchesAndOnTime()
+    TEST_CASE("compteurs : manoeuvres et heures en marche")
     {
         setTime(0);
         RelayOutput relay;
@@ -87,7 +87,7 @@ namespace
         CHECK_TRUE(counters->switches == 4);
     }
 
-    void testResetAndRestore()
+    TEST_CASE("compteurs : remise a zero et relecture")
     {
         setTime(0);
         RelayOutput relay;
@@ -112,7 +112,7 @@ namespace
         CHECK_NEAR(relay.onSeconds(), 1.0, 1e-9);
     }
 
-    void testMaintenanceLimit()
+    TEST_CASE("compteurs : seuil d'entretien")
     {
         OutputCounters counters;
         counters.switches = 1000000;
@@ -125,7 +125,7 @@ namespace
         CHECK_TRUE(counters.maintenanceDue());
     }
 
-    void testOperatingTime()
+    TEST_CASE("compteurs : heures de fonctionnement")
     {
         ProcessControl process;
         CHECK_NEAR(process.operatingSeconds(), 0.0, 0);
@@ -199,7 +199,7 @@ namespace
         }
     };
 
-    void testCounterParametersAndMenu()
+    TEST_CASE("compteurs : parametres et menu")
     {
         setTime(0);
         CounterInstallation installation;
@@ -238,7 +238,7 @@ namespace
         CHECK_TRUE(reset != nullptr && reset->group == relayCounters);
     }
 
-    void testResetActionEventsAndBanner()
+    TEST_CASE("compteurs : RAZ, journal et bandeau")
     {
         setTime(0);
         CounterInstallation installation;
@@ -296,14 +296,4 @@ namespace
         process.captureSnapshot(snapshot, 12000);
         CHECK_TRUE(AlarmDisplay::format(snapshot, text, sizeof(text), 18, color) == 0);
     }
-}
-
-void runCounterTests()
-{
-    TestHarness::run("compteurs : manoeuvres et heures en marche", testSwitchesAndOnTime);
-    TestHarness::run("compteurs : remise a zero et relecture", testResetAndRestore);
-    TestHarness::run("compteurs : seuil d'entretien", testMaintenanceLimit);
-    TestHarness::run("compteurs : heures de fonctionnement", testOperatingTime);
-    TestHarness::run("compteurs : parametres et menu", testCounterParametersAndMenu);
-    TestHarness::run("compteurs : RAZ, journal et bandeau", testResetActionEventsAndBanner);
 }

@@ -40,7 +40,7 @@ namespace
         return const_cast<ParameterDraft&>(*found);
     }
 
-    void testDutyAndPolarity()
+    TEST_CASE("PWM rapport cyclique, polarité et repli")
     {
         PWMOutput output;
         PWMOutput::sharedSettings.frequency = 1000;
@@ -79,7 +79,7 @@ namespace
         CHECK_NEAR(physicalDuty(PIN_1), 0.8, 0.001);
     }
 
-    void testSharedFrequencyAndMenu()
+    TEST_CASE("PWM fréquence partagée et menu")
     {
         PWMOutput first, second;
         PWMOutput::sharedSettings.frequency = 1000;
@@ -147,7 +147,7 @@ namespace
         }
     };
 
-    void testActuatorAndSafeState()
+    TEST_CASE("PWM actionneur et sécurité régulation")
     {
         TestRegulator regulator;
         regulator.begin("regulator");
@@ -178,11 +178,4 @@ namespace
         CHECK_NEAR(physicalDuty(PIN_1), 0.0, 0.0);
         CHECK_NEAR(physicalDuty(PIN_2), 0.0, 0.0);
     }
-}
-
-void runPWMTests()
-{
-    TestHarness::run("PWM rapport cyclique, polarité et repli", testDutyAndPolarity);
-    TestHarness::run("PWM fréquence partagée et menu", testSharedFrequencyAndMenu);
-    TestHarness::run("PWM actionneur et sécurité régulation", testActuatorAndSafeState);
 }

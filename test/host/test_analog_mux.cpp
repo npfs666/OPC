@@ -74,7 +74,7 @@ namespace
             settingsFor(Type::Pt100, Wiring::FourWire), channel);
     }
 
-    void testRouteTable()
+    TEST_CASE("routage analogique : octets des ports")
     {
         for (const ExpectedRoute& expected : ROUTES)
         {
@@ -96,7 +96,7 @@ namespace
         }
     }
 
-    void testThermocoupleAlwaysTwoWire()
+    TEST_CASE("routage analogique : thermocouple en 2 fils")
     {
         const AnalogRoute twoWire =
             AnalogRoute::forInput(settingsFor(Type::Tc, Wiring::TwoWire), 1);
@@ -107,7 +107,7 @@ namespace
             settingsFor(Type::Tc, Wiring::FourWire), 1) == twoWire);
     }
 
-    void testNoChannelOutsideBoard()
+    TEST_CASE("routage analogique : sans voie")
     {
         const Sensor::Settings settings =
             settingsFor(Type::Pt100, Wiring::FourWire);
@@ -118,7 +118,7 @@ namespace
             settings, AnalogRoute::NO_CHANNEL).portB == 0);
     }
 
-    void testOutputPins()
+    TEST_CASE("routage analogique : broches en sortie")
     {
         const AnalogRoute outputs = AnalogRoute::outputPins();
 
@@ -139,7 +139,7 @@ namespace
         }
     }
 
-    void testBeginSequence()
+    TEST_CASE("MCP23017 : séquence d'initialisation")
     {
         // Redémarrage sans reset du MCP : sorties actives, voie 1 connectée.
         TwoWire wire = mcpBus();
@@ -168,7 +168,7 @@ namespace
         CHECK_TRUE(wire.registers[IOCON] == 0x00);
     }
 
-    void testBeginWithoutDevice()
+    TEST_CASE("MCP23017 : absent au démarrage")
     {
         TwoWire absent = mcpBus();
         absent.connected = false;
@@ -185,7 +185,7 @@ namespace
         CHECK_FALSE(otherMux.begin(otherDevice));
     }
 
-    void testWriteIsOneTransaction()
+    TEST_CASE("MCP23017 : routage en une transaction")
     {
         TwoWire wire = mcpBus();
 
@@ -204,7 +204,7 @@ namespace
         CHECK_TRUE(wire.registers[OLATB] == 0x02);
     }
 
-    void testWriteFailure()
+    TEST_CASE("MCP23017 : écriture refusée")
     {
         TwoWire wire = mcpBus();
 
@@ -226,7 +226,7 @@ namespace
 
 namespace
 {
-    void testApplyVerified()
+    TEST_CASE("MCP23017 : routage vérifié")
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
@@ -244,7 +244,7 @@ namespace
         CHECK_TRUE(mux.confirm());
     }
 
-    void testApplyRetriesAfterNack()
+    TEST_CASE("MCP23017 : NACK isolé rattrapé")
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
@@ -258,7 +258,7 @@ namespace
         CHECK_TRUE(wire.registers[OLATB] == 0x01);
     }
 
-    void testApplyReinitializesAfterReset()
+    TEST_CASE("MCP23017 : réinitialisé après un reset")
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
@@ -274,7 +274,7 @@ namespace
         CHECK_TRUE(wire.registers[OLATB] == 0x04);
     }
 
-    void testApplyWithoutMcp()
+    TEST_CASE("MCP23017 : muet puis de retour")
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
@@ -294,7 +294,7 @@ namespace
         CHECK_TRUE(mux.counters().reinitializations == 2);
     }
 
-    void testConfirmAfterReset()
+    TEST_CASE("MCP23017 : reset pendant l'acquisition")
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
@@ -316,7 +316,7 @@ namespace
         CHECK_TRUE(mux.counters().reinitializations == 1);
     }
 
-    void testConfirmRereadsOnce()
+    TEST_CASE("MCP23017 : relecture en fin d'acquisition")
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
@@ -333,7 +333,7 @@ namespace
         CHECK_FALSE(mux.confirm());
     }
 
-    void testPinMismatchRejected()
+    TEST_CASE("MCP23017 : broche non conforme refusée")
     {
         TwoWire wire = mcpBus();
         AnalogMux mux;
@@ -358,31 +358,4 @@ namespace
         wire.mcpStuckLowA = 0x02;
         CHECK_FALSE(mux.confirm());
     }
-}
-
-void runAnalogMuxTests()
-{
-    TestHarness::run("routage analogique : octets des ports", testRouteTable);
-    TestHarness::run("routage analogique : thermocouple en 2 fils",
-        testThermocoupleAlwaysTwoWire);
-    TestHarness::run("routage analogique : sans voie",
-        testNoChannelOutsideBoard);
-    TestHarness::run("routage analogique : broches en sortie", testOutputPins);
-    TestHarness::run("MCP23017 : séquence d'initialisation", testBeginSequence);
-    TestHarness::run("MCP23017 : absent au démarrage", testBeginWithoutDevice);
-    TestHarness::run("MCP23017 : routage en une transaction",
-        testWriteIsOneTransaction);
-    TestHarness::run("MCP23017 : écriture refusée", testWriteFailure);
-    TestHarness::run("MCP23017 : routage vérifié", testApplyVerified);
-    TestHarness::run("MCP23017 : NACK isolé rattrapé",
-        testApplyRetriesAfterNack);
-    TestHarness::run("MCP23017 : réinitialisé après un reset",
-        testApplyReinitializesAfterReset);
-    TestHarness::run("MCP23017 : muet puis de retour", testApplyWithoutMcp);
-    TestHarness::run("MCP23017 : reset pendant l'acquisition",
-        testConfirmAfterReset);
-    TestHarness::run("MCP23017 : relecture en fin d'acquisition",
-        testConfirmRereadsOnce);
-    TestHarness::run("MCP23017 : broche non conforme refusée",
-        testPinMismatchRejected);
 }

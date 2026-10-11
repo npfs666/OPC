@@ -16,7 +16,7 @@ namespace
     constexpr uint8_t PIN_1 = Board::Rp2040::DIGITAL_INPUT_1;
     constexpr uint8_t PIN_2 = Board::Rp2040::DIGITAL_INPUT_2;
 
-    void testInitializationAndPolarity()
+    TEST_CASE("entrées numériques : initialisation et polarité")
     {
         DigitalInput input;
         input.poll(0);
@@ -48,7 +48,7 @@ namespace
         CHECK_FALSE(input.isActive());
     }
 
-    void testDebounceAndWraparound()
+    TEST_CASE("entrées numériques : rebonds et débordement millis")
     {
         DigitalInput input;
         input.begin("input", PIN_1, true, 20);
@@ -92,7 +92,7 @@ namespace
         CHECK_TRUE(input.isActive());
     }
 
-    void testSettings()
+    TEST_CASE("entrées numériques : paramètres et revalidation")
     {
         DigitalInput input;
         input.begin("permit", "Autorisation", PIN_1);
@@ -166,7 +166,7 @@ namespace
         const DigitalInput& input;
     };
 
-    void testProcessAndSnapshots()
+    TEST_CASE("entrées numériques : processus et snapshots")
     {
         DigitalInput first, second, extra;
         first.begin("first", PIN_1);
@@ -214,12 +214,4 @@ namespace
         CHECK_TRUE(snapshot.inputCount() == 0);
         CHECK_TRUE(snapshot.find(first) == nullptr);
     }
-}
-
-void runDigitalInputTests()
-{
-    TestHarness::run("entrées numériques : initialisation et polarité", testInitializationAndPolarity);
-    TestHarness::run("entrées numériques : rebonds et débordement millis", testDebounceAndWraparound);
-    TestHarness::run("entrées numériques : paramètres et revalidation", testSettings);
-    TestHarness::run("entrées numériques : processus et snapshots", testProcessAndSnapshots);
 }

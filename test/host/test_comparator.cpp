@@ -53,7 +53,7 @@ namespace
         return comparator.isOn();
     }
 
-    void testAbove()
+    TEST_CASE("comparateur : au-dessus")
     {
         ControlledTemperature temperature;
         Comparator comparator;
@@ -80,7 +80,7 @@ namespace
         CHECK_NEAR(value, 47.0, 0.0);
     }
 
-    void testBelow()
+    TEST_CASE("comparateur : en dessous")
     {
         // Hors-gel : marche à 5 °C, arrêt à 7 °C.
         ControlledTemperature temperature;
@@ -95,7 +95,7 @@ namespace
         CHECK_FALSE(step(comparator, temperature, 6.0, 4000));
     }
 
-    void testSingleThreshold()
+    TEST_CASE("comparateur : seuil unique")
     {
         ControlledTemperature temperature;
         Comparator comparator;
@@ -123,7 +123,7 @@ namespace
         CHECK_TRUE(list.find("max", "off_threshold") == nullptr);
     }
 
-    void testDifferential()
+    TEST_CASE("comparateur : différentiel")
     {
         // Charge solaire : capteur - bas du ballon, marche 8 K, arrêt 4 K.
         ControlledTemperature collector;
@@ -158,7 +158,7 @@ namespace
             std::strcmp(onThreshold->data.number.unit, "K") == 0);
     }
 
-    void testFaultAndResume()
+    TEST_CASE("comparateur : défaut et reprise")
     {
         ControlledTemperature temperature;
         Comparator comparator;
@@ -187,7 +187,7 @@ namespace
         CHECK_FALSE(step(comparator, temperature, 47.0, 5000));
     }
 
-    void testParameters()
+    TEST_CASE("comparateur : paramètres")
     {
         ControlledTemperature temperature;
         Comparator comparator;
@@ -227,14 +227,4 @@ namespace
         editor.capture();
         CHECK_TRUE(comparator.validateParameters(editor));
     }
-}
-
-void runComparatorTests()
-{
-    TestHarness::run("comparateur : au-dessus", testAbove);
-    TestHarness::run("comparateur : en dessous", testBelow);
-    TestHarness::run("comparateur : seuil unique", testSingleThreshold);
-    TestHarness::run("comparateur : différentiel", testDifferential);
-    TestHarness::run("comparateur : défaut et reprise", testFaultAndResume);
-    TestHarness::run("comparateur : paramètres", testParameters);
 }

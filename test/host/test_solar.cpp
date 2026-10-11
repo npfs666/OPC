@@ -44,7 +44,7 @@ namespace
         }
     };
 
-    void testCharge()
+    TEST_CASE("solaire : charge")
     {
         SolarBench bench;
         CHECK_TRUE(bench.started);
@@ -83,7 +83,7 @@ namespace
         CHECK_FALSE(bench.pump());
     }
 
-    void testChargeAfterLimit()
+    TEST_CASE("solaire : charge après une limite")
     {
         SolarBench bench;
 
@@ -106,7 +106,7 @@ namespace
         CHECK_TRUE(bench.pump());
     }
 
-    void testNoChatterAtTankMaximum()
+    TEST_CASE("solaire : pas de battement au ballon max")
     {
         // Haut du ballon qui plafonne à 80 °C, bruit de mesure de ±0,01 °C :
         // une seule manœuvre de la pompe (l'arrêt), au lieu d'une par cycle.
@@ -132,7 +132,7 @@ namespace
         CHECK_FALSE(previous);
     }
 
-    void testHolidayDischarge()
+    TEST_CASE("solaire : décharge nocturne vacances")
     {
         SolarBench bench;
 
@@ -180,7 +180,7 @@ namespace
         CHECK_FALSE(bench.pump());
     }
 
-    void testDischargeSettings()
+    TEST_CASE("solaire : réglages de la décharge")
     {
         SolarBench bench;
         bench.setClock(MONDAY, 2);
@@ -196,7 +196,7 @@ namespace
         CHECK_TRUE(bench.pump());
     }
 
-    void testManualPump()
+    TEST_CASE("solaire : pompe en manuel")
     {
         SolarBench bench;
         bench.setTemperatures(20.0, 40.0, 40.0);
@@ -216,7 +216,7 @@ namespace
         CHECK_FALSE(bench.pump());
     }
 
-    void testMenu()
+    TEST_CASE("solaire : menu")
     {
         SolarBench bench;
 
@@ -265,15 +265,4 @@ namespace
             CHECK_TRUE(group != nullptr && group->parent == holidayGroup);
         }
     }
-}
-
-void runSolarTests()
-{
-    TestHarness::run("solaire : charge", testCharge);
-    TestHarness::run("solaire : charge après une limite", testChargeAfterLimit);
-    TestHarness::run("solaire : pas de battement au ballon max", testNoChatterAtTankMaximum);
-    TestHarness::run("solaire : décharge nocturne vacances", testHolidayDischarge);
-    TestHarness::run("solaire : réglages de la décharge", testDischargeSettings);
-    TestHarness::run("solaire : pompe en manuel", testManualPump);
-    TestHarness::run("solaire : menu", testMenu);
 }

@@ -52,7 +52,7 @@ namespace
         thermostat.update(0);
     }
 
-    void testSafeStateByDefault()
+    TEST_CASE("repli : securite par defaut")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -66,7 +66,7 @@ namespace
         CHECK_FALSE(thermostat.isInFallback());
     }
 
-    void testHoldIsLimited()
+    TEST_CASE("repli : maintien limite")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -103,7 +103,7 @@ namespace
         CHECK_TRUE(thermostat.isInFallback());
     }
 
-    void testHoldNeedsValidCommand()
+    TEST_CASE("repli : maintien sans commande valide")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -124,7 +124,7 @@ namespace
         CHECK_FALSE(thermostat.isCommandValid());
     }
 
-    void testPIDHoldIsBumpless()
+    TEST_CASE("repli : PID sans a-coup")
     {
         ControlledTemperature temperature;
         PID pid;
@@ -161,7 +161,7 @@ namespace
         CHECK_NEAR(pid.readCommand(), before, 0.01);
     }
 
-    void testFaultParameters()
+    TEST_CASE("repli : parametres et verrouillage")
     {
         ControlledTemperature temperature;
         Thermostat thermostat;
@@ -188,13 +188,4 @@ namespace
         heater.registerParameters(locked);
         CHECK_TRUE(locked.find("heater", "fault_action") == nullptr);
     }
-}
-
-void runFaultFallbackTests()
-{
-    TestHarness::run("repli : securite par defaut", testSafeStateByDefault);
-    TestHarness::run("repli : maintien limite", testHoldIsLimited);
-    TestHarness::run("repli : maintien sans commande valide", testHoldNeedsValidCommand);
-    TestHarness::run("repli : PID sans a-coup", testPIDHoldIsBumpless);
-    TestHarness::run("repli : parametres et verrouillage", testFaultParameters);
 }

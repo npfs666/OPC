@@ -247,18 +247,22 @@ avancer `millis()`, et ses réglages se modifient comme au menu.
 ```cpp
 struct MonBanc : TemplateBench<MonInstallation> {};
 
-MonBanc banc;
-banc.setTemperature(0, 6.0);          // sonde 0 (ordre d'addSensor())
-banc.setBool("mon_option", "enabled", true);
-banc.advance(600);                    // 10 min de cycles
-CHECK_TRUE(FakeDigitalIO::levels[Board::Rp2040::OUTPUT_1] == HIGH);
+TEST_CASE("mon template : option en marche")
+{
+    MonBanc banc;
+    banc.setTemperature(0, 6.0);      // sonde 0 (ordre d'addSensor())
+    banc.setBool("mon_option", "enabled", true);
+    banc.advance(600);                // 10 min de cycles
+    CHECK_TRUE(FakeDigitalIO::levels[Board::Rp2040::OUTPUT_1] == HIGH);
+}
 ```
 
 Voir `test/host/test_solar.cpp`, `test/host/test_cold_room.cpp` et, pour
 l'exemple minimal, `test/host/test_minimal_installation.cpp`
-(`banc.measurement(i)` lit une mesure comme l'écran). Ajouter
-le fichier de test et le `.cpp` du template à `test/host/run_tests.sh`, puis
-compiler aussi le firmware (`pio run`) pour vérifier l'écran.
+(`banc.measurement(i)` lit une mesure comme l'écran). Chaque
+`TEST_CASE` (doctest) doit passer seul. Ajouter le fichier de test et le
+`.cpp` du template à `test/host/run_tests.sh`, puis compiler aussi le
+firmware (`pio run`) pour vérifier l'écran.
 
 ## 8. Avant de partager un template
 

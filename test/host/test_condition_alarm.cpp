@@ -31,7 +31,7 @@ namespace
         return alarm.isActive();
     }
 
-    void testDoorInput()
+    TEST_CASE("alarme sur condition : entrée TOR")
     {
         DigitalInput door;
         door.begin("porte", "Porte", PIN_1);
@@ -60,7 +60,7 @@ namespace
         CHECK_FALSE(doorAlarmAt(alarm, door, true, 604000));
     }
 
-    void testDoorInputFault()
+    TEST_CASE("alarme sur condition : défaut d'entrée")
     {
         DigitalInput door;
         door.begin("porte", "Porte", PIN_1);
@@ -145,7 +145,7 @@ namespace
         }
     };
 
-    void testGlueCondition()
+    TEST_CASE("alarme sur condition : glue")
     {
         GlueBench bench;
 
@@ -166,7 +166,7 @@ namespace
         CHECK_FALSE(bench.activeAt(3000));
     }
 
-    void testGlueMissingWrite()
+    TEST_CASE("alarme sur condition : non écrite")
     {
         GlueBench bench;
         CHECK_FALSE(bench.activeAt(1000));
@@ -203,7 +203,7 @@ namespace
         CHECK_FALSE(bench.activeAt(5000));
     }
 
-    void testLatchingAndAcknowledge()
+    TEST_CASE("alarme sur condition : mémorisation")
     {
         GlueBench bench;
         bench.alarm.settings.latching = true;
@@ -220,7 +220,7 @@ namespace
         CHECK_FALSE(bench.activeAt(3000));
     }
 
-    void testLongDelay()
+    TEST_CASE("alarme sur condition : tempo longue")
     {
         // Une fois confirmée, l'alarme le reste au-delà de 49 jours.
         GlueBench bench;
@@ -233,7 +233,7 @@ namespace
         CHECK_TRUE(bench.activeAt(5000));
     }
 
-    void testParameters()
+    TEST_CASE("alarme sur condition : paramètres")
     {
         ConditionAlarm alarm;
         alarm.begin("alarme", "Alarme");
@@ -253,15 +253,4 @@ namespace
             enabled != nullptr &&
             std::strcmp(enabled->categoryKey, "alarms") == 0);
     }
-}
-
-void runConditionAlarmTests()
-{
-    TestHarness::run("alarme sur condition : entrée TOR", testDoorInput);
-    TestHarness::run("alarme sur condition : défaut d'entrée", testDoorInputFault);
-    TestHarness::run("alarme sur condition : glue", testGlueCondition);
-    TestHarness::run("alarme sur condition : non écrite", testGlueMissingWrite);
-    TestHarness::run("alarme sur condition : mémorisation", testLatchingAndAcknowledge);
-    TestHarness::run("alarme sur condition : tempo longue", testLongDelay);
-    TestHarness::run("alarme sur condition : paramètres", testParameters);
 }

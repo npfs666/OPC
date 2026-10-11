@@ -79,7 +79,7 @@ namespace
         }
     };
 
-    void testCooling()
+    TEST_CASE("chambre froide : froid")
     {
         ColdRoomBench bench;
         CHECK_TRUE(bench.started);
@@ -100,7 +100,7 @@ namespace
         CHECK_TRUE(bench.fans());
     }
 
-    void testDoor()
+    TEST_CASE("chambre froide : porte")
     {
         ColdRoomBench bench;
         bench.setBool("cold_room_door_alarm", "enabled", true);
@@ -122,7 +122,7 @@ namespace
         CHECK_TRUE(bench.fans());
     }
 
-    void testDefrostCycle()
+    TEST_CASE("chambre froide : cycle de dégivrage")
     {
         ColdRoomBench bench;
         bench.advance(200);
@@ -165,7 +165,7 @@ namespace
         CHECK_FALSE(bench.heater());
     }
 
-    void testDefrostMaximum()
+    TEST_CASE("chambre froide : durée max du dégivrage")
     {
         // Évaporateur qui ne se réchauffe pas : fin à 30 min.
         ColdRoomBench bench;
@@ -177,7 +177,7 @@ namespace
         CHECK_FALSE(bench.heater());
     }
 
-    void testEvaporatorFault()
+    TEST_CASE("chambre froide : sonde évaporateur en défaut")
     {
         // Sonde d'évaporateur en défaut : jamais de résistance. Le dégivrage
         // se fait compresseur arrêté, et se termine par sa durée max.
@@ -196,7 +196,7 @@ namespace
         CHECK_FALSE(bench.heater());
     }
 
-    void testDefrostDisabled()
+    TEST_CASE("chambre froide : dégivrage désactivé")
     {
         ColdRoomBench bench;
         bench.setBool("cold_room_defrost", "enabled", false);
@@ -207,7 +207,7 @@ namespace
         CHECK_TRUE(bench.fans());
     }
 
-    void testHighAlarmMasked()
+    TEST_CASE("chambre froide : alarme haute masquée")
     {
         // Chambre à 10 °C, alarme à consigne + 4 K, sans tempo.
         ColdRoomBench bench;
@@ -222,7 +222,7 @@ namespace
         CHECK_TRUE(bench.logged("Alarme Temp. haute : ACTIVE"));
     }
 
-    void testHighAlarmInManual()
+    TEST_CASE("chambre froide : alarme haute en manuel")
     {
         // Compresseur forcé à l'arrêt, chambre à 10 °C : l'alarme haute
         // surveille toujours la consigne réglée (3 °C + 4 K).
@@ -240,7 +240,7 @@ namespace
         CHECK_TRUE(bench.logged("Alarme Temp. haute : ACTIVE"));
     }
 
-    void testManualCompressorDuringDefrost()
+    TEST_CASE("chambre froide : manuel pendant le dégivrage")
     {
         // Le mode manuel passe avant l'inhibition du dégivrage.
         ColdRoomBench bench;
@@ -261,7 +261,7 @@ namespace
         CHECK_TRUE(bench.heater());
     }
 
-    void testMenu()
+    TEST_CASE("chambre froide : menu")
     {
         ColdRoomBench bench;
 
@@ -307,18 +307,4 @@ namespace
             CHECK_TRUE(group != nullptr && group->parent == defrost);
         }
     }
-}
-
-void runColdRoomTests()
-{
-    TestHarness::run("chambre froide : froid", testCooling);
-    TestHarness::run("chambre froide : porte", testDoor);
-    TestHarness::run("chambre froide : cycle de dégivrage", testDefrostCycle);
-    TestHarness::run("chambre froide : durée max du dégivrage", testDefrostMaximum);
-    TestHarness::run("chambre froide : sonde évaporateur en défaut", testEvaporatorFault);
-    TestHarness::run("chambre froide : dégivrage désactivé", testDefrostDisabled);
-    TestHarness::run("chambre froide : alarme haute masquée", testHighAlarmMasked);
-    TestHarness::run("chambre froide : alarme haute en manuel", testHighAlarmInManual);
-    TestHarness::run("chambre froide : manuel pendant le dégivrage", testManualCompressorDuringDefrost);
-    TestHarness::run("chambre froide : menu", testMenu);
 }

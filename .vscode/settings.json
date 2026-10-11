@@ -1,0 +1,10 @@
+{
+	// Tests hôte (doctest) dans la vue Testing, via C++ TestMate.
+	// Le binaire est recompilé avant chaque lancement.
+	"testMate.cpp.test.advancedExecutables": [
+		{
+			"pattern": ".pio/host-tests/opc-tests",
+			"runTask": { "before": ["Compiler tests hôte"] }
+		}
+	]
+}

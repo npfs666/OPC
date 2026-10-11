@@ -147,7 +147,7 @@ namespace
         uint16_t start = 0;
     };
 
-    void testScheduleSlots()
+    TEST_CASE("programme horaire : plages, jours et minuit")
     {
         ClockSample clock;
         TimeSchedule schedule;
@@ -215,7 +215,7 @@ namespace
         CHECK_FALSE(commandAt(schedule, clock, 3, 14, 30));
     }
 
-    void testScheduleModesAndClock()
+    TEST_CASE("programme horaire : modes forcés et heure inconnue")
     {
         ClockSample clock;
         TimeSchedule schedule;
@@ -263,7 +263,7 @@ namespace
                 TimeSchedule::Days::Off);
     }
 
-    void testScheduleParameters()
+    TEST_CASE("programme horaire : paramètres")
     {
         ClockSample clock;
         TimeSchedule schedule;
@@ -311,7 +311,7 @@ namespace
         CHECK_TRUE(schedule.settings.slots[0].start == minutes(21, 45));
     }
 
-    void testTimeParameterValidation()
+    TEST_CASE("paramètre heure HH:MM et parent de menu")
     {
         Parameter storage[4];
         ParameterList list;
@@ -348,7 +348,7 @@ namespace
         CHECK_FALSE(list.forOwner(self).addTime("start", "Début", valid));
     }
 
-    void testScheduleMenuNesting()
+    TEST_CASE("programme horaire : sous-menus imbriqués et ordre")
     {
         ScheduleMenuInstallation installation;
         MenuBuilder menu;
@@ -420,7 +420,7 @@ namespace
         CHECK_FALSE(orphan.buildMenu(orphanMenu));
     }
 
-    void testScheduledThermostat()
+    TEST_CASE("thermostat programmé")
     {
         FakeTemperature temperature;
         ClockSample clock;
@@ -519,7 +519,7 @@ namespace
         CHECK_FALSE(thermostat.scheduledSetpoint.isAttached());
     }
 
-    void testScheduledPID()
+    TEST_CASE("PID programmé")
     {
         FakeTemperature measurement;
         ClockSample clock;
@@ -584,7 +584,7 @@ namespace
                 ScheduledSetpoint::State::ClockInvalid);
     }
 
-    void testPIDAutotuneIgnoresSchedule()
+    TEST_CASE("autotune PID ignore le programme")
     {
         FakeTemperature measurement;
         ClockSample clock;
@@ -627,7 +627,7 @@ namespace
         CHECK_TRUE(pid.isCommandValid());
     }
 
-    void testProcessClockRequirement()
+    TEST_CASE("alerte horloge : heure requise")
     {
         ProcessControl process;
         TimeSchedule schedule;
@@ -670,43 +670,4 @@ namespace
         withoutSchedule.captureInputSnapshot(otherSnapshot);
         CHECK_FALSE(otherSnapshot.clockRequired());
     }
-}
-
-void runScheduleTests()
-{
-    TestHarness::run(
-        "programme horaire : plages, jours et minuit",
-        testScheduleSlots);
-
-    TestHarness::run(
-        "programme horaire : modes forcés et heure inconnue",
-        testScheduleModesAndClock);
-
-    TestHarness::run(
-        "programme horaire : paramètres",
-        testScheduleParameters);
-
-    TestHarness::run(
-        "paramètre heure HH:MM et parent de menu",
-        testTimeParameterValidation);
-
-    TestHarness::run(
-        "programme horaire : sous-menus imbriqués et ordre",
-        testScheduleMenuNesting);
-
-    TestHarness::run(
-        "thermostat programmé",
-        testScheduledThermostat);
-
-    TestHarness::run(
-        "PID programmé",
-        testScheduledPID);
-
-    TestHarness::run(
-        "autotune PID ignore le programme",
-        testPIDAutotuneIgnoresSchedule);
-
-    TestHarness::run(
-        "alerte horloge : heure requise",
-        testProcessClockRequirement);
 }
