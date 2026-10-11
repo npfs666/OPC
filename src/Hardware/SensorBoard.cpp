@@ -24,6 +24,9 @@ namespace
     constexpr uint32_t CALIBRATION_SAMPLE_TIMEOUT_MS = 250;
     constexpr int32_t ADC_CALIBRATION_LIMIT = 32000;
     constexpr int32_t MAX_ZERO_OFFSET_COUNTS = 2048;
+    // Résistance interne 2 fils admise ; un peu de négatif pour le bruit.
+    constexpr double_t MIN_TWO_WIRE_RESISTANCE = -0.5;
+    constexpr double_t MAX_TWO_WIRE_RESISTANCE = 10.0;
     constexpr int32_t MAX_SAMPLE_SPREAD_COUNTS = 256;
     constexpr double_t REFERENCE_TOLERANCE = 0.05;
     constexpr double_t ADC_FULL_SCALE = 32768.0;
@@ -424,6 +427,10 @@ double_t SensorBoard::computeResistance(Sensor& rtdSensor) {
 
     double_t Rrtd = correctedValue * calibration.refResistanceValue / (ADC_FULL_SCALE * gain);
 
+    // En 2 fils, le chemin interne de la carte est en série avec la sonde.
+    if (rtdSensor.settings.wiring == Sensor::Wiring::TwoWire)
+        Rrtd -= settings.twoWireResistance[channel];
+
     // Compensation de la mesure en fonction de la température
     // Je suis incapable de mesurer une différence notable sur la version  0.3
     //const double_t ppm = (adcTemperature - calibration.calTemperatureADC) * calibration.systemPPMCoeff;
@@ -601,6 +608,34 @@ void SensorBoard::registerZeroCalibrationParameters(
             "pts",
             true);
     }
+
+    constexpr const char* TWO_WIRE_KEYS[MAX_RTD] = {
+        "two_wire_input_1",
+        "two_wire_input_2",
+        "two_wire_input_3"
+    };
+
+    constexpr const char* TWO_WIRE_NAMES[MAX_RTD] = {
+        "R2f entree 1",
+        "R2f entree 2",
+        "R2f entree 3"
+    };
+
+    for (uint8_t channel = 0;
+         channel < MAX_RTD;
+         channel++)
+    {
+        parameters.addDouble(
+            TWO_WIRE_KEYS[channel],
+            TWO_WIRE_NAMES[channel],
+            settings.twoWireResistance[channel],
+            MIN_TWO_WIRE_RESISTANCE,
+            MAX_TWO_WIRE_RESISTANCE,
+            0.001,
+            3,
+            "Ω",
+            true);
+    }
 }
 
 bool SensorBoard::addMenuActions(
@@ -652,7 +687,7 @@ bool SensorBoard::addMenuActions(
             zeroGroup,
             RESET_ZERO_OFFSETS,
             "reset_zero_offsets",
-            "RAZ des N0") &&
+            "RAZ N0 et R2f") &&
         menu.addAction(
             pt100Group,
             CALIBRATE_PT100_REFERENCE,
@@ -768,19 +803,26 @@ uint8_t SensorBoard::channelFor(
     return MAX_RTD;
 }
 
+/**
+ * Shunt reliant les 4 bornes de l'entrée. N0 est l'offset en tension, mesuré
+ * en 4 fils. La même mesure en 2 fils voit en plus le chemin interne de la
+ * carte : l'écart, converti en ohms avec le profil PT100 (1 mA, meilleure
+ * résolution), vaut aussi en PT1000 et sur la plage large.
+ */
 bool SensorBoard::calibrateZero(uint8_t channel)
 {
-    CalibrationSamples samples;
+    CalibrationSamples fourWire;
 
     if (!readCalibrationSamples(
             Sensor::Type::Pt100,
+            Sensor::Wiring::FourWire,
             channel,
-            samples))
+            fourWire))
     {
         return false;
     }
 
-    if (std::fabs(samples.average) >
+    if (std::fabs(fourWire.average) >
             MAX_ZERO_OFFSET_COUNTS)
     {
         Serial.println(
@@ -788,13 +830,46 @@ bool SensorBoard::calibrateZero(uint8_t channel)
         return false;
     }
 
+    CalibrationSamples twoWire;
+
+    if (!readCalibrationSamples(
+            Sensor::Type::Pt100,
+            Sensor::Wiring::TwoWire,
+            channel,
+            twoWire))
+    {
+        return false;
+    }
+
+    const double_t twoWireResistance =
+        (twoWire.average - fourWire.average) *
+        settings.pt100.refResistanceValue /
+        (ADC_FULL_SCALE * RTD_PRECISE_GAIN);
+
+    if (!std::isfinite(twoWireResistance) ||
+        twoWireResistance < MIN_TWO_WIRE_RESISTANCE ||
+        twoWireResistance > MAX_TWO_WIRE_RESISTANCE)
+    {
+        Serial.print(
+            "Calibration N0 rejected: 2-wire resistance out of range: ");
+        Serial.println(twoWireResistance, 4);
+        return false;
+    }
+
     settings.zeroOffset[channel] =
-        samples.average;
+        fourWire.average;
+    settings.twoWireResistance[channel] =
+        twoWireResistance;
 
     Serial.print("Calibration N0 input ");
     Serial.print(channel + 1);
     Serial.print(": ");
-    Serial.println(samples.average, 2);
+    Serial.print(fourWire.average, 2);
+    Serial.print(" pts, 2-wire ");
+    Serial.print(twoWire.average, 2);
+    Serial.print(" pts, R2f ");
+    Serial.print(twoWireResistance, 4);
+    Serial.println(" ohm");
 
     return true;
 }
@@ -806,9 +881,10 @@ bool SensorBoard::resetZeroOffsets()
          channel++)
     {
         settings.zeroOffset[channel] = 0.0;
+        settings.twoWireResistance[channel] = 0.0;
     }
 
-    Serial.println("ADC zero offsets reset");
+    Serial.println("ADC zero offsets and 2-wire resistances reset");
     return true;
 }
 
@@ -820,6 +896,7 @@ bool SensorBoard::calibrateReference(
 
     if (!readCalibrationSamples(
             type,
+            Sensor::Wiring::FourWire,
             channel,
             samples))
     {
@@ -893,6 +970,7 @@ bool SensorBoard::calibrateReference(
 
 bool SensorBoard::readCalibrationSamples(
     Sensor::Type type,
+    Sensor::Wiring wiring,
     uint8_t channel,
     CalibrationSamples& samples)
 {
@@ -904,7 +982,7 @@ bool SensorBoard::readCalibrationSamples(
     // Étendue précise par défaut : N0 et Rref sont pris au gain de référence.
     Sensor::Settings calibrationSettings{
         type,
-        Sensor::Wiring::FourWire,
+        wiring,
         0.0,
         CALIBRATION_SAMPLES
     };

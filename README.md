@@ -1204,7 +1204,14 @@ la clé de configuration de chaque relais.
 `Divers > Calibration` contient :
 
 - **Zéros ADC** : correction du zéro de chaque entrée (`Mesurer N0` avec un
-  shunt au connecteur, `RAZ des N0` pour tout effacer) ;
+  shunt reliant les 4 bornes du connecteur, `RAZ N0 et R2f` pour tout
+  effacer). La même action mesure deux valeurs :
+  - `N0`, l'offset en tension, mesuré en 4 fils et retranché de toutes les
+    mesures RTD ;
+  - `R2f`, la résistance interne du chemin 2 fils (commutateurs, pistes,
+    bornier), en ohms, retranchée des seules mesures RTD 2 fils, PT100 et
+    PT1000. La résistance du câble n'y est pas : elle reste à compenser par
+    l'offset de la sonde ;
 - **Profils PT100 et PT1000** : résistance de référence, valeur de l'étalon
   et action `Calibrer Rref (E1)` avec un étalon branché en 4 fils sur
   l'entrée 1 ;
@@ -1218,6 +1225,18 @@ la clé de configuration de chaque relais.
 Une mesure de calibration instable ou hors plage est rejetée sans écraser la
 calibration existante.
 
+Ordre des calibrations RTD :
+
+1. **N0** de chaque entrée. Après avoir posé le shunt, attendre quelques
+   minutes que le bornier soit en équilibre thermique : 1 point de N0 ne vaut
+   que 6,3 µV, l'ordre des tensions thermoélectriques d'un bornier qu'on
+   vient de manipuler. Relancer `Mesurer N0` deux ou trois fois : les valeurs
+   doivent se répéter à mieux que 0,3 point.
+2. **Rref** de chaque profil, avec l'étalon. `Calibrer Rref` retranche le N0
+   de l'entrée 1 : refaire Rref après chaque nouvelle mesure de N0, sinon
+   l'écart de N0 se reporte sur toutes les mesures (environ 6 mΩ par point
+   en PT100, soit 0,016 °C).
+
 Les calibrations sont propres à la carte : elles sont sauvegardées à part,
 dans `/board.json` (voir [Configuration et USB](#configuration-et-usb)), et
 conservées quand on téléverse un autre programme ou change d'installation.
@@ -1225,7 +1244,10 @@ conservées quand on téléverse un autre programme ou change d'installation.
 Les calibrations se font sur la plage `-200..280°C` et valent aussi pour la
 plage `-200..850°C` : Rref ne dépend pas du gain, et N0, mesuré en points ADC,
 est mis à l'échelle du gain de chaque entrée (deux fois plus de points en
-3 fils, deux fois moins sur la plage large).
+3 fils, deux fois moins sur la plage large). `R2f`, en ohms, ne dépend ni
+du gain ni du profil. Il est calculé avec le Rref PT100 du moment : une
+recalibration de Rref ne le change que de l'écart relatif de Rref,
+négligeable.
 
 ### Horloge
 

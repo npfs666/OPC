@@ -52,6 +52,14 @@ public:
         double_t coldJunctionOffset = 0.0;
 
         double_t zeroOffset[MAX_RTD] = {};
+
+        /*
+         * Résistance interne du chemin 2 fils (commutateurs, pistes,
+         * bornier) en ohms, mesurée avec le shunt de N0. Retranchée des
+         * mesures RTD 2 fils seulement : en 3 et 4 fils, elle est hors de
+         * la boucle de mesure.
+         */
+        double_t twoWireResistance[MAX_RTD] = {};
     };
 
     Settings settings;
@@ -164,6 +172,7 @@ private:
         uint8_t channel);
     bool readCalibrationSamples(
         Sensor::Type type,
+        Sensor::Wiring wiring,
         uint8_t channel,
         CalibrationSamples& samples);
     void registerCalibrationParameters(
