@@ -84,12 +84,11 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 9. ✅ **Précision PT100** : la conversion passe maintenant par Callendar–Van Dusen avec Newton-Raphson (`PT100::getResistanceToTemperatureNewton`).
    - Mesure faite sur l'ancienne table : erreur de 15 mK à 100 °C, 71 mK à 266 °C, et aucune mesure au-delà de 266 °C.
    - ✅ Test hôte ajouté sur les points IEC 60751 (`testPT100CallendarVanDusen`).
-10. ⬜ **Deux formules psychrométriques différentes** (`Psychrometrics.cpp`).
-    - `relativeHumidity()` utilise Magnus 17,2694/238,3 avec un γ fixe.
-    - `getRH()` utilise 17,27/237,3 avec un A calculé. C'est la seule qui sert.
-    - `dewPoint()` utilise encore 17,27/237,7.
-    - Il manque la formule sur glace quand le bulbe humide passe sous 0 °C, et un coefficient psychrométrique réglable.
-    - `constrain(0,100)` masque les incohérences, par exemple un bulbe humide plus chaud que le sec.
+10. ✅ **Deux formules psychrométriques différentes** (`Psychrometrics.cpp`).
+    - `relativeHumidity()` utilisait Magnus 17,2694/238,3 avec un γ fixe, `getRH()` 17,27/237,3 avec un A calculé (la seule qui servait), et `dewPoint()` 17,27/237,7.
+    - ✅ Une seule formule de Magnus (WMO, coefficients de Sonntag 17,62/243,12 sur l'eau, 22,46/272,62 sur la glace) ; `getRH()` est supprimée. `dewPoint()` en est l'inverse exact.
+    - ✅ Formule sur glace quand le bulbe humide passe sous 0 °C (`Bulbe < 0°C`, `Glace` par défaut), et coefficient psychrométrique réglable (`Coef. psychro.`, 6,53·10⁻⁴/°C par défaut, ventilé). Écart avec l'ancien calcul au-dessus de 0 °C : −0,1 à −0,3 % HR.
+    - ✅ `constrain(0,100)` ne masque plus les incohérences : bulbe humide plus chaud que le sec de plus de 0,5 K → `Invalid`, humidité sous −2 % → `UnderRange`. Tests dans `test_psychrometrics.cpp`.
 11. ✅ **Limites du PID**.
     - Les gains sont passés en forme standard Kp / Ti / Td (secondes), avec des plages Ti ≤ 100 000 s et Td ≤ 10 000 s.
     - La consigne va de −50 à 250 °C par défaut, et chaque installation peut la changer avec `setSetpointLimits()`.

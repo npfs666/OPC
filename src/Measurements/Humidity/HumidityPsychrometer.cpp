@@ -4,8 +4,15 @@
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 
 #include <Measurements/Psychrometer.h>
+#include <hmi/ParameterList.h>
 
-#include <cmath>
+namespace
+{
+    constexpr ParameterOption FROZEN_BULB_OPTIONS[] = {
+        {static_cast<int32_t>(Psychrometer::FrozenBulb::Ice), "Glace"},
+        {static_cast<int32_t>(Psychrometer::FrozenBulb::Supercooled), "Eau surfondue"}
+    };
+}
 
 HumidityPsychrometer::HumidityPsychrometer()
 {
@@ -13,7 +20,7 @@ HumidityPsychrometer::HumidityPsychrometer()
 
 void HumidityPsychrometer::begin(
     const char* name,
-    const Psychrometer& psychrometer)
+    Psychrometer& psychrometer)
 {
     Humidity::begin(name);
     this->psychrometer = &psychrometer;
@@ -27,24 +34,48 @@ void HumidityPsychrometer::update()
         return;
     }
 
-    const MeasurementStatus inputStatus =
-        psychrometer->status();
+    const Psychrometer::Result result =
+        psychrometer->evaluate();
 
-    if (inputStatus != MeasurementStatus::Ok)
+    if (result.status != MeasurementStatus::Ok)
     {
-        setStatus(inputStatus);
+        setStatus(result.status);
         return;
     }
 
-    const double_t humidity =
-        psychrometer->relativeHumidity();
-
-    if (!std::isfinite(humidity))
-    {
-        setValid(false);
-        return;
-    }
-
-    setValue(humidity);
+    setValue(result.relativeHumidity);
     setValid(true);
+}
+
+void HumidityPsychrometer::registerParameters(ParameterList& list)
+{
+    if (psychrometer == nullptr)
+        return;
+
+    auto parameters = list.forOwner({
+        "measurements",
+        "Mesures",
+        getConfigurationKey(),
+        getName()
+    });
+
+    Psychrometer::Settings& settings =
+        psychrometer->settings();
+
+    // 6,53 : ventilé (Assmann) ; 8 à 12 : non ventilé.
+    parameters.addDouble(
+        "coefficient",
+        "Coef. psychro.",
+        settings.coefficient,
+        5.0,
+        12.0,
+        0.01,
+        2,
+        "e-4/K");
+
+    parameters.addSelection(
+        "frozen_bulb",
+        "Bulbe < 0°C",
+        settings.frozenBulb,
+        FROZEN_BULB_OPTIONS);
 }

@@ -745,6 +745,12 @@ void ProcessControl::registerParameters(ParameterList& list)
         true,
         1);
 
+    for (uint8_t i = 0; i < measurementCount; i++)
+    {
+        if (measurements[i] != nullptr)
+            measurements[i]->registerParameters(list);
+    }
+
     for (uint8_t i = 0; i < digitalInputCount; i++)
         digitalInputs[i]->registerParameters(list);
 

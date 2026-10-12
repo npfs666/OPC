@@ -20,7 +20,6 @@
 #include <Outputs/Output.h>
 #include <Outputs/RelayOutput.h>
 #include <Physics/PT100.h>
-#include <Physics/Psychrometrics.h>
 #include <ProcessControl.h>
 #include <Regulator/PID.h>
 #include <Regulator/SetpointRamp.h>
@@ -626,39 +625,6 @@ namespace
         sensor.settings.type = Sensor::Type::Tc;
         update(100.0);
         CHECK_FALSE(temperature.isValid());
-    }
-
-    TEST_CASE("psychrométrie")
-    {
-        CHECK_NEAR(
-            Physics::Psychrometrics::getRH(
-                20.0,
-                20.0,
-                101325.0),
-            100.0,
-            0.01);
-
-        const double_t humidity =
-            Physics::Psychrometrics::getRH(
-                25.0,
-                20.0,
-                101325.0);
-
-        CHECK_TRUE(humidity > 0.0);
-        CHECK_TRUE(humidity < 100.0);
-
-        CHECK_NEAR(
-            Physics::Psychrometrics::dewPoint(
-                20.0,
-                100.0),
-            20.0,
-            0.01);
-
-        CHECK_TRUE(
-            Physics::Psychrometrics::
-                absoluteHumidity(
-                    20.0,
-                    50.0) > 0.0);
     }
 
     TEST_CASE("rampe de consigne")

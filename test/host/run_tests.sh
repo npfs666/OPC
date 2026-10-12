@@ -83,6 +83,7 @@ fi
     "${project_dir}/test/host/test_parameter_json.cpp" \
     "${project_dir}/test/host/test_analog_mux.cpp" \
     "${project_dir}/test/host/test_acquisition_sequencer.cpp" \
+    "${project_dir}/test/host/test_psychrometrics.cpp" \
     "${project_dir}/src/Inputs/DigitalInput.cpp" \
     "${project_dir}/src/Drivers/DS3231.cpp" \
     "${project_dir}/src/Hardware/RTC.cpp" \
@@ -102,6 +103,8 @@ fi
     "${project_dir}/src/hmi/ParameterJson.cpp" \
     "${project_dir}/src/hmi/ParameterList.cpp" \
     "${project_dir}/src/Measurements/Humidity/HumidityBME.cpp" \
+    "${project_dir}/src/Measurements/Humidity/HumidityPsychrometer.cpp" \
+    "${project_dir}/src/Measurements/Psychrometer.cpp" \
     "${project_dir}/src/Measurements/Measurement.cpp" \
     "${project_dir}/src/ProcessSnapshot.cpp" \
     "${project_dir}/src/Measurements/Pressure/PressureBME.cpp" \

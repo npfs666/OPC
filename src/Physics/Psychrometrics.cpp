@@ -4,55 +4,73 @@
 #include <Physics/Psychrometrics.h>
 #include <math.h>
 
-double_t Physics::Psychrometrics::relativeHumidity(
-    double_t dryBulb,
-    double_t wetBulb,
-    double_t pressure)
-{
-    const double_t es = saturationVaporPressure(dryBulb);
-
-    const double_t e = vaporPressure(dryBulb, wetBulb, pressure);
-
-    return (e / es) * 100.0;
-}
-
 double_t Physics::Psychrometrics::saturationVaporPressure(
     double_t temperature)
 {
-    return 610.78 * exp(
-               (17.2694 * temperature) /
-               (temperature + 238.3));
+    return magnusPressure * exp(
+               (waterA * temperature) /
+               (waterB + temperature));
+}
+
+double_t Physics::Psychrometrics::saturationVaporPressureIce(
+    double_t temperature)
+{
+    return magnusPressure * exp(
+               (iceA * temperature) /
+               (iceB + temperature));
 }
 
 double_t Physics::Psychrometrics::vaporPressure(
     double_t dryBulb,
     double_t wetBulb,
-    double_t pressure)
+    double_t pressure,
+    double_t coefficient,
+    bool iceBulb)
 {
-    const double_t ew = saturationVaporPressure(wetBulb);
+    if (iceBulb)
+    {
+        return saturationVaporPressureIce(wetBulb) -
+               coefficient * ICE_COEFFICIENT_RATIO *
+                   pressure * (dryBulb - wetBulb);
+    }
 
-    const double_t gamma =
-        0.00066 *
-        (1.0 + 0.00115 * wetBulb) *
-        pressure;
+    // Dépendance en température du coefficient (WMO).
+    return saturationVaporPressure(wetBulb) -
+           coefficient * (1.0 + 0.000944 * wetBulb) *
+               pressure * (dryBulb - wetBulb);
+}
 
-    return ew - gamma * (dryBulb - wetBulb);
+double_t Physics::Psychrometrics::relativeHumidity(
+    double_t dryBulb,
+    double_t wetBulb,
+    double_t pressure,
+    double_t coefficient,
+    bool iceBulb)
+{
+    const double_t e = vaporPressure(
+        dryBulb,
+        wetBulb,
+        pressure,
+        coefficient,
+        iceBulb);
+
+    return e / saturationVaporPressure(dryBulb) * 100.0;
 }
 
 double_t Physics::Psychrometrics::dewPoint(
     double_t temperature,
     double_t humidity)
 {
-    const double_t a = 17.27;
-    const double_t b = 237.7;
+    if (!(humidity > 0.0))
+        return NAN;
 
     const double_t alpha =
-        ((a * temperature) /
-         (b + temperature)) +
+        ((waterA * temperature) /
+         (waterB + temperature)) +
         log(humidity / 100.0);
 
-    return (b * alpha) /
-           (a - alpha);
+    return (waterB * alpha) /
+           (waterA - alpha);
 }
 
 double_t Physics::Psychrometrics::absoluteHumidity(
@@ -63,36 +81,6 @@ double_t Physics::Psychrometrics::absoluteHumidity(
 
     const double_t e = humidity / 100.0 * es;
 
+    // Gaz parfait : 1000 / Rv, Rv = 461,5 J/(kg·K)
     return (2.16679 * e) / (temperature + kelvin);
-}
-
-double_t Physics::Psychrometrics::getRH(
-    double_t dryBulb,
-    double_t wetBulb,
-    double_t pressure)
-{
-
-    // 1: Calcul de la "constante" psychrométrique
-    // Capacité thermique massique de l'air [kJ/kg.°C]
-    // 0.00006 * tempSeche + 1.005; ancien calcul
-    double_t Cp = (3 * dryBulb) / 50000.0 + 1.005;
-    // Energie de vaporiation de l'eau [kJ/kg]
-    double_t lambda = -2.3664 * wetBulb + 2501;
-    double_t A = Cp / (lambda * 0.622); // [1/°C]
-
-    // Atmospheric pressure [kPa]
-    double_t P = pressure / 1000.0F;
-
-    double_t pVs = 0.6108 * pow(2.71828, ((17.27 * wetBulb) / (wetBulb + 237.3)));  // [kPa]
-    double_t pV = pVs - A * P * (dryBulb - wetBulb);                                // [kPa]
-    double_t pVs2 = 0.6108 * pow(2.71828, ((17.27 * dryBulb) / (dryBulb + 237.3))); // [kPa]
-
-    // Ancien calcul
-    // double_t pVs = pow(10,(2.7877+(7.625*mes1)/(241.6+mes1)));
-    // double_t pV = pVs - 0.000667*102.3000*(mes2-mes1);
-    // double_t pVs2 = pow(10,(2.7877+(7.625*mes2)/(241.6+mes2)));
-
-    double_t rh = ((double_t)pV / pVs2) * 100.0;
-
-    return rh;
 }

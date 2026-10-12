@@ -8,18 +8,24 @@
 
 class Psychrometer;
 
+/**
+ * Humidité relative d'un Psychrometer. Ses réglages (coefficient, bulbe
+ * sous 0 °C) sont dans le menu Mesures > <nom>.
+ */
 class HumidityPsychrometer : public Humidity
 {
 public:
     HumidityPsychrometer();
 
-    void begin(const char* name, const Psychrometer& psychrometer);
+    void begin(const char* name, Psychrometer& psychrometer);
 
     void update() override;
 
+    void registerParameters(ParameterList& list) override;
+
 private:
 
-    const Psychrometer* psychrometer = nullptr;
+    Psychrometer* psychrometer = nullptr;
 };
 
 #endif

@@ -819,7 +819,21 @@ Notes sur les mesures :
   interne de l'ADS1120 : sa précision dépend de l'écart de température entre
   l'ADC et le bornier.
 - L'humidité psychrométrique se calcule à partir d'une température sèche,
-  d'une température humide et de la pression (`Psychrometer`).
+  d'une température humide et de la pression (`Psychrometer`), avec les
+  formules de la WMO : Magnus (coefficients de Sonntag) et
+  `e = e'(Tw) - A·P·(T - Tw)`. Elle est rapportée à l'eau liquide, même
+  sous 0 °C. Réglages dans `Mesures > <humidité>` :
+  - `Coef. psychro.` : coefficient A, en 10⁻⁴/°C. 6,53 (défaut) pour un
+    psychromètre ventilé de type Assmann, 8 à 12 pour un psychromètre non
+    ventilé. C'est le réglage qui pèse le plus sur le résultat.
+  - `Bulbe < 0°C` : `Glace` (défaut) pour une mèche givrée, `Eau surfondue`
+    sinon. Sur la glace, la pression saturante et A (× 0,88) changent : à
+    -5 / -6 °C, 73,5 % contre 77,1 %.
+
+  Le point de rosée (`Psychrometer::dewPoint()`) est l'inverse exact de la
+  même formule de Magnus. Une mèche sèche n'est pas détectable : le bulbe
+  humide remonte vers la température sèche et l'humidité affichée est trop
+  haute.
 - Une PT100 ou PT1000 se mesure sur l'une des deux plages suivantes,
   choisies dans `Input > <sonde> > Plage` :
 
@@ -1319,9 +1333,9 @@ les régulateurs mettent leurs sorties en état sûr, comme avant.
 | `NotReady` | `...` (gris) | Pas encore de mesure depuis le démarrage |
 | `Open` | `RUPTURE` / `RUPT` (rouge) | ADC saturé vers le haut : sonde ou ligne coupée |
 | `Short` | `C-CIRCUIT` / `C-C` (rouge) | Résistance < 10 Ω (PT100), < 100 Ω (PT1000) |
-| `UnderRange` | `TROP BAS` / `BAS` (orange) | Sous l'étendue : RTD sous -200 °C, thermocouple sous son domaine NIST |
+| `UnderRange` | `TROP BAS` / `BAS` (orange) | Sous l'étendue : RTD sous -200 °C, thermocouple sous son domaine NIST, humidité psychrométrique sous -2 % (bulbe humide trop froid) |
 | `OverRange` | `TROP HAUT` / `HAUT` (orange) | Au-dessus de l'étendue : RTD au-delà de sa plage (environ 280 ou 850 °C), thermocouple au-delà de son domaine NIST |
-| `Invalid` | `ERREUR` / `ERR` (rouge) | ADC saturé vers le bas (câblage inversé), jonction froide inconnue, calcul impossible, routage de la carte non vérifié, ADC muet |
+| `Invalid` | `ERREUR` / `ERR` (rouge) | ADC saturé vers le bas (câblage inversé), jonction froide inconnue, calcul impossible, routage de la carte non vérifié, ADC muet, bulbe humide plus chaud que le sec de plus de 0,5 K |
 
 - **Thermocouple** : la polarisation 1 MΩ (+ vers VCC, − vers GND) sature
   l'entrée quand le thermocouple est ouvert. Un court-circuit au bornier

@@ -8,7 +8,6 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "/mnt/F64CEB874CEB40CB/Mes Documents/Programmation/Microcontroleurs/PlatformIO/OPC_v0.2/include",
                 "/mnt/F64CEB874CEB40CB/Mes Documents/Programmation/Microcontroleurs/PlatformIO/OPC_v0.2/src",
                 "/home/gaou/.platformio/packages/framework-arduinopico/libraries/SingleFileDrive/src",
                 "/home/gaou/.platformio/packages/framework-arduinopico/libraries/tusb-msc/src",
@@ -191,7 +190,6 @@
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "/mnt/F64CEB874CEB40CB/Mes Documents/Programmation/Microcontroleurs/PlatformIO/OPC_v0.2/include",
                     "/mnt/F64CEB874CEB40CB/Mes Documents/Programmation/Microcontroleurs/PlatformIO/OPC_v0.2/src",
                     "/home/gaou/.platformio/packages/framework-arduinopico/libraries/SingleFileDrive/src",
                     "/home/gaou/.platformio/packages/framework-arduinopico/libraries/tusb-msc/src",
