@@ -424,13 +424,17 @@ void OPC::controlPoll()
     controller.updateOperatingTime(millis());
     mutex_exit(&processDataMutex);
 
-    if (controller.takeCountersChanged() ||
-        millis() - lastCountersSave >= COUNTERS_SAVE_PERIOD_MS)
+    // Démarrage raté : les compteurs et le journal sauvegardés n'ont pas été
+    // relus, les sauvegarder les écraserait.
+    if (controlCycleStarted &&
+        (controller.takeCountersChanged() ||
+         millis() - lastCountersSave >= COUNTERS_SAVE_PERIOD_MS))
     {
         saveCounters();
     }
 
-    if (millis() - lastEventsSave >= EVENTS_SAVE_PERIOD_MS)
+    if (controlCycleStarted &&
+        millis() - lastEventsSave >= EVENTS_SAVE_PERIOD_MS)
     {
         mutex_enter_blocking(&processDataMutex);
         const bool unsaved = controller.eventLog().hasUnsavedImportant();

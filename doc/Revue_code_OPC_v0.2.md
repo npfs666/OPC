@@ -79,11 +79,11 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
     - Tout se passe dans `handleControlMessage()` sur le cœur 0, suivi de la sauvegarde (`/board.json` puis `/config.json`). Le watchdog (8 s) n'est nourri qu'au tour de `loop()` suivant : la marge est de l'ordre de la seconde, ou moins.
     - Un reset pendant la calibration ne casse rien (sorties en sécurité, ancienne calibration conservée), mais la calibration est perdue sans explication.
     - À faire : afficher la durée de `executeMenuAction()` et de `storage.save()` sur le port série. Si la marge est faible, raccourcir la série 2 fils (1 point ADC vaut environ 6 mΩ en PT100 : 16 × 50 conversions devraient suffire pour R2f), ou nourrir le watchdog dans `readCalibrationSamples()`, dont la durée est bornée par les délais de conversion.
-29. ⬜ **Démarrage raté : les compteurs et le journal sauvegardés peuvent être écrasés** (`OPC::controlPoll`). Ajouté le 12/10/2026.
+29. ✅ **Démarrage raté : les compteurs et le journal sauvegardés peuvent être écrasés** (`OPC::controlPoll`). Ajouté le 12/10/2026.
     - Après un échec de `initMeasurements()`, `loop()` continue d'appeler `controlPoll()`.
     - Si l'échec vient après `storage.begin()` (seul cas : `StartupError::Outputs`, une sortie PWM qui ne démarre pas), `restoreCounters()` et `restoreEvents()` n'ont pas été appelés.
     - Une heure plus tard, `saveCounters()` réécrit `/counters.json` avec des compteurs de relais à zéro et les heures carte comptées depuis ce démarrage. Après 15 min, une heure inconnue (« Heure perdue ») suffit pour que `saveEvents()` remplace `/events.csv` par ce seul événement.
-    - Correction : sortir de `controlPoll()` tant que `controlCycleStarted` est faux.
+    - Corrigé le 16/10/2026 : les sauvegardes des compteurs et du journal attendent `controlCycleStarted`. Le reste de `controlPoll()` (entrées, disque USB, horloge) continue de tourner sur l'écran d'erreur.
 
 ### B. Risques de conception (à planifier)
 
