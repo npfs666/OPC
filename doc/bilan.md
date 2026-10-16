@@ -66,14 +66,7 @@ En résumé :
    - À faire : passer le template sur la sortie DC 1 (relais statique), ou allonger la période à 60–120 s avec un avertissement dans le menu.
    - Fait le 16/10/2026 : relais statique (`PWMOutput`) sur la sortie DC 1, période 10 s gardée, état sûr verrouillé à l'arrêt. Le template est maintenant testé sur l'hôte (`test_pid_template.cpp`).
 
-4. **Chauffage arrêté après une longue coupure de courant**. Voir [HeatingCurve.cpp](../src/Regulator/HeatingCurve.cpp), état `ClockInvalid`.
-   - Une coupure de plusieurs jours peut décharger le supercondensateur du DS3231, et l'heure est alors perdue.
-   - Sans heure, la loi d'eau passe en état sûr : vanne fermée, donc plus de chauffage jusqu'au réglage de l'horloge.
-   - L'hiver, dans une maison inoccupée, c'est un risque de gel.
-   - À faire :
-     - un repli sur heure inconnue, choisi au menu : `Arrêt`, `Confort` ou `Réduit`, avec `Réduit` par défaut pour le chauffage ;
-     - le même choix pour `ScheduledSetpoint` du thermostat et du PID ;
-     - **mesurer l'autonomie réelle du supercondensateur**, et la publier.
+4. **Chauffage arrêté après une longue coupure de courant** : **risque accepté** le 16/10/2026, déplacé en P2 (voir § 2, P2 n°14).
 
 ### P1
 
@@ -115,6 +108,13 @@ En résumé :
     - ✅ 29 : après un démarrage raté, `/counters.json` et `/events.csv` pouvaient être écrasés ;
     - ✅ 30 : un défaut de la nouvelle session pouvait être fusionné avec un événement relu de la précédente ;
     - 31 à 35 : capacité des actions du menu, « Manœuvres » mal affiché (✅ 32), unité de `Kp`, BME280 muet non détecté, allocations dynamiques à documenter.
+14. **Chauffage arrêté après une longue coupure de courant** (ancien P0 n°4). Voir [HeatingCurve.cpp](../src/Regulator/HeatingCurve.cpp), état `ClockInvalid`.
+    - Une coupure assez longue décharge le supercondensateur du DS3231 (autonomie non mesurée, estimée de quelques heures à 1–2 jours), et l'heure est perdue.
+    - Sans heure, la loi d'eau passe en état sûr : vanne fermée, plus de chauffage jusqu'au réglage de l'horloge. Seul `HeatingCircuitInstallation` est vraiment concerné ; l'appoint du solaire et le template de programmation horaire le sont peu.
+    - Risque accepté le 16/10/2026 : une coupure de plus d'un jour est rare, et une maison inoccupée (résidence secondaire) est hors de la cible.
+    - ✅ Heure perdue rendue visible : écran `ALERTE HORLOGE` (« Coupure longue », « Régler l'heure »), et bandeau `HEURE A REGLER` sur l'accueil des installations sans programme.
+    - Si le besoin revient : la loi d'eau passerait d'elle-même sur la consigne réduite quand l'heure est inconnue (une dizaine de lignes), ou un réglage `Heure inconnue` dans `ScheduledSetpoint`.
+    - Prochaine carte : mesure de la tension du supercondensateur par l'ADC (voir § 4).
 
 ---
 
@@ -174,6 +174,7 @@ Le comparatif JUMO (§ 3) liste déjà : entrée 0–10 V / 4–20 mA, sortie an
 | Contact inverseur (NO + NF) sur au moins un relais | Câblage d'une alarme à sécurité positive, d'une vanne tout-ou-rien sans relais d'interface, ou d'une vanne 3 points en Marche / Sens (verrouillage matériel des deux sens) |
 | Retour d'état des sorties (lecture du contact, ou courant de la charge) | LBA plus rapide, détection d'un relais collé |
 | Rétroéclairage de l'écran pilotable (aucune broche dans le brochage) | Mise en veille, durée de vie, usage de nuit (chambre) |
+| Mesure de la tension du supercondensateur du DS3231 par l'ADC (aucune entrée ADC libre sur la v0.2) | État de charge et vieillissement, avertissement avant la perte de l'heure. Mesure commutée, ou sous très forte impédance : carte éteinte, une broche ADC reliée directement viderait la supercap par ses diodes de protection |
 | Protection des entrées analogiques (TVS, résistances série) | Câbles de sonde longs, contact accidentel avec le 24 V |
 
 ### P1 : conformité, pour une diffusion au-delà de l'usage personnel
@@ -206,7 +207,7 @@ Thermostat, PID, programmation horaire, solaire, chambre froide positive, circui
 | --- | --- | --- |
 | `PIDInstallation` | ✅ Sortie DC 1 (relais statique) (§ 2, point 3) | P0 |
 | `KilnInstallation` | ✅ LBA active par défaut, durée maximale de cuisson (§ 2, point 2). Reste : consignes d'isolation du thermocouple (§ 4, point 1) | P0 |
-| `HeatingCircuitInstallation` | Repli sur heure inconnue (§ 2, point 4) | P0 |
+| `HeatingCircuitInstallation` | Repli sur heure inconnue (§ 2, P2 n°14, risque accepté) | P2 |
 | `ColdRoomInstallation` | Documenter le contacteur du compresseur. Ajouter une alarme `Temp. basse` (gel des produits, thermostat collé) | P1 |
 | `SolarInstallation` | Protection du capteur : stagnation (arrêt de la pompe au-dessus de ~120 °C, pour protéger la pompe et le glycol) et antigel (installations sans glycol). Proposé dans la revue, non fait | P1 |
 | `testInstallation` | En faire un template propre « **Indicateur / enregistreur** » : 3 voies, alarmes sur les relais, sans régulation. Très demandé en usage réel (surveillance d'une chambre, d'une cuve, d'un congélateur) | P1 |
@@ -303,7 +304,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 - ✅ Vérification du MCP23017 et récupération du bus I²C. Reste la validation sur banc de la PT1000 et du thermocouple.
 - ✅ Revue, points 28 à 30 : calibration N0 et watchdog (vérifiée sur banc), compteurs écrasés après un démarrage raté, regroupement du journal.
 - Pull-down des sorties (✅ ordre d'initialisation corrigé).
-- Repli sur heure inconnue pour le chauffage, et autonomie du supercondensateur mesurée.
+- ✅ Heure perdue visible à l'écran (repli du chauffage sur heure inconnue : risque accepté, P2).
 - ✅ Four : LBA par défaut et durée maximale de cuisson.
 - ✅ Template PID sur relais statique.
 - Documentation : contacteur, limiteur, isolation des thermocouples.
