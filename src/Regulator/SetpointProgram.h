@@ -28,6 +28,10 @@ class Measurement;
  * consigne de plus de cet écart, la rampe s'arrête et le temps de palier ne
  * compte pas. Un four en retard ne raccourcit donc pas le palier.
  *
+ * Délais maxi (0 = sans) : le programme s'arrête quand l'écart maxi le bloque
+ * plus longtemps que Attente max, ou quand sa durée dépasse Durée max
+ * (maintien final compris). timeout() en donne la cause, pour la glue.
+ *
  * Le temps du programme est figé pendant une pause (menu, timeout de
  * mesure), une inhibition et une mesure invalide ; le régulateur suiveur
  * applique sa propre règle de défaut. Le programme ne dépend pas de
@@ -58,6 +62,14 @@ public:
         Finished
     };
 
+    /** Délai maxi qui a arrêté le programme. */
+    enum class Timeout : uint8_t
+    {
+        None,
+        Hold,           // bloqué par l'écart maxi plus que Attente max
+        Duration        // programme plus long que Durée max
+    };
+
     struct Segment
     {
         // Unité de la mesure par heure ; 0 = pleine puissance.
@@ -81,6 +93,10 @@ public:
         uint32_t startDelay = 0;
         // Écart maxi (attente garantie), 0 = sans.
         double_t holdback = 0.0;
+        // Attente maxi sur l'écart maxi, en minutes, 0 = sans.
+        uint32_t maxHold = 0;
+        // Durée maxi du programme, en heures, 0 = sans.
+        uint32_t maxDuration = 0;
         End end = End::Stop;
         Program programs[MAX_PROGRAMS];
     };
@@ -155,6 +171,12 @@ public:
     bool isHeldBack() const;
 
     /**
+     * Délai maxi qui a arrêté le programme ; None pendant le programme, et
+     * après start() ou stop().
+     */
+    Timeout timeout() const;
+
+    /**
      * Rampe descendante en cours (refroidissement contrôlé ou libre) : la
      * mesure au-dessus de la consigne y est normale.
      */
@@ -217,6 +239,9 @@ private:
     // Consigne au début de la rampe : sens de la rampe à pleine puissance.
     double_t segmentStart = 0.0;
     bool heldBack = false;
+    // Temps bloqué sans interruption par l'écart maxi.
+    uint32_t heldElapsedMs = 0;
+    Timeout timeoutCause = Timeout::None;
 
     uint32_t lastTime = 0;
     bool timeKnown = false;
@@ -244,6 +269,9 @@ private:
 
     // Fin du programme : maintien ou arrêt, selon le réglage Fin.
     void finish();
+
+    // Délais maxi : vrai si le programme vient d'être arrêté.
+    bool checkTimeouts();
 
     void updateRamp(
         uint32_t elapsedMs,

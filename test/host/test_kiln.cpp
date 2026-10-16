@@ -126,6 +126,19 @@ namespace
         const Parameter* limit = bench.parameter("kiln_overtemp", "limit");
         CHECK_TRUE(limit != nullptr && *limit->value.number == 1300.0);
 
+        // Sécurités actives par défaut : boucle ouverte et délais maxi.
+        const Parameter* loop = bench.parameter("kiln_loop", "enabled");
+        CHECK_TRUE(loop != nullptr && *loop->value.boolean);
+
+        const Parameter* maxHold = bench.parameter("kiln_program", "max_hold");
+        CHECK_TRUE(maxHold != nullptr &&
+                   maxHold->discrete.read(maxHold->discrete.target) == 120);
+
+        const Parameter* maxDuration =
+            bench.parameter("kiln_program", "max_duration");
+        CHECK_TRUE(maxDuration != nullptr &&
+                   maxDuration->discrete.read(maxDuration->discrete.target) == 20);
+
         MenuBuilder menu;
         CHECK_TRUE(bench.installation.buildMenu(menu));
         CHECK_TRUE(menu.findAction(KilnInstallation::START_ACTION) != nullptr);
@@ -225,6 +238,99 @@ namespace
         bench.advance(30);
         CHECK_TRUE(bench.contactorClosed());
         CHECK_FALSE(bench.logged("Écart haut"));
+    }
+
+    TEST_CASE("Four thermocouple hors du four")
+    {
+        // Le thermocouple est tombé : il lit l'ambiance pendant que le PID
+        // chauffe à pleine puissance.
+        KilnBench bench;
+        bench.oneSegment(0.0, 1000.0, 60);
+        CHECK_TRUE(bench.action(KilnInstallation::START_ACTION));
+        bench.advance(19 * 60);
+        CHECK_TRUE(bench.contactorClosed());
+        CHECK_FALSE(bench.logged("boucle ouverte"));
+
+        // Moins de 2 °C de progrès en 2 × Ti (20 min) : boucle ouverte, la
+        // cuisson s'arrête et le contacteur s'ouvre.
+        bench.advance(2 * 60);
+        CHECK_FALSE(bench.contactorClosed());
+        CHECK_TRUE(bench.heatingDuring(30) == 0);
+        CHECK_TRUE(bench.logged("Boucle four : ACTIVE"));
+        CHECK_TRUE(bench.logged("Cuisson arrêtée : boucle ouverte"));
+
+        // Alarme mémorisée : pas de nouveau départ avant l'acquittement.
+        CHECK_FALSE(bench.action(KilnInstallation::START_ACTION));
+
+        bench.process.acknowledgeAlarms();
+        bench.advance(1);
+        CHECK_TRUE(bench.action(KilnInstallation::START_ACTION));
+        bench.advance(5);
+        CHECK_TRUE(bench.contactorClosed());
+        CHECK_TRUE(bench.heatingDuring(30) > 0);
+    }
+
+    TEST_CASE("Four relais statique collé en descente")
+    {
+        // Descente contrôlée de 900 à 500 °C à 100 °C/h : le four ne
+        // refroidit pas, le relais statique est collé.
+        KilnBench bench;
+        bench.oneSegment(100.0, 500.0, 0);
+        bench.setKiln(900.0);
+        bench.advance(2);
+        CHECK_TRUE(bench.action(KilnInstallation::START_ACTION));
+        bench.advance(15 * 60);
+        CHECK_TRUE(bench.contactorClosed());
+        CHECK_TRUE(bench.heatingDuring(30) == 0);
+
+        // Commande à 0 % sans descente pendant 20 min : boucle ouverte.
+        bench.advance(10 * 60);
+        CHECK_FALSE(bench.contactorClosed());
+        CHECK_TRUE(bench.logged("Cuisson arrêtée : boucle ouverte"));
+        CHECK_FALSE(bench.logged("Écart haut"));
+    }
+
+    TEST_CASE("Four attente max")
+    {
+        // Écart maxi de 20 °C : le four froid bloque la rampe dès 2 min.
+        KilnBench bench;
+        bench.oneSegment(600.0, 600.0, 0);
+        bench.setNumber("kiln_program", "holdback", 20.0);
+        bench.setDiscrete("kiln_program", "max_hold", 5);
+        CHECK_TRUE(bench.action(KilnInstallation::START_ACTION));
+        bench.advance(6 * 60);
+        CHECK_TRUE(bench.contactorClosed());
+
+        // Bloqué plus de 5 min : la cuisson s'arrête.
+        bench.advance(2 * 60);
+        CHECK_FALSE(bench.contactorClosed());
+        CHECK_TRUE(bench.logged("Cuisson arrêtée : attente max"));
+        CHECK_TRUE(bench.logged("Durée dépassée : ACTIVE"));
+        CHECK_FALSE(bench.logged("boucle ouverte"));
+    }
+
+    TEST_CASE("Four durée max")
+    {
+        // Palier de 2 h à 30 °C, durée maxi de 1 h.
+        KilnBench bench;
+        bench.oneSegment(0.0, 30.0, 120);
+        bench.setDiscrete("kiln_program", "max_duration", 1);
+        bench.setKiln(30.0);
+        bench.advance(2);
+        CHECK_TRUE(bench.action(KilnInstallation::START_ACTION));
+        bench.advance(59 * 60);
+        CHECK_TRUE(bench.contactorClosed());
+
+        bench.advance(2 * 60);
+        CHECK_FALSE(bench.contactorClosed());
+        CHECK_TRUE(bench.logged("Cuisson arrêtée : durée max"));
+        CHECK_TRUE(bench.logged("Durée dépassée : ACTIVE"));
+
+        // Démarrer relance la cuisson et efface l'alarme.
+        CHECK_TRUE(bench.action(KilnInstallation::START_ACTION));
+        bench.advance(5);
+        CHECK_TRUE(bench.contactorClosed());
+        CHECK_TRUE(bench.logged("Durée dépassée : FIN"));
     }
 
     TEST_CASE("Four défaut thermocouple")

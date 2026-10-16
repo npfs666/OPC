@@ -48,13 +48,16 @@ En résumé :
    - Fait : séquencement dans `loop()`, routage écrit en une transaction (`OLATA`, `OLATB`) et relu avant et après chaque entrée. Sur incohérence, l'entrée passe en `Invalid`, le MCP est réinitialisé, et le journal note `Défaut multiplexeur`. Vérifié sur banc en PT100 2, 3 et 4 fils.
    - Reste : la validation sur banc de la PT1000 et du thermocouple (étape 5 du plan).
 
-2. **Four : rien n'arrête un chauffage à 100 % si le thermocouple sort du four**. Voir [KilnInstallation.cpp](../src/Templates/KilnInstallation.cpp).
+2. ✅ **Four : rien n'arrête un chauffage à 100 % si le thermocouple sort du four**. Voir [KilnInstallation.cpp](../src/Templates/KilnInstallation.cpp).
    - Cas : le thermocouple tombe ou sort du four, et lit l'ambiance.
    - L'écart maxi fige le programme (attente) et le PID reste à 100 %.
-   - L'alarme de boucle `Boucle four` est **désactivée par défaut**, et `Écart haut` ne voit qu'un four trop chaud.
-   - À faire :
-     - activer la LBA par défaut dans ce template ;
-     - ajouter une **durée maximale de cuisson**, et une durée maximale d'attente sur un segment : au-delà, la cuisson s'arrête et une alarme est levée.
+   - L'alarme de boucle `Boucle four` était **désactivée par défaut**, et `Écart haut` ne voit qu'un four trop chaud.
+   - Fait le 16/10/2026, sur le modèle des contrôleurs du commerce (Skutt `E-1`, Bartlett `FTH` / `FTL`, Orton `FtL`) :
+     - `Boucle four` active par défaut (2 °C en 2 × Ti = 20 min), en montée comme en descente : elle voit aussi un relais statique collé pendant un refroidissement contrôlé ;
+     - la boucle ouverte arrête la cuisson, et `Démarrer` est refusé jusqu'à l'acquittement ;
+     - `SetpointProgram` : `Attente max` (bloqué par l'écart maxi, 120 min dans le four) et `Durée max` (20 h dans le four), qui arrêtent le programme. Alarme `Durée dépassée` ;
+     - tests `test_kiln.cpp` : thermocouple hors du four, relais statique collé en descente, attente max, durée max.
+   - Une carte déjà réglée garde ses valeurs sauvegardées : la boucle reste à activer au menu.
 
 3. **Template PID : relais mécanique en proportionnel temporisé, période 10 s**. Voir [PIDInstallation.cpp](../src/Templates/PIDInstallation.cpp), sortie `OUTPUT_1`.
    - Avec une période de 10 s, le relais fait jusqu'à 8 640 manœuvres par jour.
@@ -201,7 +204,7 @@ Thermostat, PID, programmation horaire, solaire, chambre froide positive, circui
 | Template | À faire | Prio. |
 | --- | --- | --- |
 | `PIDInstallation` | Sortie DC 1 (relais statique) ou période longue (§ 2, point 3) | P0 |
-| `KilnInstallation` | LBA active par défaut, durée maximale de cuisson, consignes d'isolation du thermocouple (§ 2, point 2 ; § 4, point 1) | P0 |
+| `KilnInstallation` | ✅ LBA active par défaut, durée maximale de cuisson (§ 2, point 2). Reste : consignes d'isolation du thermocouple (§ 4, point 1) | P0 |
 | `HeatingCircuitInstallation` | Repli sur heure inconnue (§ 2, point 4) | P0 |
 | `ColdRoomInstallation` | Documenter le contacteur du compresseur. Ajouter une alarme `Temp. basse` (gel des produits, thermostat collé) | P1 |
 | `SolarInstallation` | Protection du capteur : stagnation (arrêt de la pompe au-dessus de ~120 °C, pour protéger la pompe et le glycol) et antigel (installations sans glycol). Proposé dans la revue, non fait | P1 |
@@ -300,7 +303,8 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 - ✅ Revue, points 28 à 30 : calibration N0 et watchdog (vérifiée sur banc), compteurs écrasés après un démarrage raté, regroupement du journal.
 - Pull-down des sorties (✅ ordre d'initialisation corrigé).
 - Repli sur heure inconnue pour le chauffage, et autonomie du supercondensateur mesurée.
-- Four : LBA par défaut et durée maximale de cuisson. Template PID sur relais statique.
+- ✅ Four : LBA par défaut et durée maximale de cuisson.
+- Template PID sur relais statique.
 - Documentation : contacteur, limiteur, isolation des thermocouples.
 
 **v1.0 « publique »** : les P1.

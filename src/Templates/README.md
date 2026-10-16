@@ -163,10 +163,10 @@ d'échec : la cause s'affiche sur l'écran d'erreur de démarrage.
 16 actionneurs, 16 sorties, 2 entrées TOR, 8 alarmes et 192 réglages
 ([pinout.h](../Hardware/pinout.h)). Un `TimeSchedule` utilise 19 réglages,
 une `LimitAlarm` 8, une `LoopBreakAlarm` 5, une `ConditionAlarm` 3, un
-`SetpointProgram` 4 plus 25 par programme. Les
+`SetpointProgram` 6 plus 25 par programme. Les
 réglages de la carte (6 par sonde RTD, 13 de calibration) et de l'horloge
 (8) s'y ajoutent : le template solaire en utilise environ 120, le four
-céramique (3 programmes) environ 155.
+céramique (3 programmes) environ 160.
 
 ## 4. Les blocs de la glue
 

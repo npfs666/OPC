@@ -22,6 +22,10 @@ namespace
 
     constexpr double_t MAX_HOLDBACK = 100.0;
 
+    // Délais maxi : attente en minutes, durée en heures.
+    constexpr int32_t MAX_HOLD_MINUTES = 1440;
+    constexpr int32_t MAX_DURATION_HOURS = 999;
+
     // Reste d'arrondi des pas de rampe : la cible est atteinte.
     constexpr double_t RAMP_EPSILON = 1e-9;
 
@@ -126,6 +130,8 @@ void SetpointProgram::begin(
     setpoint = 0.0;
     segmentStart = 0.0;
     heldBack = false;
+    heldElapsedMs = 0;
+    timeoutCause = Timeout::None;
     timeKnown = false;
     delayElapsedMs = 0;
     soakElapsedMs = 0;
@@ -210,6 +216,8 @@ bool SetpointProgram::start()
     setpoint = measured;
     segmentStart = measured;
     heldBack = false;
+    heldElapsedMs = 0;
+    timeoutCause = Timeout::None;
     delayElapsedMs = 0;
     soakElapsedMs = 0;
     runElapsedMs = 0;
@@ -227,6 +235,8 @@ void SetpointProgram::stop()
     currentState = State::Idle;
     segmentIndex = 0;
     heldBack = false;
+    heldElapsedMs = 0;
+    timeoutCause = Timeout::None;
 }
 
 bool SetpointProgram::skipSegment()
@@ -426,6 +436,10 @@ void SetpointProgram::update(uint32_t now)
             updateRamp(elapsedMs, measured);
         else
             updateSoak(elapsedMs, measured);
+
+        // Bloqué par l'écart maxi : le temps d'attente compte.
+        heldElapsedMs =
+            heldBack ? addSaturated(heldElapsedMs, elapsedMs) : 0;
     }
     else
     {
@@ -434,7 +448,39 @@ void SetpointProgram::update(uint32_t now)
         heldBack = false;
     }
 
+    if (checkTimeouts())
+    {
+        writeCommand(0.0);
+        return;
+    }
+
     writeCommand(currentState == State::Finished ? 0.0 : 1.0);
+}
+
+bool SetpointProgram::checkTimeouts()
+{
+    if (!isRunning())
+        return false;
+
+    Timeout cause = Timeout::None;
+
+    if (settings.maxHold > 0 &&
+        heldElapsedMs >= settings.maxHold * MS_PER_MINUTE)
+    {
+        cause = Timeout::Hold;
+    }
+    else if (settings.maxDuration > 0 &&
+             runElapsedMs >= settings.maxDuration * MS_PER_HOUR)
+    {
+        cause = Timeout::Duration;
+    }
+
+    if (cause == Timeout::None)
+        return false;
+
+    stop();
+    timeoutCause = cause;
+    return true;
 }
 
 void SetpointProgram::resume(uint32_t now)
@@ -541,6 +587,11 @@ bool SetpointProgram::readSegmentTarget(double_t& target) const
 bool SetpointProgram::isHeldBack() const
 {
     return heldBack;
+}
+
+SetpointProgram::Timeout SetpointProgram::timeout() const
+{
+    return timeoutCause;
 }
 
 bool SetpointProgram::isCooling() const
@@ -683,6 +734,14 @@ void SetpointProgram::registerParameters(ParameterList& list)
         "holdback", "Écart maxi", settings.holdback,
         0.0, MAX_HOLDBACK, 1.0, 0, unit);
 
+    parameters.addInteger(
+        "max_hold", "Attente max", settings.maxHold,
+        0, MAX_HOLD_MINUTES, 15, "min");
+
+    parameters.addInteger(
+        "max_duration", "Durée max", settings.maxDuration,
+        0, MAX_DURATION_HOURS, 1, "h");
+
     parameters.addSelection(
         "end", "Fin", settings.end, END_OPTIONS);
 
@@ -691,6 +750,8 @@ void SetpointProgram::registerParameters(ParameterList& list)
     list.setLive(key, "program");
     list.setLive(key, "start_delay");
     list.setLive(key, "holdback");
+    list.setLive(key, "max_hold");
+    list.setLive(key, "max_duration");
     list.setLive(key, "end");
 
     for (uint8_t p = 0; p < programs; p++)

@@ -211,6 +211,74 @@ namespace
         CHECK_TRUE(bench.program.state() == State::Finished);
     }
 
+    TEST_CASE("Programme : attente max")
+    {
+        Bench bench;
+        bench.setSegment(0, 120.0, 100.0, 10);
+        bench.program.settings.holdback = 5.0;
+        bench.program.settings.maxHold = 30;
+        bench.program.start();
+        bench.advance(1000);
+
+        // Bloqué après 2,5 min de rampe (consigne à 25 °C).
+        bench.advance(3 * MINUTE);
+        CHECK_TRUE(bench.program.isHeldBack());
+
+        // Le four rattrape avant 30 min : le décompte repart de zéro.
+        bench.advance(25 * MINUTE);
+        bench.temperature.set(25.0);
+        bench.advance(MINUTE);
+        CHECK_FALSE(bench.program.isHeldBack());
+        bench.temperature.set(20.0);
+        bench.advance(29 * MINUTE);
+        CHECK_TRUE(bench.program.isHeldBack());
+        CHECK_TRUE(bench.program.isRunning());
+        CHECK_TRUE(bench.program.timeout() == SetpointProgram::Timeout::None);
+
+        // 30 min de blocage sans interruption : arrêt, cause donnée.
+        bench.advance(2 * MINUTE);
+        CHECK_TRUE(bench.program.state() == State::Idle);
+        CHECK_TRUE(bench.program.timeout() == SetpointProgram::Timeout::Hold);
+        CHECK_TRUE(bench.program.isCommandValid());
+        CHECK_NEAR(bench.program.readCommand(), 0.0, 1e-12);
+        double_t value = 0.0;
+        CHECK_FALSE(bench.program.readSetpoint(value));
+
+        // Cause effacée par un nouveau départ (ou par stop()).
+        CHECK_TRUE(bench.program.start());
+        CHECK_TRUE(bench.program.timeout() == SetpointProgram::Timeout::None);
+    }
+
+    TEST_CASE("Programme : durée max")
+    {
+        // Rampe de 40 min, palier de 10 min, puis maintien sans fin.
+        Bench bench;
+        bench.setSegment(0, 120.0, 100.0, 10);
+        bench.program.settings.end = SetpointProgram::End::Hold;
+        bench.program.settings.maxDuration = 1;
+        bench.tracking = true;
+        bench.program.start();
+        bench.advance(1000);
+
+        bench.advance(59 * MINUTE);
+        CHECK_TRUE(bench.program.state() == State::Hold);
+        CHECK_TRUE(bench.program.timeout() == SetpointProgram::Timeout::None);
+
+        // 1 h de programme, maintien compris : arrêt.
+        bench.advance(2 * MINUTE);
+        CHECK_TRUE(bench.program.state() == State::Idle);
+        CHECK_TRUE(bench.program.timeout() == SetpointProgram::Timeout::Duration);
+
+        bench.program.stop();
+        CHECK_TRUE(bench.program.timeout() == SetpointProgram::Timeout::None);
+
+        // 0 = sans : le maintien dure.
+        bench.program.settings.maxDuration = 0;
+        bench.program.start();
+        bench.advance(3 * 60 * MINUTE);
+        CHECK_TRUE(bench.program.state() == State::Hold);
+    }
+
     TEST_CASE("Programme : pleine puissance et descente")
     {
         Bench bench;
@@ -404,8 +472,14 @@ namespace
         bench.program.registerParameters(list);
 
         CHECK_FALSE(list.hasError());
-        // 4 généraux + 3 × (1 + 8 × 3).
-        CHECK_TRUE(list.count() == 4 + 3 * 25);
+        // 6 généraux + 3 × (1 + 8 × 3).
+        CHECK_TRUE(list.count() == 6 + 3 * 25);
+
+        // Délais maxi : réglables pendant le programme.
+        const Parameter* maxHold = list.find("prog", "max_hold");
+        CHECK_TRUE(maxHold != nullptr && maxHold->live);
+        const Parameter* maxDuration = list.find("prog", "max_duration");
+        CHECK_TRUE(maxDuration != nullptr && maxDuration->live);
 
         const Parameter* program = list.find("prog", "program");
         CHECK_TRUE(program != nullptr && program->live);

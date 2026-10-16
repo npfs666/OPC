@@ -226,6 +226,11 @@ bool KilnInstallation::begin(
     program.begin("kiln_program", "Cuisson", temperature, 3);
     program.setLimits(0.0, 1300.0, 999.0);
 
+    // Délais maxi : bloqué 2 h par l'écart maxi (FtL des contrôleurs Orton),
+    // ou cuisson de plus de 20 h (minuterie de secours des fours manuels).
+    program.settings.maxHold = 120;
+    program.settings.maxDuration = 20;
+
     setProgram(program.settings.programs[0], {
         {50.0, 200.0, 0},       // séchage
         {100.0, 600.0, 0},      // quartz, déshydratation
@@ -310,13 +315,22 @@ bool KilnInstallation::begin(
     deviation.settings.delay = 120;
     deviation.settings.latching = true;
 
-    // Boucle ouverte (résistance coupée, thermocouple hors du four), à
-    // activer au menu : met le PID en sécurité.
+    // Boucle ouverte, active : moins de 2 °C de progrès en 2 × Ti (20 min)
+    // avec la commande en butée (E-1 des contrôleurs Skutt). Thermocouple
+    // hors du four, résistance coupée, relais statique collé en descente.
+    // Met le PID en sécurité ; la glue arrête la cuisson.
     loopAlarm.begin("kiln_loop", "Boucle four", temperature, pid);
+    loopAlarm.settings.enabled = true;
+
+    // Programme arrêté sur un délai maxi : signalé jusqu'au prochain
+    // Démarrer ou Arrêter.
+    timeoutAlarm.begin("kiln_timeout", "Durée dépassée");
+    timeoutAlarm.settings.enabled = true;
 
     if (!process.add(overTemperature) ||
         !process.add(deviation) ||
-        !process.add(loopAlarm))
+        !process.add(loopAlarm) ||
+        !process.add(timeoutAlarm))
     {
         return fail("Alarmes du four non enregistrées");
     }
@@ -367,6 +381,31 @@ void KilnInstallation::processLogic(uint32_t now)
             now, EventKind::Alarm, true, "Cuisson arrêtée : surchauffe");
     }
 
+    // Boucle ouverte : le PID est déjà en sécurité. La cuisson s'arrête,
+    // pour ne pas reprendre un programme parti devant après l'acquittement.
+    if (loopAlarm.isActive() && program.isRunning())
+    {
+        program.stop();
+        process->logEvent(
+            now, EventKind::Alarm, true, "Cuisson arrêtée : boucle ouverte");
+    }
+
+    // Délais maxi : le programme s'est arrêté lui-même.
+    const SetpointProgram::Timeout timeout = program.timeout();
+
+    if (timeout != previousTimeout &&
+        timeout != SetpointProgram::Timeout::None)
+    {
+        process->logEvent(
+            now, EventKind::Alarm, true, "Cuisson arrêtée : %s",
+            timeout == SetpointProgram::Timeout::Hold
+                ? "attente max"
+                : "durée max");
+    }
+
+    previousTimeout = timeout;
+    timeoutAlarm.set(timeout != SetpointProgram::Timeout::None);
+
     const SetpointProgram::State state = program.state();
 
     if (state == SetpointProgram::State::Finished &&
@@ -390,7 +429,8 @@ void KilnInstallation::processLogic(uint32_t now)
     contactorCommand.setOn(
         heating &&
         !overTemperature.isActive() &&
-        !deviation.isActive());
+        !deviation.isActive() &&
+        !loopAlarm.isActive());
 }
 
 bool KilnInstallation::addMenuActions(
@@ -416,6 +456,7 @@ bool KilnInstallation::executeMenuAction(
         // resterait ouvert.
         return !overTemperature.isActive() &&
                !deviation.isActive() &&
+               !loopAlarm.isActive() &&
                program.start();
 
     case STOP_ACTION:

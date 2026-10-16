@@ -15,6 +15,7 @@
 #include <Outputs/RelayOutput.h>
 #include <Outputs/TimeProportionalActuator.h>
 
+#include <Regulator/ConditionAlarm.h>
 #include <Regulator/LimitAlarm.h>
 #include <Regulator/LogicCommand.h>
 #include <Regulator/LoopBreakAlarm.h>
@@ -47,7 +48,16 @@ class SensorBoard;
  * - sur écart haut (four 50 °C au-dessus de la consigne pendant 2 min, hors
  *   rampe descendante ; alarme mémorisée) : relais statique collé, le
  *   programme continue sans chauffe jusqu'à l'acquittement ;
+ * - sur boucle ouverte (active par défaut : moins de 2 °C de progrès en
+ *   2 × Ti, commande en butée, en montée comme en descente ; alarme
+ *   mémorisée) : thermocouple hors du four, résistance coupée, relais
+ *   statique collé. La cuisson s'arrête, et ne redémarre pas avant
+ *   l'acquittement ;
  * - sur défaut du thermocouple ou du PID (état sûr).
+ *
+ * Délais maxi du programme : bloqué plus de 2 h par l'écart maxi (s'il est
+ * réglé), ou cuisson de plus de 20 h. La cuisson s'arrête et l'alarme
+ * Durée dépassée reste affichée jusqu'au prochain Démarrer ou Arrêter.
  *
  * Le programme ne reprend pas après une coupure de courant. Ces sécurités
  * ne remplacent pas le limiteur de température matériel du four.
@@ -105,10 +115,14 @@ private:
     LimitAlarm overTemperature;
     LimitAlarm deviation;
     LoopBreakAlarm loopAlarm;
+    // Programme arrêté sur un délai maxi : condition écrite par la glue.
+    ConditionAlarm timeoutAlarm;
 
     // Journal (cœur contrôle, depuis la glue).
     ProcessControl* process = nullptr;
     SetpointProgram::State previousState = SetpointProgram::State::Idle;
+    SetpointProgram::Timeout previousTimeout =
+        SetpointProgram::Timeout::None;
 
     // Copie pour le cœur UI, faite par captureHomeScreenState().
     struct HomeState

@@ -470,7 +470,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 | `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
-| `KilnInstallation` | Four céramique : thermocouple K, 3 programmes paliers-rampes de 8 segments, PID sur un relais statique (sortie DC 1), contacteur de sécurité (relais 1) piloté par la glue, alarmes de surchauffe et d'écart haut actives |
+| `KilnInstallation` | Four céramique : thermocouple K, 3 programmes paliers-rampes de 8 segments, PID sur un relais statique (sortie DC 1), contacteur de sécurité (relais 1) piloté par la glue, alarmes de surchauffe, d'écart haut et de boucle ouverte actives, durées maxi de cuisson |
 | `HeatingCircuitInstallation` | Circuit de chauffage à vanne mélangeuse : départ (Pt100), extérieure (Pt1000), loi d'eau avec programme confort / réduit, PID du départ sur une vanne 3 points (relais 1 et 2), pompe avec post-circulation (sortie DC 1, par un relais d'interface) ; sans glue |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
 | `TestInstallation` (`testInstallation.h`) | Développement du psychromètre : température sèche (PT100 4 fils, ou thermocouple K avec `INPUT1_IS_THERMOCOUPLE`), température humide (PT100 4 fils), pression BMP580 (obligatoire) et humidité relative ; aucune sortie |
@@ -779,11 +779,29 @@ maintien final). Elle l'ouvre dans ces cas :
 | --- | --- |
 | `Surchauffe` : four au-dessus de 1300 °C pendant 10 s (alarme active par défaut, mémorisée) | Cuisson arrêtée, notée au journal. `Démarrer` est refusé jusqu'à l'acquittement |
 | `Écart haut` : four 50 °C au-dessus de la consigne pendant 2 min (active par défaut, mémorisée) | Relais statique collé : contacteur ouvert jusqu'à l'acquittement, le programme continue ; `Démarrer` est refusé. Inhibée pendant une rampe descendante, où le four est normalement au-dessus de la consigne |
+| `Boucle four` ([boucle ouverte](#alarme-de-boucle-ouverte)) : commande du PID en butée et moins de 2 °C de progrès vers la consigne en 2 × Ti, soit 20 min (active par défaut, mémorisée) | Thermocouple sorti du four, résistance coupée, ou relais statique collé pendant une descente : PID en sécurité, cuisson arrêtée et notée au journal. `Démarrer` est refusé jusqu'à l'acquittement |
 | Thermocouple ou PID en défaut | État sûr |
 
-L'alarme `Boucle four` ([boucle ouverte](#alarme-de-boucle-ouverte)) est
-désactivée par défaut. Activée, elle détecte une résistance coupée ou un
-thermocouple sorti du four, et met le PID en sécurité.
+L'alarme de boucle surveille aussi les descentes : un relais statique collé
+pendant un refroidissement contrôlé n'est vu que par elle, puisque
+`Écart haut` y est inhibée. Son seuil, 2 °C en 20 min à pleine puissance,
+est proche de celui des contrôleurs de four du commerce (Skutt `E-1` :
+12 °F/h pendant 22,5 min). Un four aux résistances usées qui plafonne près
+de sa température maximale peut la déclencher en fin de montée : allonger
+alors `Temps détect.`.
+
+Deux délais maxi du programme arrêtent aussi la cuisson, notée au journal ;
+l'alarme `Durée dépassée` reste affichée jusqu'au prochain `Démarrer` ou
+`Arrêter` :
+
+- `Attente max` (120 min par défaut) : programme bloqué plus longtemps par
+  l'`Écart maxi`. Sans effet tant que l'écart maxi vaut 0 (réglage d'usine) ;
+- `Durée max` (20 h par défaut) : durée totale de la cuisson, comme la
+  minuterie de secours des fours manuels. 0 = sans.
+
+Sur une carte déjà réglée, les valeurs sauvegardées sont conservées :
+`Boucle four` reste désactivée et les délais maxi à 0 jusqu'à leur réglage
+au menu.
 
 Ces sécurités logicielles **ne remplacent pas** le limiteur de température
 matériel du four. Après une coupure de courant, la cuisson ne reprend pas :
@@ -863,7 +881,7 @@ réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 32 régulateurs
 (comparateurs, temporisations, alarmes et commandes de la glue compris),
 16 actionneurs, 16 sorties, 2 entrées numériques, 8 alarmes, 192 paramètres
 (un `TimeSchedule` en utilise 19, une `LimitAlarm` 8, une `LoopBreakAlarm` 5,
-une `ConditionAlarm` 3, un `SetpointProgram` 4 plus 25 par programme).
+une `ConditionAlarm` 3, un `SetpointProgram` 6 plus 25 par programme).
 
 ### Comparateur
 
@@ -1067,8 +1085,17 @@ suite.
   de la consigne de plus de cet écart, la rampe s'arrête et le temps de
   palier ne compte pas. Un four en retard ne raccourcit donc pas le palier.
   À pleine puissance, le palier commence à l'écart maxi de la cible ;
+- `Attente max` (0 à 1440 min, 0 = sans) : quand l'écart maxi bloque le
+  programme plus longtemps sans interruption, le programme s'arrête ;
+- `Durée max` (0 à 999 h, 0 = sans) : quand le programme dure plus longtemps,
+  départ différé exclu et maintien final compris, il s'arrête ;
 - `Fin` : après le dernier segment, `Arrêt` (commande 0, refroidissement
   libre) ou `Maintien` de la dernière cible jusqu'à `stop()`.
+
+Un arrêt sur un délai maxi laisse sa cause dans `timeout()` (`Hold` ou
+`Duration`) jusqu'au prochain `start()` ou `stop()`. La glue la lit pour
+journaliser l'arrêt et lever une alarme (voir le
+[template four](#template-four-céramique)).
 
 Tous ces réglages sont des réglages de conduite : un programme se modifie
 pendant la cuisson sans couper les sorties. Une cible changée pendant son
