@@ -18,6 +18,7 @@ mise en sécurité des sorties.
   - [Borniers](#borniers)
   - [Mesure](#mesure)
   - [Isolation](#isolation)
+  - [Câblage et sécurité électrique](#câblage-et-sécurité-électrique)
 - [Compiler et téléverser](#compiler-et-téléverser)
 - [Fonctionnement](#fonctionnement)
 - [Créer une installation](#créer-une-installation)
@@ -145,6 +146,64 @@ entrées analogiques, l'I²C et l'USB sont du côté logique, isolé du 24 V
 (isolation fonctionnelle, pas de sécurité). Sur USB seul, la partie logique
 fonctionne (menu, configuration), mais pas les relais ni les sorties
 transistor.
+
+### Câblage et sécurité électrique
+
+L'OPC est un **régulateur**, pas un dispositif de sécurité : il n'est pas
+certifié, et ses sécurités (alarmes, états sûrs, watchdog) sont logicielles.
+Une carte bloquée, un relais collé ou un relais statique en court-circuit
+leur échappent.
+
+**Limiteur matériel.** Toute installation qui chauffe (four, étuve,
+chaudière, plancher, chauffe-eau) garde un limiteur ou un thermostat de
+sécurité **indépendant** de l'OPC. Il coupe la bobine du contacteur de
+puissance, que l'OPC ne fait que commander : si l'OPC se bloque ou si son
+relais colle, le limiteur coupe quand même.
+
+```
+Phase ─ Fusible ─ Limiteur (NF) ─ COM relais ─ NO relais ─ Bobine contacteur ─ Neutre
+Phase ─ Fusible ─ Contacts du contacteur ─ Charge (ou relais statique, puis charge) ─ Neutre
+```
+
+**Relais de la carte** : 5 A sous 250 V CA en charge résistive, soit
+environ 1 kW avec de la marge.
+
+- Au-delà, et pour un compresseur, un moteur ou une pompe (fort courant de
+  démarrage), le relais commande un **contacteur** (relais de puissance), qui
+  commute la charge. C'est la règle d'un installateur, même pour une charge
+  dans les 5 A.
+- Un fusible par circuit de puissance : le fusible de 100 mA de la carte ne
+  protège que son alimentation 24 V.
+
+**Sorties DC** : côté bas, environ 2 A en continu, charge alimentée en 24 V
+(30 V au plus, voir [Borniers](#borniers)). Elles commandent l'entrée d'un
+relais statique ou la bobine d'un relais d'interface.
+
+**Relais statique (SSR).**
+
+- Le choisir à zéro de tension pour une charge résistive, calibré à environ
+  2 fois le courant de la charge, sur un dissipateur.
+- Un SSR tombe souvent en panne **en court-circuit** : la charge chauffe
+  alors en permanence, sans que la sortie de l'OPC y puisse rien. Mettre en
+  amont un **contacteur général**, commandé par un relais de la carte, fermé
+  en fonctionnement et ouvert sur tout défaut détecté. Comme le relais
+  retombe aussi sur un reset, un watchdog ou une carte arrêtée, toute mise
+  en sécurité coupe le SSR. Le [template four](#template-four-céramique)
+  fonctionne ainsi.
+
+**Thermocouples.**
+
+- **Soudure isolée obligatoire** : la carte polarise le thermocouple (1 MΩ
+  vers le 3,3 V et vers le 0 V, pour détecter une rupture) ; une soudure à
+  la masse fausse la mesure.
+- **Gaine reliée à la terre**. La partie mesure n'a qu'une isolation
+  fonctionnelle (voir [Isolation](#isolation)) : dans un four, un
+  thermocouple dont la gaine touche une résistance sous 230 V amènerait le
+  secteur sur la carte, et sur le PC branché en USB.
+
+**USB en exploitation** : le port USB sert à la configuration et au
+diagnostic. Ne pas le laisser branché à un PC pendant le fonctionnement
+(jamais pendant une cuisson), ni accessible en façade.
 
 ## Compiler et téléverser
 
@@ -465,11 +524,11 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 
 | Template | Contenu |
 | --- | --- |
-| `ThermostatInstallation` | 1 PT100, thermostat avec hystérésis et rampe de consigne, relais 1 |
-| `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), pompe solaire par comparateurs et glue avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (relais 2) |
+| `ThermostatInstallation` | 1 PT100, thermostat avec hystérésis et rampe de consigne, relais 1 (charge de 5 A au plus, sinon contacteur) |
+| `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), pompe solaire par comparateurs et glue avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (contacteur sur le relais 2) |
 | `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais statique sur la sortie DC 1 en proportionnel temporisé (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
-| `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
+| `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, contacteur du compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
 | `KilnInstallation` | Four céramique : thermocouple K, 3 programmes paliers-rampes de 8 segments, PID sur un relais statique (sortie DC 1), contacteur de sécurité (relais 1) piloté par la glue, alarmes de surchauffe, d'écart haut et de boucle ouverte actives, durées maxi de cuisson |
 | `HeatingCircuitInstallation` | Circuit de chauffage à vanne mélangeuse : départ (Pt100), extérieure (Pt1000), loi d'eau avec programme confort / réduit, PID du départ sur une vanne 3 points (relais 1 et 2), pompe avec post-circulation (sortie DC 1, par un relais d'interface) ; sans glue |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
@@ -558,7 +617,8 @@ consigne, elle, reste réglable dans toute sa plage. `Mesure min` et
 >   template : allonger la période et régler `Marche mini` et `Arrêt mini`
 >   sur son relais (voir [Outputs/README.md](src/Outputs/README.md)).
 > - Les limites de mesure ne protègent que l'autotune : prévoir une sécurité
->   thermique indépendante.
+>   thermique indépendante, et un contacteur général en amont du relais
+>   statique (voir [Câblage et sécurité électrique](#câblage-et-sécurité-électrique)).
 
 ### Programmation horaire
 
@@ -656,10 +716,12 @@ comparateurs donnent les conditions, et quelques lignes de glue
     arrêt à 4 K). Sans heure valide, pas de décharge ; la charge continue ;
   - une sonde en défaut arrête la pompe (état sûr verrouillé). La pompe a le
     réglage `Commande` Auto / Marche / Arrêt.
-- **Relais 2, appoint électrique** : thermostat sur le haut du ballon
+- **Relais 2, contacteur de l'appoint électrique** (une résistance de
+  chauffe-eau de 2 à 3 kW dépasse les 5 A du relais) : thermostat sur le haut du ballon
   (55 °C, hystérésis 5 K), actif uniquement en heures creuses, de 22:00 à
   06:00 par défaut (`Programmation > Heures creuses`). Son état de sécurité
-  est verrouillé sur arrêt.
+  est verrouillé sur arrêt. Le thermostat de sécurité à réarmement du
+  chauffe-eau reste en place.
 
 La glue du template :
 
@@ -690,14 +752,24 @@ pompe, ainsi que l'état de l'appoint.
 `ColdRoomInstallation` régule une chambre froide positive (fromagerie, cave,
 2 à 4 °C) :
 
-- **Relais 1, compresseur** : thermostat en froid sur la sonde d'ambiance
-  (consigne 3 °C, réglable de -10 à 20 °C, à l'accueil comme au menu ;
-  hystérésis 2 K), arrêt mini de 3 min
-  contre les cycles courts ;
+- **Relais 1, contacteur du compresseur** (jamais le compresseur en direct :
+  son courant de démarrage dépasse les 5 A du relais) : thermostat en froid
+  sur la sonde d'ambiance (consigne 3 °C, réglable de -10 à 20 °C, à
+  l'accueil comme au menu ; hystérésis 2 K), arrêt mini de 3 min contre les
+  cycles courts ;
 - **Relais 2, ventilateurs** de l'évaporateur ;
 - **PWM 1, résistance de dégivrage** par un relais statique (commande de
   sécurité verrouillée à 0, sans mode manuel) ;
 - **Entrée TOR 1, porte** (active quand elle est ouverte).
+
+Les sécurités du groupe froid (pressostats haute et basse pression,
+protection thermique du moteur) restent dans le groupe, câblées dans le
+circuit de la bobine du contacteur.
+
+Les deux relais étant pris, le relais statique du dégivrage n'a pas de
+contacteur général : un SSR en court-circuit chauffe l'évaporateur en
+continu. L'alarme `Temp. haute` le signale ; garder le thermostat de fin de
+dégivrage (klixon) de la résistance, qui la borne.
 
 La glue enchaîne le cycle de dégivrage, sans horloge :
 
@@ -812,6 +884,18 @@ au menu.
 Ces sécurités logicielles **ne remplacent pas** le limiteur de température
 matériel du four. Après une coupure de courant, la cuisson ne reprend pas :
 le four reste arrêté.
+
+Câblage de sécurité (voir [Câblage et sécurité électrique](#câblage-et-sécurité-électrique)) :
+
+```
+Phase ─ Fusible ─ Limiteur (NF) ─ COM relais 1 ─ NO relais 1 ─ Bobine contacteur ─ Neutre
+Phase ─ Fusible ─ Contacteur ─ SSR (commandé par DC 1) ─ Résistances ─ Neutre
+```
+
+- le limiteur coupe la bobine du contacteur, indépendamment de l'OPC ;
+- le contacteur, en amont du SSR, coupe un SSR en court-circuit ;
+- thermocouple à **soudure isolée**, gaine reliée à la terre ;
+- USB débranché pendant la cuisson.
 
 L'écran d'accueil affiche l'état (`RAMPE`, `PALIER`, `MAINTIEN`, `TERMINE`,
 `DIFFERE`...), le programme et le segment (`P1 S2/3`), la température, la

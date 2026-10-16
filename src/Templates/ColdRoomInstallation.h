@@ -31,7 +31,8 @@ class SensorBoard;
  * Exemple d'installation : chambre froide positive (fromagerie, 2 à 4 °C).
  *
  * - Sonde 1 : ambiance ; sonde 2 : évaporateur ; entrée TOR 1 : porte.
- * - Relais 1 : compresseur, thermostat froid sur l'ambiance ;
+ * - Relais 1 : contacteur du compresseur (jamais le compresseur en direct),
+ *   thermostat froid sur l'ambiance ;
  * - Relais 2 : ventilateurs de l'évaporateur ;
  * - PWM 1 : résistance de dégivrage, par un relais statique.
  *

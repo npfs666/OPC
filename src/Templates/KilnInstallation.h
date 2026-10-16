@@ -31,7 +31,8 @@ class SensorBoard;
  * rampes.
  *
  * - Sonde 1 : thermocouple K dans le four (type réglable au menu Input :
- *   S, R ou N pour le grès et la porcelaine) ;
+ *   S, R ou N pour le grès et la porcelaine), à soudure isolée et gaine
+ *   reliée à la terre ;
  * - Sortie DC 1 : relais statique des résistances, en proportionnel
  *   temporisé (période 10 s) ;
  * - Relais 1 : bobine du contacteur de sécurité, en amont du relais

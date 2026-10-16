@@ -31,8 +31,9 @@ class SensorBoard;
  *   glue (processLogic()) les combine : charge quand le capteur est plus
  *   chaud que le bas du ballon, décharge nocturne en mode vacances
  *   (programme « Décharge nuit ») ;
- * - Relais 2 : résistance d'appoint, thermostat sur le haut du ballon actif
- *   uniquement pendant le programme « Heures creuses ».
+ * - Relais 2 : contacteur de la résistance d'appoint (2 à 3 kW : au-delà
+ *   des 5 A du relais), thermostat sur le haut du ballon actif uniquement
+ *   pendant le programme « Heures creuses ».
  *
  * Ce template n'est pas sélectionné par OPC. Il peut être copié,
  * renommé et adapté avant de remplacer l'installation utilisateur.

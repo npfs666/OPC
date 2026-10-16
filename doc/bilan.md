@@ -137,13 +137,13 @@ Certains points sont tirés du README et du brochage, sans les schémas. Ils son
 
 ### P0 : avant de câbler une installation réelle
 
-1. **Thermocouple de four et isolation de la partie mesure**.
+1. ✅ **Thermocouple de four et isolation de la partie mesure** (documentation faite le 16/10/2026 : README, § Câblage et sécurité électrique, et template four).
    - Les entrées analogiques et l'USB n'ont qu'une isolation **fonctionnelle** avec le 24 V.
    - Dans un four, un thermocouple peut toucher une résistance à 230 V (gaine fendue, résistance affaissée). Le secteur arrive alors sur la partie logique, et sur le PC branché en USB.
    - À faire, dans le README et dans le template four :
      - imposer un thermocouple à soudure isolée, gaine reliée à la terre ;
      - ne pas laisser l'USB branché pendant une cuisson.
-   - Sur une prochaine carte, envisager une isolation renforcée de la partie mesure.
+   - Reste : sur une prochaine carte, envisager une isolation renforcée de la partie mesure.
 
 2. **Erratum RP2350-E9 et glitch des sorties au démarrage**. Revue, point 16 : partie logicielle corrigée.
    - Avant `RelayOutput::begin()`, les broches de sortie sont des entrées. Le pull-down interne du RP2350 (puce A2) peut ne pas tenir le niveau bas (erratum E9).
@@ -153,12 +153,12 @@ Certains points sont tirés du README et du brochage, sans les schémas. Ils son
      - matériel : des pull-down externes de valeur faible (≤ 10 kΩ) sur les quatre commandes de sortie ;
      - vérifier la révision de puce montée.
 
-3. **Charges inductives et puissance**.
+3. ✅ **Charges inductives et puissance** (documentation faite le 16/10/2026 : contacteur pour le compresseur de la chambre froide et l'appoint du solaire, qui dépassait aussi les 5 A ; contacteur général en amont d'un SSR).
    - Les relais sont des contacts travail (NO) de 5 A.
    - Le template chambre froide pilote le compresseur **directement sur le relais 1**, alors que le courant de démarrage d'un compresseur dépasse largement 5 A.
    - À faire : imposer dans la documentation un **contacteur** pour les compresseurs, les moteurs et les résistances de plus de ~1 kW. Prévoir un RC ou une varistance sur les contacts, et un fusible par circuit.
 
-4. **Limiteur de sécurité matériel**.
+4. ✅ **Limiteur de sécurité matériel** (documentation faite le 16/10/2026 : règle générale et schéma dans le README, schéma du four).
    - Il est mentionné pour le four, le plancher chauffant et le PID.
    - À faire : en faire une règle écrite dans **chaque** template qui chauffe, avec un schéma de câblage. Le contacteur de puissance est commandé à travers le limiteur, jamais par l'OPC seul.
 
@@ -306,7 +306,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 - ✅ Heure perdue visible à l'écran (repli du chauffage sur heure inconnue : risque accepté, P2).
 - ✅ Four : LBA par défaut et durée maximale de cuisson.
 - ✅ Template PID sur relais statique.
-- Documentation : contacteur, limiteur, isolation des thermocouples.
+- ✅ Documentation : contacteur, limiteur, isolation des thermocouples.
 
 **v1.0 « publique »** : les P1.
 
