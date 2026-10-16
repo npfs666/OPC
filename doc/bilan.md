@@ -26,7 +26,7 @@ Les points réglés depuis le bilan initial sont marqués ✅.
 | Architecture logicielle | Solide : deux cœurs séparés, snapshot, états sûrs, watchdog à deux cœurs, sauvegarde atomique, restauration tolérante |
 | Tests | 281 tests hôte, tous OK (16/10/2026). Templates testés complets sur PC. Firmware compilé (RAM 23 %, flash 6 %) |
 | Sécurité de la régulation | Bonne base : défauts de sonde, timeout, LBA, alarmes, temps mini des relais, verrous d'état sûr |
-| Robustesse matérielle (bus, démarrage, alimentation) | Acquisition hors ISR, routage MCP vérifié, bus I²C débloqué, ADC muet détecté. **Points ouverts** : glitch possible des sorties au démarrage, boucle de redémarrages, 24 V non surveillé |
+| Robustesse matérielle (bus, démarrage, alimentation) | Acquisition hors ISR, routage MCP vérifié, bus I²C débloqué, ADC muet détecté. **Points ouverts** : sorties en haute impédance avant leur initialisation (erratum E9, pull-down matériels), boucle de redémarrages, 24 V non surveillé |
 | Templates | 7 templates applicatifs + 2 de test. Il manque des applications phares (humidité, couveuse, chaud / froid) |
 | Distribution | **Pas prête** : pas de version affichée, pas de release, un firmware à compiler par installation, matériel non publié |
 | Documentation utilisateur | README très complet, mais écrit pour un développeur. Pas de guide d'installateur ni de schémas de câblage |
@@ -141,13 +141,12 @@ Certains points sont tirés du README et du brochage, sans les schémas. Ils son
      - ne pas laisser l'USB branché pendant une cuisson.
    - Sur une prochaine carte, envisager une isolation renforcée de la partie mesure.
 
-2. **Erratum RP2350-E9 et glitch des sorties au démarrage**. Revue, point 16 : ouvert.
+2. **Erratum RP2350-E9 et glitch des sorties au démarrage**. Revue, point 16 : partie logicielle corrigée.
    - Avant `RelayOutput::begin()`, les broches de sortie sont des entrées. Le pull-down interne du RP2350 (puce A2) peut ne pas tenir le niveau bas (erratum E9).
-   - Ensuite, `pinMode(OUTPUT)` force un niveau bas avant `forceSafe()`.
    - Un relais statique, ou une commande active à l'état bas, peut réagir.
+   - ✅ Logiciel (16/10/2026) : le niveau sûr est écrit avant de passer la broche en sortie. `pinMode(OUTPUT)` ne passe plus par le niveau bas du reset.
    - À faire :
      - matériel : des pull-down externes de valeur faible (≤ 10 kΩ) sur les quatre commandes de sortie ;
-     - logiciel : écrire le niveau sûr avant de passer la broche en sortie (`gpio_put` puis `gpio_set_dir`, sans `gpio_init` qui remet le niveau à 0) ;
      - vérifier la révision de puce montée.
 
 3. **Charges inductives et puissance**.
@@ -299,7 +298,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 
 - ✅ Vérification du MCP23017 et récupération du bus I²C. Reste la validation sur banc de la PT1000 et du thermocouple.
 - Revue, points 28 à 30 : calibration N0 et watchdog, compteurs écrasés après un démarrage raté, regroupement du journal.
-- Pull-down et ordre d'initialisation des sorties.
+- Pull-down des sorties (✅ ordre d'initialisation corrigé).
 - Repli sur heure inconnue pour le chauffage, et autonomie du supercondensateur mesurée.
 - Four : LBA par défaut et durée maximale de cuisson. Template PID sur relais statique.
 - Documentation : contacteur, limiteur, isolation des thermocouples.

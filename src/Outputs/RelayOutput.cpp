@@ -91,6 +91,13 @@ bool RelayOutput::begin()
             configuredActiveHigh);
     }
 
+    // Niveau sûr préparé avant d'activer la sortie : pinMode(OUTPUT) garde
+    // la valeur écrite, sans passage par le niveau du reset.
+    writePhysicalState(
+        settings.pin,
+        settings.safeState,
+        settings.activeHigh);
+
     pinMode(settings.pin, OUTPUT);
 
     configuredPin = settings.pin;

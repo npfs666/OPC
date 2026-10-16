@@ -121,10 +121,10 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
     - Sans état précédent (démarrage, retour du menu, levée d'une inhibition), le thermostat part maintenant à l'arrêt dans la bande.
 15. ✅ **`TimeProportionalActuator` sans durée minimale d'impulsion**.
     - `Impulsion mini` sur l'actionneur temporel, `Marche mini` et `Arrêt mini` (anti-court-cycle) sur chaque relais.
-16. ⬜ **Glitch possible au démarrage d'une sortie** (`RelayOutput::begin`).
-    - `pinMode(OUTPUT)` force le niveau bas avant `forceSafe()`. Un SSR actif à LOW peut réagir.
-    - Avant `beginOutputs()`, les broches sont en haute impédance : il faut une résistance de tirage matérielle.
-    - Toujours présent le 12/10/2026. Correction simple : écrire le niveau sûr (`digitalWrite`, qui fixe déjà la sortie du GPIO) avant `pinMode(OUTPUT)`. `PWMOutput` n'est pas concerné : il écrit le niveau avant de passer la broche en sortie.
+16. ✅ **Glitch possible au démarrage d'une sortie** (`RelayOutput::begin`).
+    - `pinMode(OUTPUT)` activait la sortie avec la valeur du reset (bas) avant `forceSafe()`. Un SSR actif à LOW, ou une sortie d'état sûr ON, pouvait réagir.
+    - Corrigé le 16/10/2026 : le niveau sûr est écrit (`digitalWrite`) avant `pinMode(OUTPUT)`. Dans le cœur Arduino-Pico, `digitalWrite` sur une entrée fixe la valeur de sortie du GPIO, et `pinMode(OUTPUT)` ne la remet pas à 0 (pas de `gpio_init`). Test `relais : niveau sur avant la sortie`. `PWMOutput` n'était pas concerné.
+    - Reste matériel : avant `beginOutputs()`, les broches sont en haute impédance, il faut une résistance de tirage (bilan, § 4, point 2 : erratum E9).
 25. ✅ **Tempo des alarmes après 49 jours** (`LimitAlarm`, `LoopBreakAlarm`). Ajouté après la revue initiale (renuméroté : il portait le n° 17, déjà pris).
     - La tempo était recalculée à chaque cycle (`now - début >= délai`). Une alarme non mémorisée en cours depuis plus de 49,7 jours retombait pendant sa tempo au rebouclage de `millis()`.
     - La tempo écoulée est maintenant acquise tant que la condition dure, comme dans `ConditionAlarm` et `DelayTimer`. Tests de non-régression dans `test_limit_alarm.cpp` et `test_loop_break.cpp`.

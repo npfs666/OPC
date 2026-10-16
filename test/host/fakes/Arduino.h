@@ -19,6 +19,9 @@ namespace FakeDigitalIO
 {
     inline uint8_t modes[256] = {};
     inline int levels[256] = {};
+
+    // Niveau préparé au moment où la broche passe en sortie.
+    inline int levelsAtOutput[256] = {};
 }
 
 // Horloge pilotée par les tests.
@@ -35,6 +38,9 @@ inline uint32_t millis()
 inline void pinMode(uint8_t pin, uint8_t mode)
 {
     FakeDigitalIO::modes[pin] = mode;
+
+    if (mode == OUTPUT)
+        FakeDigitalIO::levelsAtOutput[pin] = FakeDigitalIO::levels[pin];
 }
 
 inline void digitalWrite(uint8_t pin, bool level)

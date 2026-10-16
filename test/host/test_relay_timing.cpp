@@ -159,6 +159,42 @@ namespace
         CHECK_TRUE(relayIsOn(pump));
     }
 
+    TEST_CASE("relais : niveau sur avant la sortie")
+    {
+        struct Case
+        {
+            bool activeHigh;
+            bool safeState;
+            int expectedLevel;
+        };
+
+        const Case cases[] = {
+            {true, false, LOW},
+            {true, true, HIGH},
+            {false, false, HIGH},   // commande active à l'état bas
+            {false, true, LOW}
+        };
+
+        setTime(0);
+
+        for (const Case& test : cases)
+        {
+            // Broche en entrée, valeur opposée au niveau sûr : seul un
+            // niveau écrit avant pinMode(OUTPUT) passe le test.
+            FakeDigitalIO::modes[PIN_1] = INPUT;
+            FakeDigitalIO::levels[PIN_1] = test.expectedLevel == HIGH ? LOW : HIGH;
+            FakeDigitalIO::levelsAtOutput[PIN_1] = -1;
+
+            RelayOutput relay;
+            relay.begin("relay", "Relais", PIN_1, test.activeHigh, test.safeState);
+            CHECK_TRUE(relay.begin());
+
+            CHECK_TRUE(FakeDigitalIO::modes[PIN_1] == OUTPUT);
+            CHECK_TRUE(FakeDigitalIO::levelsAtOutput[PIN_1] == test.expectedLevel);
+            CHECK_TRUE(FakeDigitalIO::levels[PIN_1] == test.expectedLevel);
+        }
+    }
+
     TEST_CASE("relais : validation menu et broche")
     {
         setTime(0);
