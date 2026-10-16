@@ -206,14 +206,26 @@ voulue. Le PID, l'autotune, le mode manuel et les alarmes ne changent pas.
 
 ### Câblage
 
-**Ouvrir / Fermer** : une sortie par sens.
+Les relais de la carte (G6DN-1A) n'ont qu'un contact **NO** chacun : pas de
+NF ni d'inverseur. Seul le câblage Ouvrir / Fermer se fait avec eux seuls.
+
+**Ouvrir / Fermer** : une sortie par sens. Sur les relais de la carte :
+
+```
+Phase / 24 V ──┬── COM R1      NO R1 ── Ouvrir
+               └── COM R2      NO R2 ── Fermer
+Neutre / G0 ─────────────────────────── Commun du servomoteur
+```
+
+Rien n'empêche matériellement les deux sens d'être alimentés ensemble : seul
+le firmware l'interdit.
 
 ```cpp
 vanne.begin("vanne", "Vanne mélange", pid, relaisOuvrir, relaisFermer, 120);
 
 relaisOuvrir.begin("v_open", "Vanne ouvrir", Board::Rp2040::OUTPUT_1);
 relaisFermer.begin("v_close", "Vanne fermer", Board::Rp2040::OUTPUT_2,
-                   true, true);     // état sûr ON : fermeture en défaut
+                   true, true);     // état sûr ON : fermeture sur défaut détecté
 
 if (!process.add(vanne) ||
     !process.connect(vanne, relaisOuvrir) ||
@@ -221,9 +233,11 @@ if (!process.add(vanne) ||
     return fail("Vanne non reliée");
 ```
 
-**Marche / Sens** (recommandé avec des relais) : un relais coupe
-l'alimentation, l'autre, câblé en inverseur, choisit le sens. Les deux fils ne
-peuvent **physiquement** jamais être alimentés ensemble.
+**Marche / Sens** : un relais coupe l'alimentation, l'autre, câblé en
+inverseur, choisit le sens. Les deux fils ne peuvent **physiquement** jamais
+être alimentés ensemble. Sens demande un contact inverseur (NO + NF) : ce doit
+être un **relais externe**, piloté par une sortie DC par exemple. Marche peut
+rester un relais de la carte.
 
 ```
 Phase / 24 V ── COM R1 (Marche)
@@ -255,15 +269,23 @@ une autre valeur).
 
 | Montage | Sorties de la carte | Reste libre |
 | --- | --- | --- |
-| Vanne sur les relais de la carte | Relais 1 + 2 | Les 2 sorties DC |
+| Ouvrir / Fermer sur les relais de la carte | Relais 1 + 2 | Les 2 sorties DC |
+| Marche sur un relais de la carte, Sens sur un relais inverseur externe | Relais 1 + DC 1 | Relais 2, DC 2 |
 | Vanne sur 2 relais externes pilotés par les sorties DC | DC 1 + 2 | Les 2 relais |
 
 ### Repli
 
 | Câblage | Verrouillée à OFF | Choisit le repli (`État de sécurité`) |
 | --- | --- | --- |
-| Ouvrir / Fermer | Ouvrir | Fermer : ON = fermeture en défaut, OFF = vanne figée |
-| Marche / Sens | Sens (au repos : fermer) | Marche : ON = fermeture en défaut, OFF = vanne figée |
+| Ouvrir / Fermer | Ouvrir | Fermer : ON = fermeture sur défaut détecté, OFF = vanne figée |
+| Marche / Sens | Sens (au repos : fermer) | Marche : ON = fermeture sur défaut détecté, OFF = vanne figée |
+
+Ce repli est **logiciel** : il couvre les défauts que le firmware détecte
+(mesure, timeout, réglages en cours d'application…). Si la carte s'arrête
+(reset, flash, watchdog, perte du 3,3 V), les GPIO retombent à 0 et tous les
+relais s'ouvrent : la vanne reste **figée** où elle est, elle ne se ferme pas.
+Une fermeture garantie même carte arrêtée demande un servomoteur à retour par
+ressort, ou une sécurité matérielle indépendante.
 
 Les fins de course coupent le moteur : une fermeture prolongée en défaut ne
 l'abîme pas. Le repli coupe toujours la sortie à l'arrêt avant de mettre
@@ -300,6 +322,11 @@ la fin du recalage du démarrage.
   course peut dériver de quelques % ; une commande à 0 ou 1 la recale.
 - La position n'est pas encore dans le snapshot : un écran d'accueil ne peut
   pas l'afficher.
+- Chaque contact de relais de la carte a une varistance 390 V en parallèle
+  (tenue 250 VAC). Sur un servomoteur 230 V à condensateur, le fil du sens au
+  repos peut porter une tension supérieure au secteur : vérifier sur la fiche
+  du servomoteur qu'elle reste sous 250 VAC, sinon passer par des relais
+  d'interface.
 
 ## État sûr
 

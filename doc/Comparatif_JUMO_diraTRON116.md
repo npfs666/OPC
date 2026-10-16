@@ -98,7 +98,7 @@ Les quatre premières sont du logiciel seul, réalisable sur la carte actuelle.
 | **PID chaud / froid** avec zone morte | Chambres climatiques, bains | Moyen |
 | **Import et sauvegarde de la configuration par USB** | Mise en service en série, sauvegarde avant intervention | Moyen |
 | **Fonctions des entrées numériques choisies dans le menu** : marche / arrêt à distance, deuxième consigne, manuel, acquittement, défaut externe (verrouillage) | Câbler un thermostat d'ambiance, un contact de porte, un défaut de pompe… sans programmer. Déjà possible en C++ : glue (inhibition), `ConditionAlarm` sur entrée TOR, acquittement par entrée | Moyen |
-| ✅ **Vanne 3 points** (pas à pas, deux relais, temps de course) | Chauffage hydraulique | Fait : `ThreePointActuator`, câblage Ouvrir / Fermer ou Marche / Sens, recalage en butée |
+| ✅ **Vanne 3 points** (pas à pas, deux relais, temps de course) | Chauffage hydraulique | Fait : `ThreePointActuator`, câblage Ouvrir / Fermer (relais de la carte) ou Marche / Sens (relais inverseur externe), recalage en butée |
 
 ### Plus tard
 
@@ -224,7 +224,8 @@ fixe, mesure en grand, jauge des seuils du thermostat.
 
 - `ThreePointActuator` : position estimée sur le temps de course, recalage
   en butée et au démarrage, zone morte, pause d'inversion. Câblage
-  Ouvrir / Fermer ou Marche / Sens (inverseur, interverrouillage matériel).
+  Ouvrir / Fermer ou Marche / Sens (relais inverseur externe,
+  interverrouillage matériel).
 - Mise en état sûr en deux passes (coupure avant mise en marche).
 
 **Loi d'eau** (`Plan_loi_d_eau.md`)

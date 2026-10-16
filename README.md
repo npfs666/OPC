@@ -725,7 +725,8 @@ avant le prochain dégivrage ou la fin de l'étape en cours.
 - **Sonde 1, départ** (Pt100 3 fils), après la vanne et la pompe ;
 - **Sonde 2, extérieure** (Pt1000 2 fils), au nord, à l'abri du soleil ;
 - **Relais 1 et 2, vanne 3 points** (Ouvrir, Fermer ; course 120 s) : la vanne
-  se ferme en défaut ;
+  se ferme sur défaut détecté (repli logiciel : si la carte s'arrête, la
+  vanne reste figée) ;
 - **Sortie DC 1, pompe**, par un relais d'interface (collecteur ouvert) :
   elle tourne en défaut, contre le gel.
 

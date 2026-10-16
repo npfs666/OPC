@@ -170,7 +170,7 @@ Le comparatif JUMO (§ 3) liste déjà : entrée 0–10 V / 4–20 mA, sortie an
 | Détection de la présence du 24 V (troisième voie ISO1212, par exemple) | Voir § 3 : sorties hors service sans le savoir |
 | Bus I²C d'extension séparé ou tamponné | Voir § 3 |
 | Pull-down externes sur les commandes de sortie | Voir l'erratum E9 ci-dessus |
-| Contact inverseur (NO + NF) sur au moins un relais | Câblage d'une alarme à sécurité positive, ou d'une vanne tout-ou-rien sans relais d'interface |
+| Contact inverseur (NO + NF) sur au moins un relais | Câblage d'une alarme à sécurité positive, d'une vanne tout-ou-rien sans relais d'interface, ou d'une vanne 3 points en Marche / Sens (verrouillage matériel des deux sens) |
 | Retour d'état des sorties (lecture du contact, ou courant de la charge) | LBA plus rapide, détection d'un relais collé |
 | Rétroéclairage de l'écran pilotable (aucune broche dans le brochage) | Mise en veille, durée de vie, usage de nuit (chambre) |
 | Protection des entrées analogiques (TVS, résistances série) | Câbles de sonde longs, contact accidentel avec le 24 V |
