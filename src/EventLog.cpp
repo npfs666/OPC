@@ -65,6 +65,11 @@ void EventLog::add(
     {
         EventEntry& recent = slot(i);
 
+        // Les événements relus sont plus anciens que tous ceux de la
+        // session : rien à regrouper au-delà.
+        if (recent.fromPreviousSession)
+            break;
+
         if (recent.kind == kind &&
             now - recent.uptimeMs <= COALESCE_WINDOW_MS &&
             std::strncmp(recent.text, text, TEXT_SIZE - 1) == 0)
@@ -153,6 +158,7 @@ void EventLog::restore(const EventEntry& entry)
 {
     EventEntry restored = entry;
     restored.important = true;
+    restored.fromPreviousSession = true;
     append(restored);
 }
 

@@ -31,6 +31,10 @@ struct EventEntry
     // Occurrences regroupées (rafale d'un même événement).
     uint16_t repeats = 1;
 
+    // Relu de /events.csv : son uptimeMs vient d'une autre session, il
+    // n'est jamais regroupé. Non sauvegardé.
+    bool fromPreviousSession = false;
+
     char text[44] = {};
 };
 

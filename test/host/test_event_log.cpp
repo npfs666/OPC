@@ -180,6 +180,32 @@ namespace
         CHECK_TRUE(stream.printedLineCount == 0);
     }
 
+    TEST_CASE("journal : pas de regroupement avec la session precedente")
+    {
+        // Sonde en rupture 5 s après le démarrage précédent...
+        EventEntry previous;
+        CHECK_TRUE(EventLog::parseCsv(
+            "2026-10-03 09:00:05;5000;1;1;T : RUPTURE", previous));
+
+        EventLog log;
+        log.restore(previous);
+
+        // ... et de nouveau 10 s après celui-ci : nouvelle ligne, datée.
+        log.add(10000, clockAt(8, 0, 10), EventKind::Fault, true, "T : RUPTURE");
+        REQUIRE(log.count() == 2);
+        CHECK_TRUE(log.at(0)->repeats == 1);
+        CHECK_TRUE(log.at(0)->time.day == 4);
+        CHECK_TRUE(log.at(1)->repeats == 1);
+        CHECK_TRUE(log.at(1)->time.day == 3);
+        CHECK_TRUE(log.hasUnsavedImportant());
+
+        // Les rafales de la session restent regroupées.
+        log.add(10500, clockAt(8, 0, 10), EventKind::Fault, true, "T : RUPTURE");
+        CHECK_TRUE(log.count() == 2);
+        CHECK_TRUE(log.at(0)->repeats == 2);
+        CHECK_TRUE(log.at(1)->repeats == 1);
+    }
+
     TEST_CASE("journal : evenements du processus")
     {
         ProcessControl process;

@@ -151,10 +151,10 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 
 Points 30 à 35 ajoutés le 12/10/2026.
 
-30. ⬜ **Journal : regroupement avec la session précédente** (`EventLog::add`).
-    - Les événements relus de `/events.csv` gardent l'`uptimeMs` de leur session. Un événement identique de la nouvelle session, daté à moins de 60 s du même instant après le démarrage, est fusionné avec l'ancien (« x2 »).
-    - Cas typique : une sonde en rupture au démarrage, ou une boucle de redémarrages. Le défaut récent n'apparaît pas comme une nouvelle ligne : il garde la date de l'ancienne et reste placé avant l'événement de redémarrage.
-    - Correction : marquer les événements relus (`restore()`) comme non regroupables.
+30. ✅ **Journal : regroupement avec la session précédente** (`EventLog::add`).
+    - Les événements relus de `/events.csv` gardent l'`uptimeMs` de leur session. Un événement identique de la nouvelle session, daté à moins de 60 s du même instant après le démarrage, était fusionné avec l'ancien (« x2 »).
+    - Cas typique : une sonde en rupture au démarrage, ou une boucle de redémarrages. Le défaut récent n'apparaissait pas comme une nouvelle ligne : il gardait la date de l'ancienne et restait placé avant l'événement de redémarrage.
+    - Corrigé le 16/10/2026 : `restore()` marque les événements relus (`EventEntry::fromPreviousSession`, non sauvegardé), et le regroupement s'arrête au premier. Test `journal : pas de regroupement avec la session precedente`.
 31. ⬜ **Capacité des actions du menu** (`MenuBuilder::MAX_ACTIONS` = 16).
     - Calibration (6), Journal, Acquitter, une « RAZ compteurs » par relais et les actions de l'installation. Au-delà de 16, `initMenu()` échoue : le menu reste inaccessible et la cause n'est écrite que sur le port série.
     - Sans conséquence sur la carte v0.2 : elle n'a que deux broches de relais, donc au plus 13 actions avec les templates actuels. À revoir si `MAX_REGISTERED_OUTPUTS` (16) devient atteignable, ou à rendre visible à l'écran.

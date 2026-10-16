@@ -106,11 +106,11 @@ En résumé :
 10. Revue, point 13 : interruptions coupées pendant toute une sauvegarde (des centaines de ms sur le cœur 0). Impact jugé faible le 12/10/2026 (DRDY retardée déjà traitée, `millis()` et PWM matériels) : laissé en l'état.
 11. Revue, points 17, 18, 20 et 21 : nettoyage. `FixedBufferPrint` tronque en silence, `isAccumulationDone()` compare avec `==`, code mort, et `ADS1120::begin` laisse une transaction ouverte.
 12. ✅ ADC redémarré ou muet : une étape sans conversion dans deux fois sa durée normale passe en `Invalid`, réinitialise l'ADC et note `ADC muet` au journal. Détection en quelques secondes, au lieu des 30 s du timeout des mesures.
-13. Revue, points 28 à 35 (relecture du 12/10/2026). Les trois premiers sont des corrections courtes, à faire avant la v0.3 :
+13. Revue, points 28 à 35 (relecture du 12/10/2026). Les trois premiers sont des corrections courtes, à faire avant la v0.3 (29 et 30 faits le 16/10/2026) :
     - 28 : « Mesurer N0 » dure près de 7 s, proche du watchdog de 8 s (à mesurer sur banc) ;
-    - 29 : après un démarrage raté, `/counters.json` et `/events.csv` peuvent être écrasés ;
-    - 30 : un défaut de la nouvelle session peut être fusionné avec un événement relu de la précédente ;
-    - 31 à 35 : capacité des actions du menu, « Manœuvres » mal affiché, unité de `Kp`, BME280 muet non détecté, allocations dynamiques à documenter.
+    - ✅ 29 : après un démarrage raté, `/counters.json` et `/events.csv` pouvaient être écrasés ;
+    - ✅ 30 : un défaut de la nouvelle session pouvait être fusionné avec un événement relu de la précédente ;
+    - 31 à 35 : capacité des actions du menu, « Manœuvres » mal affiché (✅ 32), unité de `Kp`, BME280 muet non détecté, allocations dynamiques à documenter.
 
 ---
 
@@ -297,7 +297,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 **v0.3 « terrain »** : les P0.
 
 - ✅ Vérification du MCP23017 et récupération du bus I²C. Reste la validation sur banc de la PT1000 et du thermocouple.
-- Revue, points 28 à 30 : calibration N0 et watchdog, compteurs écrasés après un démarrage raté, regroupement du journal.
+- Revue, point 28 : calibration N0 et watchdog (✅ points 29 et 30 : compteurs écrasés après un démarrage raté, regroupement du journal).
 - Pull-down des sorties (✅ ordre d'initialisation corrigé).
 - Repli sur heure inconnue pour le chauffage, et autonomie du supercondensateur mesurée.
 - Four : LBA par défaut et durée maximale de cuisson. Template PID sur relais statique.
