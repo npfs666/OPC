@@ -114,7 +114,7 @@ En résumé :
     - Risque accepté le 16/10/2026 : une coupure de plus d'un jour est rare, et une maison inoccupée (résidence secondaire) est hors de la cible.
     - ✅ Heure perdue rendue visible : écran `ALERTE HORLOGE` (« Coupure longue », « Régler l'heure »), et bandeau `HEURE A REGLER` sur l'accueil des installations sans programme.
     - Si le besoin revient : la loi d'eau passerait d'elle-même sur la consigne réduite quand l'heure est inconnue (une dizaine de lignes), ou un réglage `Heure inconnue` dans `ScheduledSetpoint`.
-    - Prochaine carte : mesure de la tension du supercondensateur par l'ADC (voir § 4).
+    - Mesure de la tension du supercondensateur par l'ADC : écartée le 16/10/2026. Le bit `OSF` du DS3231 dit déjà si l'heure a été perdue.
 
 ---
 
@@ -174,7 +174,6 @@ Le comparatif JUMO (§ 3) liste déjà : entrée 0–10 V / 4–20 mA, sortie an
 | Contact inverseur (NO + NF) sur au moins un relais | Câblage d'une alarme à sécurité positive, d'une vanne tout-ou-rien sans relais d'interface, ou d'une vanne 3 points en Marche / Sens (verrouillage matériel des deux sens) |
 | Retour d'état des sorties (lecture du contact, ou courant de la charge) | LBA plus rapide, détection d'un relais collé |
 | Rétroéclairage de l'écran pilotable (aucune broche dans le brochage) | Mise en veille, durée de vie, usage de nuit (chambre) |
-| Mesure de la tension du supercondensateur du DS3231 par l'ADC (aucune entrée ADC libre sur la v0.2) | État de charge et vieillissement, avertissement avant la perte de l'heure. Mesure commutée, ou sous très forte impédance : carte éteinte, une broche ADC reliée directement viderait la supercap par ses diodes de protection |
 | Protection des entrées analogiques (TVS, résistances série) | Câbles de sonde longs, contact accidentel avec le 24 V |
 
 ### P1 : conformité, pour une diffusion au-delà de l'usage personnel
