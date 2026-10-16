@@ -74,11 +74,12 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
     - Bus bloqué ou capteur muet : la pression restait figée et valide, et l'humidité psychrométrique en dépend.
     - Correctif : lecture par `performReading()`, mesure invalide en cas d'échec. `pressureSeaLevel()` fait aussi une seule lecture pour la pression et la température.
     - Vérifié sur banc (SDA à la masse) : `BMP580 : ERREUR` pendant le court-circuit, puis `BMP580 : OK`.
-28. ⬜ **Calibration N0 proche du délai du watchdog** (`SensorBoard::calibrateZero`). Ajouté le 12/10/2026, à mesurer sur banc.
+28. ✅ **Calibration N0 proche du délai du watchdog** (`SensorBoard::calibrateZero`). Ajouté le 12/10/2026, vérifié sur banc le 16/10/2026.
     - Depuis la mesure de R2f (commit 69976a4), « Mesurer N0 » fait deux séries de 15 + 3 200 conversions uniques à 1000 SPS : environ 1,07 ms chacune, soit près de 7 s.
     - Tout se passe dans `handleControlMessage()` sur le cœur 0, suivi de la sauvegarde (`/board.json` puis `/config.json`). Le watchdog (8 s) n'est nourri qu'au tour de `loop()` suivant : la marge est de l'ordre de la seconde, ou moins.
     - Un reset pendant la calibration ne casse rien (sorties en sécurité, ancienne calibration conservée), mais la calibration est perdue sans explication.
-    - À faire : afficher la durée de `executeMenuAction()` et de `storage.save()` sur le port série. Si la marge est faible, raccourcir la série 2 fils (1 point ADC vaut environ 6 mΩ en PT100 : 16 × 50 conversions devraient suffire pour R2f), ou nourrir le watchdog dans `readCalibrationSamples()`, dont la durée est bornée par les délais de conversion.
+    - Sur banc le 16/10/2026 : plusieurs calibrations, aucun reset par le watchdog. Le total (calibration et sauvegarde) reste donc sous 8 s ; la marge exacte n'est pas mesurée, et seule la sauvegarde LittleFS peut varier. Laissé en l'état, puisqu'un reset serait sans danger.
+    - Si un reset apparaît : raccourcir la série 2 fils (1 point ADC vaut environ 6 mΩ en PT100 : 16 × 50 conversions devraient suffire pour R2f), soit environ 2,5 s de gagnées. Éviter de nourrir le watchdog dans `readCalibrationSamples()`, qui affaiblirait la garantie « les deux cœurs progressent ».
 29. ✅ **Démarrage raté : les compteurs et le journal sauvegardés peuvent être écrasés** (`OPC::controlPoll`). Ajouté le 12/10/2026.
     - Après un échec de `initMeasurements()`, `loop()` continue d'appeler `controlPoll()`.
     - Si l'échec vient après `storage.begin()` (seul cas : `StartupError::Outputs`, une sortie PWM qui ne démarre pas), `restoreCounters()` et `restoreEvents()` n'ont pas été appelés.
