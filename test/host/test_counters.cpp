@@ -259,6 +259,11 @@ namespace
         char text[32];
         uint16_t color = 0;
 
+        // Heure valide : le rappel d'entretien occupe le bandeau.
+        ClockSample clock;
+        clock.valid = true;
+        process.updateClock(clock);
+
         // Seuil à 4 manœuvres (deux marches, deux arrêts). Il se règle dans
         // le menu, par le paramètre lié au compteur.
         const_cast<OutputCounters*>(relay.counters())->maintenanceLimit = 4;
@@ -280,6 +285,15 @@ namespace
         AlarmDisplay::format(snapshot, text, sizeof(text), 18, color);
         CHECK_TRUE(std::strcmp(text, "ENTRETIEN Relais 1") == 0);
         CHECK_TRUE(color == AlarmDisplay::COLOR_LATCHED);
+
+        // Heure perdue : passe devant l'entretien.
+        clock.valid = false;
+        process.updateClock(clock);
+        process.captureSnapshot(snapshot, 10000);
+        AlarmDisplay::format(snapshot, text, sizeof(text), 18, color);
+        CHECK_TRUE(std::strcmp(text, "HEURE A REGLER") == 0);
+        clock.valid = true;
+        process.updateClock(clock);
 
         // Journalisé une seule fois.
         process.updateMeasurementsAndRegulators(11000);

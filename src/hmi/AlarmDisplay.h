@@ -15,8 +15,10 @@ class ProcessSnapshot;
  *  - "ALARME <nom>" pour une alarme, "<n> ALARMES" pour plusieurs ;
  *  - rouge si une alarme est en cours, orange si elles sont seulement
  *    mémorisées (cause disparue, acquittement attendu) ;
- *  - sans alarme : "ENTRETIEN <sortie>" (ou "<n> ENTRETIENS") en orange
- *    quand le seuil d'entretien d'un relais est atteint ;
+ *  - sans alarme : "HEURE A REGLER" en orange si l'heure est inconnue
+ *    (supercap déchargée, DS3231 illisible) : le journal n'est plus daté ;
+ *  - sinon, "ENTRETIEN <sortie>" (ou "<n> ENTRETIENS") en orange quand le
+ *    seuil d'entretien d'un relais est atteint ;
  *  - vide sinon.
  */
 namespace AlarmDisplay

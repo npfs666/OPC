@@ -1238,7 +1238,8 @@ redémarrages n'use pas la flash). Une coupure de courant perd au plus les
 Chaque relais a un **Seuil entret.** en manœuvres (0 = aucun, par pas de
 10 000 ; un relais standard tient environ 150 000 manœuvres à pleine charge).
 Une fois le seuil atteint, l'accueil affiche `ENTRETIEN <relais>` en orange
-(quand aucune alarme n'est signalée) et le journal l'indique une fois.
+(quand aucune alarme n'est signalée et que l'heure est connue) et le journal
+l'indique une fois.
 Après l'entretien, l'action **RAZ compteurs** du relais remet ses compteurs à
 zéro, sans arrêter la régulation.
 
@@ -1314,6 +1315,19 @@ lecture d'après `Divers > Fuseau horaire` :
 Le changement d'heure ne réécrit donc jamais le DS3231, et il est appliqué
 même si la carte était éteinte à ce moment-là. Lors du réglage manuel pendant
 l'heure répétée d'octobre (02:00 à 03:00), l'heure d'été est retenue.
+
+**Heure perdue.** Carte hors tension, le DS3231 est secouru par un
+supercondensateur, pas par une pile : après une coupure longue, il se vide
+et l'oscillateur s'arrête. Au démarrage suivant, le DS3231 le signale (bit
+`OSF`), ou il est illisible. L'heure est alors inconnue, et le journal note
+`Heure perdue` :
+
+- installation avec une régulation programmée : l'écran **ALERTE HORLOGE**
+  remplace l'accueil (`Coupure longue`, `Régler l'heure` en rouge ; un clic
+  ouvre le menu), et les programmes en `Auto` passent en état sûr ;
+- autres installations : la régulation continue, et le bandeau de l'accueil
+  affiche `HEURE A REGLER` en orange quand aucune alarme n'est signalée. Les
+  événements du journal ne sont plus datés (`+42 s`) jusqu'au réglage.
 
 ### Configuration et USB
 
@@ -1478,6 +1492,8 @@ mais n'est pas mémorisée.
 
 **Affichage** : bandeau `ALARME <nom>` (ou `<n> ALARMES`) à l'accueil, rouge
 tant qu'une cause est présente, orange quand l'alarme est seulement mémorisée.
+Sans alarme, le bandeau rappelle une heure à régler (`HEURE A REGLER`, voir
+[Horloge](#horloge)), puis un entretien de relais (`ENTRETIEN <relais>`).
 Chaque changement est inscrit au [journal](#journal-des-événements) :
 `Alarme Temp. haute : ACTIVE`, puis `MEMORISEE` ou `FIN`.
 

@@ -50,7 +50,13 @@ size_t AlarmDisplay::format(
 
     char text[48];
 
-    if (signaled == 0)
+    if (signaled == 0 && !snapshot.clock().valid)
+    {
+        // Pas d'alarme, heure inconnue : à régler, sans bloquer l'accueil.
+        color = COLOR_LATCHED;
+        std::snprintf(text, sizeof(text), "HEURE A REGLER");
+    }
+    else if (signaled == 0)
     {
         // Pas d'alarme : rappel d'entretien, moins urgent.
         size_t due = 0;

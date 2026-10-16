@@ -391,6 +391,11 @@ namespace
         char text[32];
         uint16_t color = 0;
 
+        // Heure valide : seules les alarmes occupent le bandeau.
+        ClockSample clock;
+        clock.valid = true;
+        process.updateClock(clock);
+
         temperature.set(50.0);
         process.updateMeasurementsAndRegulators(1000);
         process.captureSnapshot(snapshot, 1000);
@@ -434,10 +439,26 @@ namespace
         process.captureSnapshot(snapshot, 6000);
         CHECK_TRUE(AlarmDisplay::format(snapshot, text, sizeof(text), 18, color) == 0);
 
+        // Heure perdue sans alarme : rappel orange.
+        clock.valid = false;
+        process.updateClock(clock);
+        process.captureSnapshot(snapshot, 6000);
+        AlarmDisplay::format(snapshot, text, sizeof(text), 18, color);
+        CHECK_TRUE(std::strcmp(text, "HEURE A REGLER") == 0);
+        CHECK_TRUE(color == AlarmDisplay::COLOR_LATCHED);
+
+        // Une alarme passe devant.
+        temperature.set(90.0);
+        process.updateMeasurementsAndRegulators(7000);
+        process.captureSnapshot(snapshot, 7000);
+        AlarmDisplay::format(snapshot, text, sizeof(text), 18, color);
+        CHECK_TRUE(std::strcmp(text, "ALARME Temp. haute") == 0);
+        temperature.set(50.0);
+
         // Journal : haute active, mémorisée, basse active, basse finie,
-        // acquittement, haute finie.
+        // acquittement, haute finie, haute de nouveau active.
         process.printStatusEvents(log);
-        CHECK_TRUE(log.printedLineCount == 6);
+        CHECK_TRUE(log.printedLineCount == 7);
     }
 
     TEST_CASE("alarmes : condition de plus de 49 jours")

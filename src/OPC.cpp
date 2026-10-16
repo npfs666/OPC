@@ -730,12 +730,16 @@ void OPC::showClockAlert()
 
     tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     y = printWrapped(
-        tft, "Régulations programmées à l'arrêt, leurs sorties en sécurité.", y, 4);
+        tft, "Régulations programmées à l'arrêt, sorties en sécurité.", y, 4);
 
     y += 6;
 
+    // Pas de pile : la supercap du DS3231 s'est vidée pendant la coupure.
     tft.setTextColor(COLOR_GREY, ST77XX_BLACK);
-    printWrapped(tft, "Pile du DS3231 à vérifier.", y, 2);
+    y = printWrapped(tft, "Coupure longue", y, 1);
+
+    tft.setTextColor(ST77XX_RED, ST77XX_BLACK);
+    printWrapped(tft, "Régler l'heure", y, 1);
 
     tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     printWrapped(tft, "Clic : Divers > Horloge", 212, 1);
