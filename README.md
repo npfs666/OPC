@@ -1198,7 +1198,7 @@ redémarrages n'use pas la flash). Une coupure de courant perd au plus les
 `Divers > Compteurs` affiche, en lecture seule :
 
 - **Heures carte** : durée de fonctionnement cumulée de la carte ;
-- pour chaque relais (`Divers > Compteurs > <relais>`) : **Manœuvres**
+- pour chaque relais (`Divers > Compteurs > <relais>`) : **Manoeuvres**
   (basculements réels, mises en sécurité comprises) et **Heures ON** (durée
   cumulée en marche).
 

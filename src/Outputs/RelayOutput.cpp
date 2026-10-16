@@ -345,7 +345,7 @@ void RelayOutput::registerParameters(
 
     counterValues.addInteger(
         "switches",
-        "Manœuvres",
+        "Manoeuvres",
         displayedSwitches,
         0,
         INT32_MAX,
