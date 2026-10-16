@@ -470,8 +470,9 @@ Chaque étape compile et laisse une carte qui fonctionne.
    - Drapeau de compilation de test qui force `IODIR` = 0xFF : voie rejetée,
      réinitialisation, journal.
    - `GPIO = OLAT` relevé dans toutes les configurations, puis rendu bloquant.
-6. ⬜ **Documentation** : revue (points 4 et 8), bilan (P0 n°1 et n°7), README
-   (défauts de mesure), CLAUDE.md (description de l'ISR).
+6. ✅ **Documentation** : revue (points 4 et 8), bilan (P0 n°1 et n°7, mis à
+   jour le 16/10/2026), README (défauts de mesure), CLAUDE.md (description de
+   l'ISR).
 
 ---
 

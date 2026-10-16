@@ -1,6 +1,6 @@
 # Bilan OPC v0.2 : ce qui reste avant un usage réel et une publication
 
-Bilan du 09/10/2026, sur le commit `dc06a03` (bloc et template four).
+Bilan du 09/10/2026, sur le commit `dc06a03` (bloc et template four). Mis à jour le 16/10/2026, sur le commit `3af7140` : routage analogique vérifié et bus I²C récupéré ([Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md)), ADC muet détecté, psychrométrie corrigée (sauf la mèche sèche), points 28 à 35 de la revue repris.
 
 Il complète deux documents sans les répéter :
 
@@ -15,6 +15,8 @@ Légende des priorités :
 - **P1** : à faire avant une publication (v1.0) ;
 - **P2** : confort, et fonctions qui élargissent les usages.
 
+Les points réglés depuis le bilan initial sont marqués ✅.
+
 ---
 
 ## 1. Verdict
@@ -22,9 +24,9 @@ Légende des priorités :
 | Domaine | État |
 | --- | --- |
 | Architecture logicielle | Solide : deux cœurs séparés, snapshot, états sûrs, watchdog à deux cœurs, sauvegarde atomique, restauration tolérante |
-| Tests | 247 tests hôte, tous OK. Templates testés complets sur PC. Firmware compilé (RAM 23 %, flash 6 %) |
+| Tests | 281 tests hôte, tous OK (16/10/2026). Templates testés complets sur PC. Firmware compilé (RAM 23 %, flash 6 %) |
 | Sécurité de la régulation | Bonne base : défauts de sonde, timeout, LBA, alarmes, temps mini des relais, verrous d'état sûr |
-| Robustesse matérielle (bus, démarrage, alimentation) | **Points ouverts** : I²C non vérifié dans l'ISR, glitch possible des sorties au démarrage, 24 V non surveillé |
+| Robustesse matérielle (bus, démarrage, alimentation) | Acquisition hors ISR, routage MCP vérifié, bus I²C débloqué, ADC muet détecté. **Points ouverts** : glitch possible des sorties au démarrage, boucle de redémarrages, 24 V non surveillé |
 | Templates | 7 templates applicatifs + 2 de test. Il manque des applications phares (humidité, couveuse, chaud / froid) |
 | Distribution | **Pas prête** : pas de version affichée, pas de release, un firmware à compiler par installation, matériel non publié |
 | Documentation utilisateur | README très complet, mais écrit pour un développeur. Pas de guide d'installateur ni de schémas de câblage |
@@ -41,15 +43,10 @@ En résumé :
 
 ### P0
 
-1. **Routage analogique non vérifié pendant l'acquisition**. Revue, point 4 : reste ouvert.
-   - L'ISR DRDY commute les entrées par le MCP23017 ([AnalogMux.cpp](../src/Hardware/AnalogMux.cpp)), avec `mcp.digitalWrite()` broche par broche, sans contrôle d'erreur.
-   - Si le MCP redémarre (ESD, chute de tension, parasite sur le bus d'extension I²C), ses broches repassent en entrées. Le routage devient alors indéterminé.
-   - La mesure est fausse mais peut rester plausible. Son état reste `Ok`, et la régulation agit sur une valeur fausse.
-   - À faire :
-     - vérifier le retour des transactions I²C (écrire `GPIOA` / `GPIOB` en une transaction, plutôt que broche par broche) ;
-     - relire régulièrement `IODIR` et `OLAT` hors de l'ISR ;
-     - sur incohérence, passer les mesures en `Invalid` et réinitialiser le MCP ;
-     - journaliser `Défaut multiplexeur`.
+1. ✅ **Routage analogique non vérifié pendant l'acquisition**. Revue, points 4 et 8. Voir [Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md), étapes 1 à 3.
+   - Constat initial : l'ISR DRDY commutait les entrées par le MCP23017, broche par broche, sans contrôle d'erreur. Un MCP redémarré (ESD, chute de tension, parasite sur le bus d'extension) donnait une mesure fausse mais plausible, restée `Ok`.
+   - Fait : séquencement dans `loop()`, routage écrit en une transaction (`OLATA`, `OLATB`) et relu avant et après chaque entrée. Sur incohérence, l'entrée passe en `Invalid`, le MCP est réinitialisé, et le journal note `Défaut multiplexeur`. Vérifié sur banc en PT100 2, 3 et 4 fils.
+   - Reste : la validation sur banc de la PT1000 et du thermocouple (étape 5 du plan).
 
 2. **Four : rien n'arrête un chauffage à 100 % si le thermocouple sort du four**. Voir [KilnInstallation.cpp](../src/Templates/KilnInstallation.cpp).
    - Cas : le thermocouple tombe ou sort du four, et lit l'ambiance.
@@ -90,29 +87,30 @@ En résumé :
      - au-delà de N, rester en état sûr et afficher un écran de défaut ;
      - garder dans ces registres l'étape en cours, pour le diagnostic (proposition de la revue).
 
-7. **Aucune récupération du bus I²C**.
-   - Le bus `Wire1` sert au MCP23017 (dans l'ISR), au DS3231 et au BMP581. Il est aussi sorti sur le connecteur d'extension.
-   - Une SDA tenue basse bloque à la fois l'acquisition et l'horloge.
-   - À faire :
-     - au démarrage et après une erreur, envoyer 9 impulsions SCL puis un STOP ;
-     - donner un timeout aux transactions ;
-     - revoir l'ISR longue (revue, point 8) : sortir de l'ISR le séquencement, qui fait des accès I²C.
+7. ✅ **Aucune récupération du bus I²C**. Voir [Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md), étape 4.
+   - Le bus `Wire1` sert au MCP23017, au DS3231 et au BMP581. Il est aussi sorti sur le connecteur d'extension.
+   - Fait : délai de 10 ms par transaction, puis déblocage (9 impulsions SCL, STOP) par le cœur Arduino-Pico ; déblocage aussi au démarrage, avant la première transaction. Le séquencement, qui fait les accès I²C, est sorti de l'ISR (revue, point 8).
+   - Vérifié sur banc, SDA à la masse quelques secondes : entrées en défaut, « Heure perdue », puis retour sans redémarrage. L'essai a aussi trouvé le BMP580 muet affiché comme valide (revue, point 27, corrigé).
 
 8. **Démarrage progressif** (proposé, non fait).
    - Usages : résistances blindées à sécher, limitation des appels de courant.
    - C'est un réglage par régulateur : sortie limitée pendant X min, ou sous un seuil de mesure.
 
-9. **Psychrométrie**. Revue, point 10 : ouvert.
-   - Les formules sont incohérentes entre elles.
-   - Il manque le calcul sur glace et un coefficient A réglable.
-   - Il manque la détection d'une mèche sèche : bulbe humide ≈ bulbe sec, ce qui donne une fausse HR à 100 %.
-   - C'est bloquant pour tout template qui régule l'humidité (voir § 5).
+9. **Psychrométrie**. Revue, point 10 : corrigé, sauf la mèche sèche.
+   - ✅ Une seule formule de Magnus, sur l'eau et sur la glace, et un coefficient psychrométrique réglable.
+   - ✅ Bulbe humide plus chaud que le sec de plus de 0,5 K : `Invalid`.
+   - ⬜ Il manque la détection d'une mèche sèche : bulbe humide ≈ bulbe sec, ce qui donne une fausse HR à 100 %. C'est bloquant pour tout template qui régule l'humidité (voir § 5).
 
 ### P2
 
-10. Revue, point 13 : interruptions coupées pendant toute une sauvegarde (des centaines de ms sur le cœur 0).
-11. Revue, points 17 à 21 : nettoyage. `FixedBufferPrint` tronque en silence, `isAccumulationDone()` compare avec `==`, code mort, et `ADS1120::begin` laisse une transaction ouverte.
-12. Relire régulièrement les registres de l'ADS1120. Un redémarrage de l'ADC (ESD) est aujourd'hui rattrapé par le timeout des mesures, mais seulement après 30 s.
+10. Revue, point 13 : interruptions coupées pendant toute une sauvegarde (des centaines de ms sur le cœur 0). Impact jugé faible le 12/10/2026 (DRDY retardée déjà traitée, `millis()` et PWM matériels) : laissé en l'état.
+11. Revue, points 17, 18, 20 et 21 : nettoyage. `FixedBufferPrint` tronque en silence, `isAccumulationDone()` compare avec `==`, code mort, et `ADS1120::begin` laisse une transaction ouverte.
+12. ✅ ADC redémarré ou muet : une étape sans conversion dans deux fois sa durée normale passe en `Invalid`, réinitialise l'ADC et note `ADC muet` au journal. Détection en quelques secondes, au lieu des 30 s du timeout des mesures.
+13. Revue, points 28 à 35 (relecture du 12/10/2026). Les trois premiers sont des corrections courtes, à faire avant la v0.3 :
+    - 28 : « Mesurer N0 » dure près de 7 s, proche du watchdog de 8 s (à mesurer sur banc) ;
+    - 29 : après un démarrage raté, `/counters.json` et `/events.csv` peuvent être écrasés ;
+    - 30 : un défaut de la nouvelle session peut être fusionné avec un événement relu de la précédente ;
+    - 31 à 35 : capacité des actions du menu, « Manœuvres » mal affiché, unité de `Kp`, BME280 muet non détecté, allocations dynamiques à documenter.
 
 ---
 
@@ -124,7 +122,7 @@ En résumé :
 | **Reprogrammation libre par l'USB** | Toute personne qui a accès au port USB peut remplacer le firmware | Acceptable pour un projet ouvert. À documenter : ne pas laisser l'USB accessible en façade. Le *secure boot* du RP2350 est hors sujet | P2 |
 | **USB seul, 24 V absent** : la partie logique tourne, sans les sorties (README, § Isolation) | Le firmware croit piloter : écran, journal et compteurs sont faux. Le même cas se produit si le 24 V disparaît pendant que l'USB est branché | Matériel : détecter la présence du 24 V. Logiciel : défaut `24 V absent`, journalisé, avec les sorties notées hors service | P1 (carte) |
 | **Disque USB : déconnexion et reconnexion à chaque sauvegarde** ([Storage.cpp](../src/Storage.cpp)) | Fenêtres « disque retiré » sous Windows, et gêne pour un logiciel de supervision sur le port série | Ne rafraîchir le disque qu'à la demande (action de menu), ou hors connexion | P2 |
-| **Bus I²C d'extension sur le même bus que le multiplexeur** | Un câble d'extension long, en court-circuit ou soumis à une ESD perturbe toute l'acquisition (voir § 2, point 1) | Prochaine carte : bus d'extension séparé (`Wire` ≠ `Wire1`) ou tamponné (P82B715, ISO1540) | P1 (carte) |
+| **Bus I²C d'extension sur le même bus que le multiplexeur** | Un câble d'extension long, en court-circuit ou soumis à une ESD arrête toute l'acquisition et l'horloge tant qu'il perturbe le bus. Depuis le § 2, points 1 et 7, c'est détecté (mesures en défaut, état sûr) et rattrapé sans redémarrage, mais la régulation reste arrêtée | Prochaine carte : bus d'extension séparé (`Wire` ≠ `Wire1`) ou tamponné (P82B715, ISO1540) | P1 (carte) |
 | **Menu ouvert à tous** | Choix assumé (➖ dans le comparatif) | Garder ce choix, mais proposer un **verrou de façade** optionnel (appui long), contre les manipulations par erreur ou par un enfant en usage domestique | P2 |
 
 ---
@@ -214,7 +212,7 @@ Thermostat, PID, programmation horaire, solaire, chambre froide positive, circui
 
 | Template | Contenu | Bloc à créer avant |
 | --- | --- | --- |
-| **Cave d'affinage, séchoir, chambre de maturation** | Température (froid + chauffage) et humidité (humidificateur, déshumidification par le froid). Il valorise le travail de métrologie fait sur le psychromètre | Psychrométrie corrigée, régulation sur l'HR, détection de mèche sèche |
+| **Cave d'affinage, séchoir, chambre de maturation** | Température (froid + chauffage) et humidité (humidificateur, déshumidification par le froid). Il valorise le travail de métrologie fait sur le psychromètre | Régulation sur l'HR, détection de mèche sèche (psychrométrie déjà corrigée) |
 | **Couveuse** | Température PID, humidité, retournement des œufs (temporisation cyclique), arrêt du retournement avant l'éclosion (J-3), alarmes haute et basse | Temporisation cyclique (impulsion toutes les N min) |
 | **Chambre de fermentation, bain thermostaté, chambre climatique** | Chauffage et froid sur la même consigne | **PID chaud / froid avec zone morte** (3 états) |
 | **Ballon tampon et chaudière bois, charge d'ECS** | Pompe de charge sur différentiel, protection anti-condensation du retour, priorité ECS | Aucun : comparateurs et glue |
@@ -283,7 +281,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
    - des **avertissements de sécurité** en tête : pas de limiteur homologué, contacteur obligatoire pour les fortes charges, isolation des thermocouples, USB en exploitation ;
    - une FAQ et un dépannage, à partir des messages de l'écran et du journal.
 7. **Nettoyage du dépôt avant publication** :
-   - `.continue/` (configuration d'un outil local) ;
+   - ✅ `.continue/` (configuration d'un outil local) : retiré du dépôt et ignoré ;
    - le fichier de verrou `.~lock.mesures_…csv#` dans `doc/V0.2 Measurements/4 - …` ;
    - les journaux bruts de `doc/Random measurements/` ;
    - `doc/Old code/` (archive morte) : à sortir du dépôt publié, ou à mettre dans une branche.
@@ -299,7 +297,8 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 
 **v0.3 « terrain »** : les P0.
 
-- Vérification du MCP23017 et récupération du bus I²C.
+- ✅ Vérification du MCP23017 et récupération du bus I²C. Reste la validation sur banc de la PT1000 et du thermocouple.
+- Revue, points 28 à 30 : calibration N0 et watchdog, compteurs écrasés après un démarrage raté, regroupement du journal.
 - Pull-down et ordre d'initialisation des sorties.
 - Repli sur heure inconnue pour le chauffage, et autonomie du supercondensateur mesurée.
 - Four : LBA par défaut et durée maximale de cuisson. Template PID sur relais statique.
@@ -310,7 +309,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 - Version affichée, réinitialisation usine, test des sorties, diagnostic du câblage, confirmations.
 - Reset 1200 bauds désactivé, boucle de redémarrages détectée.
 - Export du journal et des courbes par l'USB, import de la configuration.
-- PID chaud / froid, démarrage progressif, fonctions des entrées TOR, psychrométrie corrigée.
+- PID chaud / froid, démarrage progressif, fonctions des entrées TOR, détection de mèche sèche.
 - Templates : indicateur / enregistreur, cave d'affinage ou couveuse, protections du solaire.
 - CI, releases `.uf2`, compilation reproductible, fichiers matériels, guide de l'installateur.
 
