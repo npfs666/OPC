@@ -9,7 +9,7 @@
 
 /*
  * Template PID complet sur l'hôte : PT100 simulée par sa résistance,
- * relais statique sur la sortie DC 1.
+ * relais statique sur la sortie DC 1, contacteur général sur le relais 1.
  */
 namespace
 {
@@ -18,6 +18,11 @@ namespace
         bool ssrOn() const
         {
             return FakeGPIO::levels[Board::Rp2040::OUTPUT_3];
+        }
+
+        bool contactorClosed() const
+        {
+            return FakeDigitalIO::levels[Board::Rp2040::OUTPUT_1] == HIGH;
         }
 
         // Secondes de chauffe du relais statique pendant la durée donnée.
@@ -50,17 +55,52 @@ namespace
         bench.setTemperature(0, 20.0);
         bench.advance(2);
 
-        // Régulation arrêtée par défaut : aucune chauffe.
+        // Régulation arrêtée par défaut : aucune chauffe, contacteur ouvert.
         CHECK_TRUE(bench.heatingDuring(30) == 0);
+        CHECK_FALSE(bench.contactorClosed());
 
-        // Activée, consigne 35 °C, mesure à 20 °C : le relais statique
-        // chauffe.
+        // Activée, consigne 35 °C, mesure à 20 °C : le contacteur se ferme
+        // et le relais statique chauffe.
         bench.setBool("tune_pid", "enabled", true);
         CHECK_TRUE(bench.heatingDuring(30) > 0);
+        CHECK_TRUE(bench.contactorClosed());
 
-        // Sonde en court-circuit : sortie coupée.
+        // Sonde en court-circuit : sortie coupée, contacteur ouvert (un SSR
+        // en court-circuit serait coupé).
         bench.shortSensor(0);
         bench.advance(2);
         CHECK_TRUE(bench.heatingDuring(30) == 0);
+        CHECK_FALSE(bench.contactorClosed());
+
+        // Retour de la sonde : la régulation reprend.
+        bench.setTemperature(0, 20.0);
+        bench.advance(2);
+        CHECK_TRUE(bench.contactorClosed());
+
+        // Arrêt de la régulation : contacteur ouvert.
+        bench.setBool("tune_pid", "enabled", false);
+        bench.advance(2);
+        CHECK_FALSE(bench.contactorClosed());
+    }
+
+    TEST_CASE("Template PID : contacteur en mode manuel")
+    {
+        // Manuel à 50 %, régulation non activée : le contacteur se ferme,
+        // même sonde en défaut (le manuel garde la main).
+        PidBench bench;
+        bench.setTemperature(0, 20.0);
+        bench.advance(2);
+        bench.setDiscrete(
+            "tune_pid", "operation",
+            static_cast<int32_t>(PID::Operation::Manual));
+        bench.setNumber("tune_pid", "manual_output", 50.0);
+        bench.advance(2);
+        CHECK_TRUE(bench.contactorClosed());
+        CHECK_TRUE(bench.heatingDuring(30) > 0);
+
+        bench.shortSensor(0);
+        bench.advance(2);
+        CHECK_TRUE(bench.contactorClosed());
+        CHECK_TRUE(bench.heatingDuring(30) > 0);
     }
 }

@@ -5,7 +5,7 @@
  * @file main.cpp
  *
  * @author GAOU (arstaligtredan.fr)
- * @version 0.3
+ * @version 0.2
  * @date 2026-07-12
  *
  * @copyright Copyright (c) 2022

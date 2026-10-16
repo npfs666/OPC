@@ -11,10 +11,13 @@
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
 
+#include <Outputs/ActuatorOnOff.h>
 #include <Outputs/PWMOutput.h>
+#include <Outputs/RelayOutput.h>
 #include <Outputs/TimeProportionalActuator.h>
 
 #include <Regulator/LimitAlarm.h>
+#include <Regulator/LogicCommand.h>
 #include <Regulator/LoopBreakAlarm.h>
 #include <Regulator/PID.h>
 
@@ -31,6 +34,12 @@ class SensorBoard;
  *
  * Sortie DC 1 : relais statique, en proportionnel temporisé (période 10 s).
  * Un relais mécanique ne tiendrait pas : jusqu'à 8 640 manoeuvres par jour.
+ *
+ * Relais 1 : bobine d'un contacteur général, en amont du relais statique.
+ * La glue le ferme quand le PID commande la sortie (Activé, autotune ou
+ * manuel) ; il s'ouvre sur un PID en défaut ou verrouillé et sur toute mise
+ * en sécurité, reset et watchdog compris : un relais statique en
+ * court-circuit est alors coupé.
  */
 class PIDInstallation final : public Installation
 {
@@ -60,6 +69,8 @@ public:
 
     void printHomeScreen(
         HomeScreenContext& context) override;
+
+    void processLogic(uint32_t now) override;
 
 private:
     struct HomeState
@@ -103,6 +114,11 @@ private:
     // Commande temporisée du relais statique (sortie DC 1)
     TimeProportionalActuator actuator;
     PWMOutput ssrOutput;
+
+    // Contacteur général en amont du relais statique, piloté par la glue
+    LogicCommand contactorCommand;
+    ActuatorOnOff contactor;
+    RelayOutput contactorRelay;
 
     // Alarmes (affichées seulement, désactivées par défaut)
     LimitAlarm alarm;

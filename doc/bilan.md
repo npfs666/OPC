@@ -232,7 +232,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 
 | Fonction | Pourquoi | Prio. |
 | --- | --- | --- |
-| **Version du firmware, template et commit dans un menu `À propos`**, et au démarrage sur le port série | Support : savoir ce qui tourne sur une carte. `main.cpp` annonce 0.3, le port série affiche « v0.2 » | P1 |
+| **Version du firmware, template et commit dans un menu `À propos`**, et au démarrage sur le port série | Support : savoir ce qui tourne sur une carte. La version n'est aujourd'hui qu'un commentaire de `main.cpp` et un texte du port série (0.2), à tenir à jour à la main | P1 |
 | **Réinitialisation usine** (réglages de l'installation, réglages de la carte à part) | Aujourd'hui, il faut effacer la flash au PC | P1 |
 | **Export du journal et des compteurs sur le disque USB** | `/events.csv` existe, mais seul `config.json` est visible par l'USB | P1 |
 | **Enregistrement des courbes en CSV** (mesures, consigne, sortie), visible par l'USB | Mise en service et diagnostic. Remplacerait les scripts `serialLog.py` | P1 |

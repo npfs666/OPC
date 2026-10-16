@@ -526,7 +526,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | --- | --- |
 | `ThermostatInstallation` | 1 PT100, thermostat avec hystérésis et rampe de consigne, relais 1 (charge de 5 A au plus, sinon contacteur) |
 | `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), pompe solaire par comparateurs et glue avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (contacteur sur le relais 2) |
-| `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais statique sur la sortie DC 1 en proportionnel temporisé (période 10 s, impulsion minimale 0,5 s) |
+| `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais statique sur la sortie DC 1 en proportionnel temporisé (période 10 s, impulsion minimale 0,5 s), contacteur général sur le relais 1 |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 | `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, contacteur du compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
 | `KilnInstallation` | Four céramique : thermocouple K, 3 programmes paliers-rampes de 8 segments, PID sur un relais statique (sortie DC 1), contacteur de sécurité (relais 1) piloté par la glue, alarmes de surchauffe, d'écart haut et de boucle ouverte actives, durées maxi de cuisson |
@@ -553,6 +553,16 @@ sortie DC 1 : + du SSR au 24 V, − sur DC 1. Elle est verrouillée à l'arrêt
 en sécurité. Un relais mécanique ne convient pas : avec une période de 10 s,
 il peut faire 8 640 manoeuvres par jour, et ses 150 000 manoeuvres seraient
 atteintes en 2 à 3 semaines.
+
+Le **relais 1** commande la bobine d'un **contacteur général**, en amont du
+SSR (voir [Câblage et sécurité électrique](#câblage-et-sécurité-électrique)).
+La glue le ferme quand le PID commande la sortie : régulation `Activé`,
+autotune en cours ou mode manuel. Il s'ouvre quand la régulation est
+arrêtée, quand le PID est en défaut (sonde en défaut sans `Maintien`) ou
+verrouillé par l'alarme de boucle, et sur toute mise en sécurité (timeout
+des mesures, réglages en cours d'application, reset, watchdog). Un SSR en
+court-circuit est alors coupé. Le contacteur n'a pas de mode manuel ; en
+mode manuel du PID, il reste fermé même sur une sonde en défaut.
 
 Le PID utilise la forme standard des régulateurs de température :
 `sortie = Kp · (e + 1/Ti · ∫e dt + Td · dérivée)`.

@@ -212,6 +212,33 @@ bool PIDInstallation::begin(
     if (!process.add(loopAlarm))
         return fail("Alarme de boucle non enregistrée");
 
+    // Contacteur général sur le relais 1, en amont du relais statique :
+    // ouvert quand le PID ne commande pas la sortie, et sur toute mise en
+    // sécurité. Il ne dépend que du PID : il suit sa règle de défaut, et le
+    // mode manuel garde la main sur une sonde en défaut.
+    contactorCommand.begin("pid_contactor_cmd", "Cde contacteur");
+    contactorCommand.disableManualMode();
+    contactorCommand.lockFaultAction(Regulator::FaultAction::SafeState);
+
+    contactor.begin("pid_contactor", "Contacteur", contactorCommand);
+
+    contactorRelay.begin(
+        "pid_contactor_relay",
+        "Relais contact.",
+        Board::Rp2040::OUTPUT_1,
+        true,
+        false);
+
+    contactorRelay.lockSafeState(false);
+
+    if (!contactorCommand.dependsOn(pid) ||
+        !process.add(contactorCommand) ||
+        !process.add(contactor) ||
+        !process.connect(contactor, contactorRelay))
+    {
+        return fail("Contacteur non relié");
+    }
+
     board.registerParameters(parameterList);
     process.registerParameters(parameterList);
 
@@ -236,6 +263,15 @@ bool PIDInstallation::begin(
         return fail("Consigne d'accueil introuvable");
 
     return true;
+}
+
+void PIDInstallation::processLogic(uint32_t now)
+{
+    (void)now;
+
+    // Fermé quand le PID commande la sortie : régulation Activée, autotune
+    // ou mode manuel.
+    contactorCommand.setOn(pid.isEnabled() || pid.isManual());
 }
 
 void PIDInstallation::onParametersApplied()
