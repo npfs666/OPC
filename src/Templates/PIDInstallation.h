@@ -11,7 +11,7 @@
 #include <Measurements/Resistance.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
 
-#include <Outputs/RelayOutput.h>
+#include <Outputs/PWMOutput.h>
 #include <Outputs/TimeProportionalActuator.h>
 
 #include <Regulator/LimitAlarm.h>
@@ -27,7 +27,10 @@ class SensorBoard;
  *
  * Le réglage manuel est disponible dans le menu « PID ». L'autotune est une
  * option séparée : il calcule les gains sans démarrer ensuite la régulation.
- * Le mode choisi doit correspondre à l'équipement raccordé au relais.
+ * Le mode choisi doit correspondre à l'équipement raccordé.
+ *
+ * Sortie DC 1 : relais statique, en proportionnel temporisé (période 10 s).
+ * Un relais mécanique ne tiendrait pas : jusqu'à 8 640 manoeuvres par jour.
  */
 class PIDInstallation final : public Installation
 {
@@ -97,9 +100,9 @@ private:
     // Régulation
     PID pid;
 
-    // Commande temporisée du relais
+    // Commande temporisée du relais statique (sortie DC 1)
     TimeProportionalActuator actuator;
-    RelayOutput controlRelay;
+    PWMOutput ssrOutput;
 
     // Alarmes (affichées seulement, désactivées par défaut)
     LimitAlarm alarm;

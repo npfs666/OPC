@@ -59,11 +59,12 @@ En résumé :
      - tests `test_kiln.cpp` : thermocouple hors du four, relais statique collé en descente, attente max, durée max.
    - Une carte déjà réglée garde ses valeurs sauvegardées : la boucle reste à activer au menu.
 
-3. **Template PID : relais mécanique en proportionnel temporisé, période 10 s**. Voir [PIDInstallation.cpp](../src/Templates/PIDInstallation.cpp), sortie `OUTPUT_1`.
+3. ✅ **Template PID : relais mécanique en proportionnel temporisé, période 10 s**. Voir [PIDInstallation.cpp](../src/Templates/PIDInstallation.cpp), sortie `OUTPUT_1`.
    - Avec une période de 10 s, le relais fait jusqu'à 8 640 manœuvres par jour.
    - Les 150 000 manœuvres d'un relais standard sont atteintes en 2 à 3 semaines.
    - Le template est le point de départ le plus copié : il doit être sûr par défaut.
    - À faire : passer le template sur la sortie DC 1 (relais statique), ou allonger la période à 60–120 s avec un avertissement dans le menu.
+   - Fait le 16/10/2026 : relais statique (`PWMOutput`) sur la sortie DC 1, période 10 s gardée, état sûr verrouillé à l'arrêt. Le template est maintenant testé sur l'hôte (`test_pid_template.cpp`).
 
 4. **Chauffage arrêté après une longue coupure de courant**. Voir [HeatingCurve.cpp](../src/Regulator/HeatingCurve.cpp), état `ClockInvalid`.
    - Une coupure de plusieurs jours peut décharger le supercondensateur du DS3231, et l'heure est alors perdue.
@@ -203,7 +204,7 @@ Thermostat, PID, programmation horaire, solaire, chambre froide positive, circui
 
 | Template | À faire | Prio. |
 | --- | --- | --- |
-| `PIDInstallation` | Sortie DC 1 (relais statique) ou période longue (§ 2, point 3) | P0 |
+| `PIDInstallation` | ✅ Sortie DC 1 (relais statique) (§ 2, point 3) | P0 |
 | `KilnInstallation` | ✅ LBA active par défaut, durée maximale de cuisson (§ 2, point 2). Reste : consignes d'isolation du thermocouple (§ 4, point 1) | P0 |
 | `HeatingCircuitInstallation` | Repli sur heure inconnue (§ 2, point 4) | P0 |
 | `ColdRoomInstallation` | Documenter le contacteur du compresseur. Ajouter une alarme `Temp. basse` (gel des produits, thermostat collé) | P1 |
@@ -304,7 +305,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 - Pull-down des sorties (✅ ordre d'initialisation corrigé).
 - Repli sur heure inconnue pour le chauffage, et autonomie du supercondensateur mesurée.
 - ✅ Four : LBA par défaut et durée maximale de cuisson.
-- Template PID sur relais statique.
+- ✅ Template PID sur relais statique.
 - Documentation : contacteur, limiteur, isolation des thermocouples.
 
 **v1.0 « publique »** : les P1.

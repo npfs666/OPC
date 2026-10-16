@@ -467,7 +467,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | --- | --- |
 | `ThermostatInstallation` | 1 PT100, thermostat avec hystérésis et rampe de consigne, relais 1 |
 | `SolarInstallation` | 3 PT100 (capteur, haut et bas du ballon), pompe solaire par comparateurs et glue avec décharge nocturne en mode vacances (relais 1), appoint électrique en heures creuses (relais 2) |
-| `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais à commande temporelle (période 10 s, impulsion minimale 0,5 s) |
+| `PIDInstallation` | 1 PT100, PID avec rampe et autotune, relais statique sur la sortie DC 1 en proportionnel temporisé (période 10 s, impulsion minimale 0,5 s) |
 | `ScheduleInstallation` | 2 programmes horaires hebdomadaires sur les relais 1 et 2, sans sonde ; heure et état des relais à l'accueil |
 | `ColdRoomInstallation` | Chambre froide positive : 2 PT100 (ambiance, évaporateur), porte sur l'entrée TOR 1, compresseur (relais 1), ventilateurs (relais 2), résistance de dégivrage (PWM 1) ; cycle de dégivrage par la glue |
 | `KilnInstallation` | Four céramique : thermocouple K, 3 programmes paliers-rampes de 8 segments, PID sur un relais statique (sortie DC 1), contacteur de sécurité (relais 1) piloté par la glue, alarmes de surchauffe, d'écart haut et de boucle ouverte actives, durées maxi de cuisson |
@@ -488,6 +488,12 @@ Le menu `Regulateur` du template PID contient :
   action `Lancer autotune`.
 
 Au démarrage avec la configuration par défaut, la régulation est arrêtée.
+
+La sortie est un **relais statique** (SSR à entrée continue 3–32 V) sur la
+sortie DC 1 : + du SSR au 24 V, − sur DC 1. Elle est verrouillée à l'arrêt
+en sécurité. Un relais mécanique ne convient pas : avec une période de 10 s,
+il peut faire 8 640 manoeuvres par jour, et ses 150 000 manoeuvres seraient
+atteintes en 2 à 3 semaines.
 
 Le PID utilise la forme standard des régulateurs de température :
 `sortie = Kp · (e + 1/Ti · ∫e dt + Td · dérivée)`.

@@ -80,6 +80,7 @@ fi
     "${project_dir}/test/host/test_heating_circuit.cpp" \
     "${project_dir}/test/host/test_setpoint_program.cpp" \
     "${project_dir}/test/host/test_kiln.cpp" \
+    "${project_dir}/test/host/test_pid_template.cpp" \
     "${project_dir}/test/host/test_parameter_json.cpp" \
     "${project_dir}/test/host/test_analog_mux.cpp" \
     "${project_dir}/test/host/test_acquisition_sequencer.cpp" \
@@ -146,6 +147,7 @@ fi
     "${project_dir}/src/Templates/ColdRoomInstallation.cpp" \
     "${project_dir}/src/Templates/HeatingCircuitInstallation.cpp" \
     "${project_dir}/src/Templates/KilnInstallation.cpp" \
+    "${project_dir}/src/Templates/PIDInstallation.cpp" \
     "${project_dir}/examples/MinimalInstallation/MinimalInstallation.cpp" \
     -o "${binary}"
 

@@ -7,17 +7,37 @@
 #include <Hardware/pinout.h>
 #include <ProcessControl.h>
 
-#include <Adafruit_GFX.h>
 #include <Arduino.h>
 
 #include <ProcessSnapshot.h>
 #include <hmi/HomeScreen.h>
-#include <hmi/AlarmDisplay.h>
-#include <hmi/MeasurementDisplay.h>
-#include <hmi/TextField.h>
 
 #include <cmath>
 #include <cstdio>
+
+namespace
+{
+    constexpr const char* AUTOTUNE_OWNER_KEY =
+        "tune_pid.autotune";
+
+    constexpr const char* AUTOTUNE_OWNER_NAME =
+        "PID autotune";
+
+    constexpr const char* RAMP_OWNER_KEY =
+        "tune_pid.ramp";
+
+    constexpr const char* RAMP_OWNER_NAME =
+        "Rampe PID";
+}
+
+// Le dessin n'est compilé que pour la carte : les tests sur l'hôte
+// vérifient la logique du template, pas l'écran.
+#ifndef OPC_HOST_TEST
+#include <Adafruit_GFX.h>
+
+#include <hmi/AlarmDisplay.h>
+#include <hmi/MeasurementDisplay.h>
+#include <hmi/TextField.h>
 
 namespace
 {
@@ -54,18 +74,6 @@ namespace
 
     constexpr const char* DEGREES_C = "\xF8" "C"; // "°C" en CP437
 
-    constexpr const char* AUTOTUNE_OWNER_KEY =
-        "tune_pid.autotune";
-
-    constexpr const char* AUTOTUNE_OWNER_NAME =
-        "PID autotune";
-
-    constexpr const char* RAMP_OWNER_KEY =
-        "tune_pid.ramp";
-
-    constexpr const char* RAMP_OWNER_NAME =
-        "Rampe PID";
-
     // Champ de valeur de taille 2 aligné sur le bord droit.
     void printValue(
         Adafruit_GFX& display,
@@ -84,6 +92,7 @@ namespace
             Align::Right);
     }
 }
+#endif
 
 const char* PIDInstallation::name() const
 {
@@ -166,21 +175,23 @@ bool PIDInstallation::begin(
     if (!process.add(actuator))
         return fail("Actionneur PID non enregistré");
 
-    controlRelay.begin(
-        "pid_tune_relay",
-        "Relais PID",
-        Board::Rp2040::OUTPUT_1,
+    // Relais statique sur la sortie DC 1 : avec une période de 10 s, un
+    // relais mécanique serait usé en quelques semaines.
+    ssrOutput.begin(
+        "pid_ssr",
+        "Relais statique",
+        Board::Rp2040::OUTPUT_3,
         true,
-        false);
+        0.0);
 
-    /* L'état sûr logique de l'équipement commandé est toujours OFF. */
-    controlRelay.lockSafeState(false);
+    /* L'état sûr de l'équipement commandé est toujours à l'arrêt. */
+    ssrOutput.lockSafeCommand(0.0);
 
     if (!process.connect(
             actuator,
-            controlRelay))
+            ssrOutput))
     {
-        return fail("Relais PID non relié à l'actionneur");
+        return fail("Relais statique non relié à l'actionneur");
     }
 
     // Alarme d'écart à la consigne, à activer dans le menu Alarmes :
@@ -315,6 +326,9 @@ void PIDInstallation::captureHomeScreenState()
 void PIDInstallation::printHomeScreen(
     HomeScreenContext& context)
 {
+#ifdef OPC_HOST_TEST
+    (void)context;
+#else
     Adafruit_GFX& display = context.display;
 
     display.cp437(true);
@@ -342,7 +356,7 @@ void PIDInstallation::printHomeScreen(
             COLOR_GREY);
 
         TextField::print(display, MARGIN, OUTPUT_Y, 2, COLOR_WHITE, "Sortie", LABEL_CHARS);
-        TextField::print(display, MARGIN, RELAY_Y, 2, COLOR_WHITE, "Relais", LABEL_CHARS);
+        TextField::print(display, MARGIN, RELAY_Y, 2, COLOR_WHITE, "SSR", LABEL_CHARS);
     }
 
     const bool cooling =
@@ -545,10 +559,10 @@ void PIDInstallation::printHomeScreen(
         BAR_HEIGHT - 2,
         COLOR_BLACK);
 
-    // ----- Relais -----
+    // ----- Relais statique -----
 
     const OutputSample* relaySample =
-        context.snapshot.find(controlRelay);
+        context.snapshot.find(ssrOutput);
 
     if (relaySample == nullptr || !relaySample->healthy)
         printValue(display, RELAY_Y, COLOR_GREY, "--");
@@ -583,4 +597,5 @@ void PIDInstallation::printHomeScreen(
         text,
         GAINS_CHARS,
         Align::Center);
+#endif
 }
