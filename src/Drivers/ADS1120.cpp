@@ -41,16 +41,20 @@ void ADS1120::begin(SPIClassRP2040 *spiClass, uint8_t clk_pin, uint8_t miso_pin,
   miso = miso_pin;
   mosi = mosi_pin;
 
-  // Configure the SPI interface (CPOL=0, CPHA=1)
+  // SPI dédié à l'ADS1120 (CPOL=0, CPHA=1, 4 MHz). CS est piloté par le
+  // pilote (digitalWrite), pas par le périphérique SPI : begin(false).
   HW_SPI = spiClass;
-  
+
   HW_SPI->setSCK(clk);
-  HW_SPI->setCS(cs);
   HW_SPI->setRX(miso);
   HW_SPI->setTX(mosi);
 
+  HW_SPI->begin(false);
+
+  // Réglages appliqués une fois pour toutes : aucune autre puce sur ce bus,
+  // et aucune interruption à masquer (pas de usingInterrupt()).
   HW_SPI->beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE1));
-  HW_SPI->begin(true);
+  HW_SPI->endTransaction();
 
   // Configure chip select as an output
   pinMode(cs, OUTPUT);

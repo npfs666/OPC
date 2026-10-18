@@ -230,10 +230,8 @@ bool Sensor::isAccumulationHalfWay()
 
 bool Sensor::isAccumulationDone()
 {
-    if (sampleCount == accumulationTarget())
-        return true;
-    else
-        return false;
+    // >= : un échantillon de trop ne doit pas empêcher la fin de la série.
+    return sampleCount >= accumulationTarget();
 }
 
 int32_t Sensor::accumulationTarget() const

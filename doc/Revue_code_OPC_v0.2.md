@@ -133,14 +133,16 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 ### C. Mineur / nettoyage
 
 17. ⬜ `FixedBufferPrint` tronque en silence au-delà de 1024 octets.
-18. ⬜ `Sensor::isAccumulationDone()` utilise `==` : `>=` serait plus robuste.
+18. ✅ `Sensor::isAccumulationDone()` utilisait `==` : un échantillon de trop empêchait la fin de la série. Corrigé en `>=` le 18/10/2026 (le test de mi-série du *chopping* reste en `==`).
 19. ✅ `273.14` au lieu de `273.15` dans `pressureSeaLevel` (BMP580 et BME).
 20. ⬜ Code mort :
     - `RTC::addMenuActions` / `executeMenuAction` / `validateParameters` ne sont jamais appelés (seulement par les tests). Son action, qui portait le n° 48 comme « Acquitter », porte maintenant le n° 71 ;
     - `printCSVPsychro` indexe sans vérifier les bornes ;
     - `readADC_Array` et `readADC_SingleArray` (boucle sans timeout) ne servent pas ;
     - `Storage::erase()` n'est jamais appelé (ajouté le 12/10/2026).
-21. ⬜ `ADS1120::begin` : `beginTransaction` n'est jamais fermé, et `begin(true)` (CS matériel) est ensuite écrasé par `pinMode(cs)`.
+21. ✅ `ADS1120::begin` : `beginTransaction` n'est jamais fermé, et `begin(true)` (CS matériel) est ensuite écrasé par `pinMode(cs)`.
+    - Relu le 18/10/2026 dans le cœur Arduino-Pico : moins grave que noté. `SPI.begin()` rappelle `beginTransaction()` puis `endTransaction()` avec les réglages déjà donnés, et aucune interruption n'est masquée (pas de `usingInterrupt()`). Le CS matériel était bien annulé par `pinMode()`.
+    - Réécrit pour la lisibilité : `begin(false)` (CS logiciel), puis `beginTransaction()` / `endTransaction()`, sans `setCS()`. Comportement inchangé ; contrôle sur banc (mesures identiques) à faire.
 22. ✅ Gain 3 fils : `setGain(16)` mais `measurementGain()` renvoie 8. C'est **correct**, car Vref vaut 2·I·Rref avec les deux IDAC : `Sensor::adcGain()` le commente.
 23. ✅ `src/.garbo` gagnerait à sortir de `src/`, car IntelliSense voit des `main.cpp` en double (dossier supprimé).
 24. ✅ Le README est désynchronisé du code :
