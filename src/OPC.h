@@ -86,8 +86,10 @@ public:
     RTC clock;
 
 private:
+    // Sortie série d'un cycle (événements et état du processus) : un gros
+    // template dépasse 1 Ko. Au-delà, la sortie est marquée tronquée.
     static constexpr size_t SERIAL_PRINT_BUFFER_SIZE =
-        1024;
+        2048;
 
     // Période de rappel de l'erreur de démarrage sur le port série.
     static constexpr uint32_t STARTUP_ERROR_REPEAT_MS =

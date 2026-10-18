@@ -118,14 +118,22 @@ namespace
         return y;
     }
 
+    /**
+     * Sortie série d'un cycle, écrite dans un tampon fixe. Au-delà de sa
+     * capacité, la suite est perdue, mais finish() termine le texte par
+     * TRUNCATED_MARK : une sortie tronquée se voit (Trace Série, terminal).
+     */
     class FixedBufferPrint final : public Stream
     {
     public:
+        static constexpr char TRUNCATED_MARK[] = "\n[sortie série tronquée]\n";
+        static constexpr size_t MARK_LENGTH = sizeof(TRUNCATED_MARK) - 1;
+
         FixedBufferPrint(
             uint8_t* storage,
             size_t capacity)
             : storage(storage),
-              capacity(capacity)
+              capacity(capacity > MARK_LENGTH ? capacity - MARK_LENGTH : 0)
         {
         }
 
@@ -133,6 +141,8 @@ namespace
         {
             if (length < capacity)
                 storage[length++] = value;
+            else
+                truncated = true;
 
             return 1;
         }
@@ -145,6 +155,16 @@ namespace
                 write(data[i]);
 
             return size;
+        }
+
+        /** Ajoute la marque de troncature si du texte a été perdu. */
+        void finish()
+        {
+            if (!truncated)
+                return;
+
+            std::memcpy(storage + length, TRUNCATED_MARK, MARK_LENGTH);
+            length += MARK_LENGTH;
         }
 
         size_t size() const
@@ -173,8 +193,10 @@ namespace
 
     private:
         uint8_t* storage = nullptr;
+        // Capacité utile, place de TRUNCATED_MARK réservée en fin de tampon.
         size_t capacity = 0;
         size_t length = 0;
+        bool truncated = false;
     };
 }
 
@@ -1732,6 +1754,8 @@ void OPC::handleUIMessage(
         //bufferedOutput.printf("%-16s: %10.2f °C\n", "CJ_temp", sharedColdJunctionTemperature);
 
         mutex_exit(&processDataMutex);
+
+        bufferedOutput.finish();
 
         if (uiState == UIState::Home)
         {

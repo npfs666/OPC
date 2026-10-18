@@ -132,7 +132,7 @@ L'architecture est propre et défensive : validations nombreuses, écriture atom
 
 ### C. Mineur / nettoyage
 
-17. ⬜ `FixedBufferPrint` tronque en silence au-delà de 1024 octets.
+17. ✅ `FixedBufferPrint` tronquait en silence au-delà de 1024 octets. Corrigé le 18/10/2026 : tampon de 2048 octets (un gros template dépassait 1 Ko), et une sortie qui déborde quand même se termine par `[sortie série tronquée]`.
 18. ✅ `Sensor::isAccumulationDone()` utilisait `==` : un échantillon de trop empêchait la fin de la série. Corrigé en `>=` le 18/10/2026 (le test de mi-série du *chopping* reste en `==`).
 19. ✅ `273.14` au lieu de `273.15` dans `pressureSeaLevel` (BMP580 et BME).
 20. ✅ Code mort (traité le 18/10/2026) :
