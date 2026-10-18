@@ -6,7 +6,7 @@
 
 #include <Measurements/Temperature/Temperature.h>
 
-class Adafruit_BME280;
+class CheckedBME280;
 
 class TemperatureBME : public Temperature
 {
@@ -15,12 +15,12 @@ public:
 
     void begin(
         const char* name,
-        Adafruit_BME280& bme);
+        CheckedBME280& bme);
 
     void update() override;
 
 private:
-    Adafruit_BME280* bme = nullptr;
+    CheckedBME280* bme = nullptr;
 };
 
 #endif

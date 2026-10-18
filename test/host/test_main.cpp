@@ -4,7 +4,7 @@
 #include "TestHarness.h"
 
 #include <Adafruit_BMP5xx.h>
-#include <Adafruit_BME280.h>
+#include <Hardware/CheckedBME280.h>
 #include <Drivers/DS3231.h>
 #include <Hardware/RTC.h>
 #include <Hardware/SensorBoard.h>
@@ -32,6 +32,7 @@
 #include <hmi/ParameterList.h>
 
 #include <cstring>
+#include <utility>
 #include <limits>
 
 namespace
@@ -380,7 +381,7 @@ namespace
 
     TEST_CASE("validation des mesures BME280")
     {
-        Adafruit_BME280 bme;
+        CheckedBME280 bme;
 
         TemperatureBME temperature;
         HumidityBME humidity;
@@ -475,6 +476,27 @@ namespace
         CHECK_FALSE(temperature.isValid());
         CHECK_FALSE(humidity.isValid());
         CHECK_FALSE(pressure.isValid());
+
+        // Capteur muet : valeurs plausibles, mais la puce ne répond plus.
+        bme.temperature = 21.5f;
+        bme.humidity = 48.25f;
+        bme.pressure = 101325.0f;
+        bme.responding = false;
+
+        temperature.update();
+        humidity.update();
+        pressure.update();
+
+        CHECK_FALSE(temperature.isValid());
+        CHECK_FALSE(humidity.isValid());
+        CHECK_FALSE(pressure.isValid());
+        CHECK_FALSE(std::isfinite(pressure.pressureSeaLevel(100)));
+
+        // Retour du capteur.
+        bme.responding = true;
+        temperature.update();
+        CHECK_TRUE(temperature.isValid());
+        CHECK_TRUE(std::isfinite(pressure.pressureSeaLevel(100)));
     }
 
     TEST_CASE("interpolation PT100")
@@ -3145,5 +3167,45 @@ namespace
         watchdog.checkInControlCore();
 
         CHECK_TRUE(rp2040.watchdogResetCount == 2);
+    }
+
+    TEST_CASE("PID unité de Kp selon la mesure")
+    {
+        class UnitMeasurement final : public Measurement
+        {
+        public:
+            explicit UnitMeasurement(const char* unit)
+            {
+                Measurement::begin("mesure", unit);
+            }
+
+            void update() override
+            {
+            }
+        };
+
+        // Kp en fraction de sortie par unité de la mesure régulée.
+        const std::pair<const char*, const char*> cases[] = {
+            {"°C", "1/°C"},
+            {"%", "1/%"},
+            {"", ""}
+        };
+
+        for (const auto& test : cases)
+        {
+            UnitMeasurement measurement(test.first);
+            PID pid;
+            pid.begin("pid", "PID", measurement);
+
+            Parameter storage[32];
+            ParameterList parameters;
+            parameters.begin(storage, 32);
+            pid.registerParameters(parameters);
+            CHECK_FALSE(parameters.hasError());
+
+            const Parameter* kp = parameters.find("pid", "kp");
+            CHECK_TRUE(kp != nullptr &&
+                       std::strcmp(kp->data.number.unit, test.second) == 0);
+        }
     }
 }

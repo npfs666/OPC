@@ -3,7 +3,7 @@
 
 #include <Measurements/Temperature/TemperatureBME.h>
 
-#include <Adafruit_BME280.h>
+#include <Hardware/CheckedBME280.h>
 
 #include <cmath>
 
@@ -20,7 +20,7 @@ TemperatureBME::TemperatureBME()
 
 void TemperatureBME::begin(
     const char* name,
-    Adafruit_BME280& bme)
+    CheckedBME280& bme)
 {
     Temperature::begin(name);
     this->bme = &bme;
@@ -28,7 +28,9 @@ void TemperatureBME::begin(
 
 void TemperatureBME::update()
 {
-    if (bme == nullptr)
+    // La bibliothèque ignore les échecs I²C : la puce doit répondre avant et
+    // après la lecture (voir CheckedBME280).
+    if (bme == nullptr || !bme->responds())
     {
         setValid(false);
         return;
@@ -37,7 +39,8 @@ void TemperatureBME::update()
     const double_t value =
         bme->readTemperature();
 
-    if (!std::isfinite(value) ||
+    if (!bme->responds() ||
+        !std::isfinite(value) ||
         value < MIN_TEMPERATURE ||
         value > MAX_TEMPERATURE)
     {

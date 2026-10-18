@@ -9,6 +9,7 @@
 #include <hmi/ParameterList.h>
 
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace
@@ -1111,6 +1112,12 @@ void PID::registerParameters(
             inputUnit);
     }
 
+    // Fraction de sortie par unité de mesure : 1/°C, 1/%, 1/hPa...
+    if (inputUnit != nullptr && inputUnit[0] != '\0')
+        snprintf(kpUnit, sizeof(kpUnit), "1/%s", inputUnit);
+    else
+        kpUnit[0] = '\0';
+
     parameters.addDouble(
         "kp",
         "Kp",
@@ -1119,7 +1126,7 @@ void PID::registerParameters(
         KP_MAX,
         0.01,
         2,
-        "1/°C");
+        kpUnit);
 
     // Premier pas de 10 s, puis réglage fin à la seconde.
     parameters.addDouble(

@@ -101,13 +101,13 @@ En résumé :
 ### P2
 
 10. Revue, point 13 : interruptions coupées pendant toute une sauvegarde (des centaines de ms sur le cœur 0). Impact jugé faible le 12/10/2026 (DRDY retardée déjà traitée, `millis()` et PWM matériels) : laissé en l'état.
-11. Revue, points 17, 18, 20 et 21 : nettoyage. `FixedBufferPrint` tronque en silence, `isAccumulationDone()` compare avec `==`, code mort, et `ADS1120::begin` laisse une transaction ouverte.
+11. ✅ Revue, points 17, 18, 20 et 21 : nettoyage fait le 18/10/2026. Sortie série de 2 Ko signalée si tronquée, fin de série en `>=`, code mort supprimé (`Storage::erase()` gardé pour la réinitialisation usine), initialisation SPI de l'ADS1120 réécrite (contrôle sur banc à faire).
 12. ✅ ADC redémarré ou muet : une étape sans conversion dans deux fois sa durée normale passe en `Invalid`, réinitialise l'ADC et note `ADC muet` au journal. Détection en quelques secondes, au lieu des 30 s du timeout des mesures.
 13. Revue, points 28 à 35 (relecture du 12/10/2026). Les trois premiers sont des corrections courtes, faits le 16/10/2026 :
     - ✅ 28 : « Mesurer N0 » dure près de 7 s, proche du watchdog de 8 s. Plusieurs calibrations sur banc sans reset : laissé en l'état ;
     - ✅ 29 : après un démarrage raté, `/counters.json` et `/events.csv` pouvaient être écrasés ;
     - ✅ 30 : un défaut de la nouvelle session pouvait être fusionné avec un événement relu de la précédente ;
-    - 31 à 35 : capacité des actions du menu, « Manœuvres » mal affiché (✅ 32), unité de `Kp`, BME280 muet non détecté, allocations dynamiques à documenter.
+    - 31 à 35 : capacité des actions du menu (laissée en l'état), ✅ « Manœuvres » mal affiché, ✅ unité de `Kp`, ✅ BME280 muet détecté, ✅ allocations dynamiques documentées.
 14. **Chauffage arrêté après une longue coupure de courant** (ancien P0 n°4). Voir [HeatingCurve.cpp](../src/Regulator/HeatingCurve.cpp), état `ClockInvalid`.
     - Une coupure assez longue décharge le supercondensateur du DS3231 (autonomie non mesurée, estimée de quelques heures à 1–2 jours), et l'heure est perdue.
     - Sans heure, la loi d'eau passe en état sûr : vanne fermée, plus de chauffage jusqu'au réglage de l'horloge. Seul `HeatingCircuitInstallation` est vraiment concerné ; l'appoint du solaire et le template de programmation horaire le sont peu.

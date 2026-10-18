@@ -234,6 +234,9 @@ private:
     double_t setpointMinimum = -50.0;
     double_t setpointMaximum = 250.0;
 
+    // Unité de Kp, « 1/<unité de la mesure> » : gardée par ParameterList.
+    char kpUnit[16] = {};
+
     /*
      * Terme intégral exprimé en fraction de sortie : un changement de Kp
      * ou de Ti ne fait donc pas sauter la commande.

@@ -6,7 +6,7 @@
 
 #include <Measurements/Pressure/Pressure.h>
 
-class Adafruit_BME280;
+class CheckedBME280;
 
 class PressureBME : public Pressure
 {
@@ -16,7 +16,7 @@ public:
 
     void begin(
         const char* name,
-        Adafruit_BME280& bme);
+        CheckedBME280& bme);
 
     double_t pressureSeaLevel(int16_t altitude);
 
@@ -28,7 +28,7 @@ public:
 
 private:
 
-    Adafruit_BME280* bme = nullptr;
+    CheckedBME280* bme = nullptr;
 };
 
 #endif

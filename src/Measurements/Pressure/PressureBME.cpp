@@ -3,7 +3,7 @@
 
 #include <Measurements/Pressure/PressureBME.h>
 
-#include <Adafruit_BME280.h>
+#include <Hardware/CheckedBME280.h>
 
 #include <cmath>
 
@@ -22,7 +22,7 @@ PressureBME::PressureBME()
 
 void PressureBME::begin(
     const char* name,
-    Adafruit_BME280& bme)
+    CheckedBME280& bme)
 {
     Pressure::begin(name);
     this->bme = &bme;
@@ -30,7 +30,7 @@ void PressureBME::begin(
 
 double_t PressureBME::pressureSeaLevel(int16_t altitude) {
 
-    if (bme == nullptr)
+    if (bme == nullptr || !bme->responds())
         return NAN;
 
     const double_t pressure =
@@ -39,7 +39,8 @@ double_t PressureBME::pressureSeaLevel(int16_t altitude) {
     const double_t temperature =
         bme->readTemperature();
 
-    if (!std::isfinite(pressure) ||
+    if (!bme->responds() ||
+        !std::isfinite(pressure) ||
         pressure < MIN_PRESSURE ||
         pressure > MAX_PRESSURE ||
         !std::isfinite(temperature) ||
@@ -68,7 +69,9 @@ uint8_t PressureBME::printDecimals() const {
 
 void PressureBME::update()
 {
-    if (bme == nullptr)
+    // La bibliothèque ignore les échecs I²C : la puce doit répondre avant et
+    // après la lecture (voir CheckedBME280).
+    if (bme == nullptr || !bme->responds())
     {
         setValid(false);
         return;
@@ -77,7 +80,8 @@ void PressureBME::update()
     const double_t value =
         bme->readPressure();
 
-    if (!std::isfinite(value) ||
+    if (!bme->responds() ||
+        !std::isfinite(value) ||
         value < MIN_PRESSURE ||
         value > MAX_PRESSURE)
     {

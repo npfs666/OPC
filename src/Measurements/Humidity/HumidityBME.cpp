@@ -3,7 +3,7 @@
 
 #include <Measurements/Humidity/HumidityBME.h>
 
-#include <Adafruit_BME280.h>
+#include <Hardware/CheckedBME280.h>
 
 #include <cmath>
 
@@ -19,7 +19,7 @@ HumidityBME::HumidityBME()
 
 void HumidityBME::begin(
     const char* name,
-    Adafruit_BME280& bme)
+    CheckedBME280& bme)
 {
     Humidity::begin(name);
     this->bme = &bme;
@@ -27,7 +27,9 @@ void HumidityBME::begin(
 
 void HumidityBME::update()
 {
-    if (bme == nullptr)
+    // La bibliothèque ignore les échecs I²C : la puce doit répondre avant et
+    // après la lecture (voir CheckedBME280).
+    if (bme == nullptr || !bme->responds())
     {
         setValid(false);
         return;
@@ -36,7 +38,8 @@ void HumidityBME::update()
     const double_t value =
         bme->readHumidity();
 
-    if (!std::isfinite(value) ||
+    if (!bme->responds() ||
+        !std::isfinite(value) ||
         value < MIN_HUMIDITY ||
         value > MAX_HUMIDITY)
     {

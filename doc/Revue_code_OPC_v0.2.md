@@ -162,9 +162,9 @@ Points 30 à 35 ajoutés le 12/10/2026.
     - Calibration (6), Journal, Acquitter, une « RAZ compteurs » par relais et les actions de l'installation. Au-delà de 16, `initMenu()` échoue : le menu reste inaccessible et la cause n'est écrite que sur le port série.
     - Sans conséquence sur la carte v0.2 : elle n'a que deux broches de relais, donc au plus 13 actions avec les templates actuels. À revoir si `MAX_REGISTERED_OUTPUTS` (16) devient atteignable, ou à rendre visible à l'écran.
 32. ✅ Le libellé « Manœuvres » (`RelayOutput`, compteurs) s'affichait « Man?uvres » : le « œ » n'existe pas en CP437 (`DisplayTextCodec`). Il s'écrit maintenant « Manoeuvres ».
-33. ⬜ L'unité de `Kp` est toujours « 1/°C » dans le menu du PID, même si la mesure régulée est une humidité ou une pression. Elle pourrait être construite à partir de l'unité de la mesure, comme celle de la consigne.
-34. ⬜ Les classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) ne détectent pas un capteur muet, comme le BMP580 avant le point 27 : `Adafruit_BME280` ne signale pas une lecture I²C ratée. Aucun template ne les utilise.
-35. ⬜ **Allocations dynamiques** : la règle « pas d'allocation dynamique » de `CLAUDE.md` a deux exceptions, à documenter.
+33. ✅ L'unité de `Kp` était toujours « 1/°C » dans le menu du PID, même si la mesure régulée est une humidité ou une pression. Corrigé le 18/10/2026 : « 1/<unité de la mesure> » (1/%, 1/hPa...), rien pour une mesure sans unité. Test `PID unité de Kp selon la mesure`.
+34. ✅ Les classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) ne détectaient pas un capteur muet, comme le BMP580 avant le point 27 : `Adafruit_BME280` ne signale pas une lecture I²C ratée. Corrigé le 18/10/2026 : elles prennent un `CheckedBME280` (`Hardware/CheckedBME280.h`), qui relit l'identifiant de la puce avant et après chaque lecture ; une lecture ratée laisse l'adresse du registre dans le tampon, jamais l'identifiant. Mesure invalide sinon. Aucun template ne les utilise encore.
+35. ✅ **Allocations dynamiques** : la règle « pas d'allocation dynamique » de `CLAUDE.md` a deux exceptions, documentées le 18/10/2026 (CLAUDE.md et README).
     - `ArduinoMenuUI` crée les éléments du menu par `new`, une seule fois au démarrage : sans risque de fragmentation.
     - Les `JsonDocument` d'ArduinoJson 7 (`Storage`, `OPC::saveCounters()`) allouent sur le tas à chaque sauvegarde, puis libèrent. Volumes faibles et sauvegardes rares, donc risque faible, mais c'est le seul usage répété du tas.
 

@@ -982,6 +982,9 @@ réglables dans [pinout.h](src/Hardware/pinout.h) : 16 mesures, 32 régulateurs
 16 actionneurs, 16 sorties, 2 entrées numériques, 8 alarmes, 192 paramètres
 (un `TimeSchedule` en utilise 19, une `LimitAlarm` 8, une `LoopBreakAlarm` 5,
 une `ConditionAlarm` 3, un `SetpointProgram` 6 plus 25 par programme).
+Le tas ne sert qu'en deux endroits : le menu crée ses éléments une seule fois
+au démarrage, et les sauvegardes (configuration, compteurs) allouent puis
+libèrent leur document JSON.
 
 ### Comparateur
 

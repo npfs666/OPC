@@ -6,7 +6,7 @@
 
 #include <Measurements/Humidity/Humidity.h>
 
-class Adafruit_BME280;
+class CheckedBME280;
 
 class HumidityBME : public Humidity
 {
@@ -16,13 +16,13 @@ public:
 
     void begin(
         const char* name,
-        Adafruit_BME280& bme);
+        CheckedBME280& bme);
 
     void update() override;
 
 private:
 
-    Adafruit_BME280* bme = nullptr;
+    CheckedBME280* bme = nullptr;
 };
 
 #endif
