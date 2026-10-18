@@ -220,7 +220,7 @@ namespace
         CHECK_TRUE(switches != nullptr &&
                    std::strcmp(switches->parentOwnerKey, "counters") == 0);
 
-        // Divers > Compteurs > Relais 1, avec son action de remise à zéro.
+        // Divers > Entretien > Relais 1, avec son action de remise à zéro.
         MenuBuilder menu;
         CHECK_TRUE(installation.buildMenu(menu));
         CHECK_TRUE(installation.process.addMenuActions(menu));
@@ -230,6 +230,8 @@ namespace
             menu.findGroupForOwner("relay.counters");
         CHECK_TRUE(counters != MenuBuilder::INVALID_GROUP);
         CHECK_TRUE(relayCounters != MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(counters != MenuBuilder::INVALID_GROUP &&
+                   std::strcmp(menu.getGroup(counters)->name, "Entretien") == 0);
 
         const MenuBuilder::Group* group = menu.getGroup(relayCounters);
         CHECK_TRUE(group != nullptr && group->parent == counters);

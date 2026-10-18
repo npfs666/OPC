@@ -132,7 +132,7 @@ courts (compresseur, contacteur) :
   chronos, sauf si la broche change.
 
 Chaque relais compte aussi ses manœuvres et sa durée en marche, avec un seuil
-d'entretien (`Divers > Compteurs`, voir le README principal). `counters()`,
+d'entretien (`Divers > Entretien`, voir le README principal). `counters()`,
 `onSeconds()` et `resetCounters()` y donnent accès ; une sortie PWM n'a pas
 de compteurs.
 
@@ -317,7 +317,7 @@ la fin du recalage du démarrage.
   résultats si la course est courte devant la constante de temps. Le délai
   d'une `LoopBreakAlarm` doit dépasser le temps de course.
 - Chaque impulsion compte une manœuvre de relais : la zone morte règle le
-  compromis entre précision et usure (seuil d'entretien, `Divers > Compteurs`).
+  compromis entre précision et usure (seuil d'entretien, `Divers > Entretien`).
 - L'estimation n'est recalée qu'en butée. Une vanne qui reste longtemps à mi-
   course peut dériver de quelques % ; une commande à 0 ou 1 la recale.
 - La position n'est pas encore dans le snapshot : un écran d'accueil ne peut

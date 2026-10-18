@@ -564,9 +564,15 @@ void SensorBoard::registerCalibrationParameters(
 void SensorBoard::registerDiagnosticParameters(
     ParameterList& list)
 {
-    // Compteurs depuis le démarrage, non sauvegardés.
-    auto counters = list.forOwner(boardOwner(
-        "sensor_board.diagnostics", "Diagnostic", false));
+    // Divers > Diagnostic, à côté du journal : on les consulte quand
+    // quelque chose cloche, on ne les règle pas. Compteurs depuis le
+    // démarrage, non sauvegardés.
+    ParameterOwner owner{
+        "miscellaneous", "Divers", "sensor_board.diagnostics", "Diagnostic",
+        false};
+    owner.board = true;
+
+    auto counters = list.forOwner(owner);
 
     constexpr int32_t COUNTER_MAX = INT32_MAX;
 

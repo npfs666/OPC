@@ -715,13 +715,13 @@ void ProcessControl::print(Stream& stream) const
 
 void ProcessControl::registerParameters(ParameterList& list)
 {
-    // Divers > Compteurs, parent des compteurs de chaque relais : enregistré
-    // avant les sorties.
+    // Divers > Entretien, parent des compteurs de chaque relais : enregistré
+    // avant les sorties. La clé « counters » reste celle des sauvegardes.
     auto counters = list.forOwner({
         "miscellaneous",
         "Divers",
         "counters",
-        "Compteurs",
+        "Entretien",
         false
     });
 

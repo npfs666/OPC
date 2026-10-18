@@ -41,6 +41,7 @@ mise en sécurité des sorties.
   - [Mode manuel](#mode-manuel)
   - [Journal des événements](#journal-des-événements)
   - [Compteurs d'entretien](#compteurs-dentretien)
+  - [Diagnostic de la carte](#diagnostic-de-la-carte)
   - [Calibration](#calibration)
   - [Horloge](#horloge)
   - [Configuration et USB](#configuration-et-usb)
@@ -1325,10 +1326,10 @@ redémarrages n'use pas la flash). Une coupure de courant perd au plus les
 
 ### Compteurs d'entretien
 
-`Divers > Compteurs` affiche, en lecture seule :
+`Divers > Entretien` affiche, en lecture seule :
 
 - **Heures carte** : durée de fonctionnement cumulée de la carte ;
-- pour chaque relais (`Divers > Compteurs > <relais>`) : **Manoeuvres**
+- pour chaque relais (`Divers > Entretien > <relais>`) : **Manoeuvres**
   (basculements réels, mises en sécurité comprises) et **Heures ON** (durée
   cumulée en marche).
 
@@ -1344,6 +1345,17 @@ Les compteurs sont sauvegardés à part, dans `/counters.json`, toutes les
 heures et après une remise à zéro, pour ménager la flash : une coupure de
 courant perd au plus une heure de comptage. Ils sont relus au démarrage, par
 la clé de configuration de chaque relais.
+
+### Diagnostic de la carte
+
+`Divers > Diagnostic` affiche des compteurs depuis le démarrage, en lecture
+seule et non sauvegardés, à consulter quand une mesure passe en défaut (voir
+aussi le [journal](#journal-des-événements)) :
+
+- `Erreurs I2C MCP` : transactions en échec avec le multiplexeur des
+  entrées ;
+- `Reinit. MCP` : réinitialisations du multiplexeur ;
+- `ADC muet` : étapes d'acquisition sans conversion dans le délai prévu.
 
 ### Calibration
 
@@ -1362,11 +1374,7 @@ la clé de configuration de chaque relais.
   et action `Calibrer Rref (E1)` avec un étalon branché en 4 fils sur
   l'entrée 1 ;
 - **Thermocouples** : `C.J. offset` pour corriger la soudure froide, avec
-  affichage de la température de l'ADC ;
-- **Diagnostic** : compteurs depuis le démarrage, en lecture seule et non
-  sauvegardés : `Erreurs I2C MCP` (transactions en échec avec le
-  multiplexeur), `Reinit. MCP` (réinitialisations du multiplexeur) et
-  `ADC muet` (étapes sans conversion dans le délai prévu).
+  affichage de la température de l'ADC.
 
 Une mesure de calibration instable ou hors plage est rejetée sans écraser la
 calibration existante.
@@ -1398,10 +1406,12 @@ négligeable.
 ### Horloge
 
 `Divers > Horloge` affiche et règle la date et l'heure locales. `Valider`
-écrit dans l'horloge ; `Quitter` abandonne les modifications.
+écrit dans l'horloge ; `Quitter` abandonne les modifications de la date et
+de l'heure.
 
 Le DS3231 contient l'heure **UTC**. L'heure locale est calculée à chaque
-lecture d'après `Divers > Fuseau horaire` :
+lecture d'après le sous-menu `Divers > Horloge > Fuseau horaire`, appliqué
+à la sortie du menu comme les autres réglages :
 
 - **Décalage UTC** : décalage de l'heure d'hiver (`1.00 h` pour la France,
   réglable au quart d'heure) ;

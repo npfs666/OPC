@@ -422,8 +422,8 @@ Chaque étape compile et laisse une carte qui fonctionne.
      muet » / « ADC rétabli », « Broche MCP non conforme » / « Broches MCP
      conformes » (`OPC::logAcquisitionFaults()`).
    - Compteurs en lecture seule, non sauvegardés, dans
-     `Calibration > Diagnostic` : `Erreurs I2C MCP`, `Reinit. MCP`,
-     `ADC muet`.
+     `Calibration > Diagnostic` (aujourd'hui `Divers > Diagnostic`) :
+     `Erreurs I2C MCP`, `Reinit. MCP`, `ADC muet`.
    - Calibration refusée si le routage n'est pas prouvé.
    - `GPIO ≠ OLAT`, compté seulement quand la configuration est en place :
      bloquant (`PIN_MISMATCH_IS_FAULT = true` dans `AnalogMux.cpp`) depuis la

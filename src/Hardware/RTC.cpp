@@ -690,6 +690,11 @@ void RTC::registerParameters(
     };
     timeZoneOwner.board = true;
 
+    // Sous-menu de Horloge. Valider et Quitter ne concernent que la date et
+    // l'heure : le fuseau s'applique à la sortie du menu, comme les autres
+    // réglages.
+    timeZoneOwner.parentOwnerKey = MENU_OWNER_KEY;
+
     auto timeZoneParameters = list.forOwner(timeZoneOwner);
 
     timeZoneParameters.addDouble(

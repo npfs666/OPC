@@ -63,7 +63,7 @@ public:
     void resetCounters() override;
     void restoreCounters(uint32_t switches, double_t onSeconds) override;
 
-    /** Clé du sous-menu Divers > Compteurs > <relais>. */
+    /** Clé du sous-menu Divers > Entretien > <relais>. */
     const char* countersOwnerKey() const override
     {
         return counterOwnerKey;

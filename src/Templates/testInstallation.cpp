@@ -15,7 +15,7 @@
 namespace
 {
     // Entrée 1 : false = PT100 4 fils, true = thermocouple type K.
-    constexpr bool INPUT1_IS_THERMOCOUPLE = true;
+    constexpr bool INPUT1_IS_THERMOCOUPLE = false;
 
     constexpr uint16_t SAMPLES = 16;
 

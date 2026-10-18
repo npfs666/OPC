@@ -339,7 +339,7 @@ void RelayOutput::registerParameters(
         5,
         "s");
 
-    // Divers > Compteurs > <relais> : valeurs en lecture seule (sauvegardées
+    // Divers > Entretien > <relais> : valeurs en lecture seule (sauvegardées
     // à part, dans /counters.json) et seuil d'entretien.
     auto counterValues = list.forOwner({
         "miscellaneous",

@@ -2955,6 +2955,13 @@ namespace
             menu.getGroup(clockGroup)->parent ==
                 miscellaneous);
 
+        // Divers > Horloge > Fuseau horaire.
+        const MenuBuilder::GroupId timeZoneGroup =
+            menu.findGroupForOwner(RTC::TIME_ZONE_OWNER_KEY);
+        CHECK_TRUE(timeZoneGroup != MenuBuilder::INVALID_GROUP);
+        CHECK_TRUE(timeZoneGroup != MenuBuilder::INVALID_GROUP &&
+                   menu.getGroup(timeZoneGroup)->parent == clockGroup);
+
         // L'heure s'écrit à la validation du menu, sans action dédiée.
         CHECK_TRUE(menu.findAction("rtc_set_date_time") == nullptr);
 
