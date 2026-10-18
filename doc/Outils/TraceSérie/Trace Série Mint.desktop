@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Trace Série (Linux Mint)
+Comment=Utiliser les bibliothèques fournies par Linux Mint
+Exec=/usr/bin/python3 -E -s -c "import os,pathlib,sys; from urllib.parse import urlparse,unquote; p=sys.argv[1]; p=unquote(urlparse(p).path) if p.startswith('file:') else p; os.execv('/bin/sh',['sh',str(pathlib.Path(p).resolve().with_name('lancer-mint.sh'))])" %k
+Terminal=false
+Icon=utilities-system-monitor
+Categories=Utility;

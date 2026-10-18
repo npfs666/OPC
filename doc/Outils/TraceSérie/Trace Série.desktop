@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Trace Série
+Comment=Courbes en direct depuis un port série
+Exec=python3 -c "import os,pathlib,sys; from urllib.parse import urlparse,unquote; p=sys.argv[1]; p=unquote(urlparse(p).path) if p.startswith('file:') else p; os.execv(sys.executable,[sys.executable,str(pathlib.Path(p).resolve().with_name('lancer.pyw'))])" %k
+Terminal=false
+Icon=utilities-system-monitor
+Categories=Utility;Education;
