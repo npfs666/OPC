@@ -113,8 +113,6 @@ public:
 
     void print(Stream& stream) const;
 
-    void printCSVPsychro(Stream& stream) const;
-
     /**
      * Écrit les événements ajoutés au journal depuis le dernier appel
      * (changements d'état des mesures et des alarmes, entretien...). Le

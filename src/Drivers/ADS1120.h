@@ -114,11 +114,7 @@ class ADS1120 {
     void begin(SPIClassRP2040 *spiClass, uint8_t clk_pin, uint8_t miso_pin, uint8_t mosi_pin, uint8_t cs_pin, uint8_t drdy_pin);
     bool isDataReady(void);
     int32_t readADC(void);
-    byte * readADC_Array(void);
-    int32_t readADC_Single(void);
     bool readADC_Single(int32_t& value, uint32_t timeoutMs);
-    byte * readADC_SingleArray(void);
-    double readInternalTemp(void);
     bool readInternalTemp(double& value, uint32_t timeoutMs);
     // Conversion d'une mesure brute du capteur interne en °C.
     static double rawToTemperature(int32_t rawValue);

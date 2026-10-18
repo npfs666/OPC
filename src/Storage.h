@@ -76,7 +76,8 @@ public:
         const char* installationId,
         const ParameterList& parameters);
 
-    // Efface /config.json ; /board.json est conservé.
+    // Efface /config.json ; /board.json est conservé. Pas encore appelée :
+    // gardée pour la future réinitialisation usine.
     bool erase();
 
     /**

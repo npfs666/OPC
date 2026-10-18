@@ -840,38 +840,6 @@ bool RTC::applyMenuParameters(ParameterEditor& editor)
     return true;
 }
 
-bool RTC::addMenuActions(
-    MenuBuilder& menu) const
-{
-    const MenuBuilder::GroupId group =
-        menu.findGroupForOwner(
-            MENU_OWNER_KEY);
-
-    if (group == MenuBuilder::INVALID_GROUP)
-        return true;
-
-    return menu.addAction(
-        group,
-        SET_DATE_TIME_ACTION,
-        "rtc_set_date_time",
-        "Mettre à jour");
-}
-
-bool RTC::handlesMenuAction(
-    MenuBuilder::ActionId actionId) const
-{
-    return actionId == SET_DATE_TIME_ACTION;
-}
-
-bool RTC::executeMenuAction(
-    MenuBuilder::ActionId actionId)
-{
-    if (!handlesMenuAction(actionId))
-        return false;
-
-    return setDateTime(menuDateTime);
-}
-
 bool RTC::isValidDateTime(
     const DateTime& dateTime)
 {

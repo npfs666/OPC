@@ -665,18 +665,6 @@ void ProcessControl::captureSnapshot(
     return measurements[id];
 }*/
 
-/**
- * Only for testing hardware, do not correct
- */
-void ProcessControl::printCSVPsychro(Stream& stream) const {
-
-    stream.print(measurements[2]->getValue(),3);
-    stream.print(";");
-    stream.print(measurements[4]->getValue(),3);
-    stream.print(";");
-    stream.println(measurements[5]->getValue(),3);
-}
-
 void ProcessControl::print(Stream& stream) const
 {
     //stream.println();

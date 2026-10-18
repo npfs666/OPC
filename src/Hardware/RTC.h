@@ -7,7 +7,6 @@
 #include <Arduino.h>
 #include <Configurable.h>
 #include <Drivers/DS3231.h>
-#include <hmi/MenuBuilder.h>
 
 class ParameterEditor;
 class ParameterList;
@@ -149,14 +148,6 @@ public:
     /** Valide et écrit uniquement les champs de l'horloge modifiés. */
     bool applyMenuParameters(ParameterEditor& editor);
 
-    bool addMenuActions(MenuBuilder& menu) const;
-
-    bool handlesMenuAction(
-        MenuBuilder::ActionId actionId) const;
-
-    bool executeMenuAction(
-        MenuBuilder::ActionId actionId);
-
     static bool isValidDateTime(
         const DateTime& dateTime);
 
@@ -189,10 +180,6 @@ private:
     bool readMenuDateTime(
         const ParameterEditor& editor,
         DateTime& dateTime) const;
-
-    // Distinct des actions d'OPC (48 : « Acquitter », 70 : journal).
-    static constexpr MenuBuilder::ActionId
-        SET_DATE_TIME_ACTION = 71;
 
     static uint8_t toBcd(uint8_t value);
 

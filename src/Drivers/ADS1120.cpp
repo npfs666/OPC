@@ -92,28 +92,7 @@ int32_t ADS1120::readADC()
   return static_cast<int16_t>(adcVal);
 }
 
-byte *ADS1120::readADC_Array()
-{
-  digitalWrite(cs, LOW); // Take CS low
-  delayMicroseconds(1);              // Minimum of td(CSSC)
-  static byte dataarray[2];
-  for (int x = 0; x < 2; x++)
-  {
-    dataarray[x] = HW_SPI->transfer(SPI_MASTER_DUMMY);
-  }
-  delayMicroseconds(1); // Minimum of td(CSSC)
-  digitalWrite(cs, HIGH);
-  return dataarray;
-}
-
 // Single Conversion read modes
-int32_t ADS1120::readADC_Single()
-{
-  int32_t value = 0;
-  readADC_Single(value, UINT32_MAX);
-  return value;
-}
-
 bool ADS1120::readADC_Single(
   int32_t& value,
   uint32_t timeoutMs)
@@ -140,35 +119,6 @@ bool ADS1120::readADC_Single(
   digitalWrite(cs, HIGH);
   value = static_cast<int16_t>(adcVal);
   return true;
-}
-
-byte *ADS1120::readADC_SingleArray()
-{
-  digitalWrite(cs, LOW); // Take CS low
-  delayMicroseconds(1);              // Minimum of td(CSSC)
-
-  HW_SPI->transfer(CMD_START_SYNC);
-  while (digitalRead(drdy) == HIGH)
-  {
-    // Espera a que DRDY se ponga en nivel bajo. Esto es un riesgo porque pude quedar bloqueado el codigo aca.
-    // Se deberia poner un timeout configurable en el metodo de begin y devolver un error si no responde
-  }
-
-  static byte dataarray[2];
-  for (int x = 0; x < 2; x++)
-  {
-    dataarray[x] = HW_SPI->transfer(SPI_MASTER_DUMMY);
-  }
-  delayMicroseconds(1); // Minimum of td(CSSC)
-  digitalWrite(cs, HIGH);
-  return dataarray;
-}
-
-double ADS1120::readInternalTemp(void) {
-
-  double value = NAN;
-  readInternalTemp(value, UINT32_MAX);
-  return value;
 }
 
 bool ADS1120::readInternalTemp(

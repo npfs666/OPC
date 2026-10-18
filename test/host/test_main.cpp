@@ -213,8 +213,7 @@ namespace
                     group,
                     2,
                     "pid_autotune_cancel",
-                    "Annuler autotune") &&
-                clock.addMenuActions(menu);
+                    "Annuler autotune");
         }
 
     private:
@@ -2179,36 +2178,9 @@ namespace
         CHECK_TRUE(setClockDraft(editor, "hour", 23));
         CHECK_TRUE(setClockDraft(editor, "minute", 58));
         CHECK_TRUE(setClockDraft(editor, "second", 57));
-        CHECK_TRUE(editor.apply());
 
-        MenuBuilder menu;
-        CHECK_TRUE(menu.begin("Test"));
-
-        const MenuBuilder::GroupId miscellaneous =
-            menu.addSubmenu(
-                menu.root(),
-                "miscellaneous",
-                "Divers");
-
-        const MenuBuilder::GroupId clockGroup =
-            menu.addSubmenu(
-                miscellaneous,
-                "rtc.clock",
-                "Horloge");
-
-        CHECK_TRUE(
-            menu.addParameters(
-                clockGroup,
-                "rtc.clock"));
-        CHECK_TRUE(clock.addMenuActions(menu));
-
-        const MenuBuilder::Action* action =
-            menu.findAction(
-                "rtc_set_date_time");
-
-        CHECK_TRUE(action != nullptr);
-        CHECK_TRUE(
-            clock.executeMenuAction(action->id));
+        // Écriture comme à la validation du menu Horloge.
+        CHECK_TRUE(clock.applyMenuParameters(editor));
         CHECK_TRUE(wire.registers[0x00] == 0x57);
         CHECK_TRUE(wire.registers[0x01] == 0x58);
         CHECK_TRUE(wire.registers[0x02] == 0x23);
@@ -2849,7 +2821,7 @@ namespace
             menu.getGroup(autoTuneGroup)->parent ==
                 regulators);
 
-        CHECK_TRUE(menu.actionCount() == 3);
+        CHECK_TRUE(menu.actionCount() == 2);
 
         const MenuBuilder::Action* startAction =
             menu.findAction(
@@ -2961,17 +2933,8 @@ namespace
             menu.getGroup(clockGroup)->parent ==
                 miscellaneous);
 
-        const MenuBuilder::Action* clockAction =
-            menu.findAction(
-                "rtc_set_date_time");
-
-        CHECK_TRUE(clockAction != nullptr);
-        CHECK_TRUE(clockAction->id == 71);
-        CHECK_TRUE(
-            clockAction->id !=
-                ProcessControl::ACKNOWLEDGE_ALARMS_ACTION);
-        CHECK_TRUE(
-            clockAction->group == clockGroup);
+        // L'heure s'écrit à la validation du menu, sans action dédiée.
+        CHECK_TRUE(menu.findAction("rtc_set_date_time") == nullptr);
 
         const Parameter* clockHour =
             installation.getParameters().find(
