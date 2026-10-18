@@ -306,6 +306,8 @@ bool OPC::newMeasurement()
     controller.captureSnapshot(
         sharedProcessSnapshot,
         times);
+    sharedAdcTemperature = input.getAdcTemperature();
+    sharedColdJunctionTemperature = input.getColdJunctionTemperature();
 
     const bool configurationSaveRequested =
         userInstall.takeConfigurationSaveRequest();
@@ -1722,11 +1724,12 @@ void OPC::handleUIMessage(
 
         controller.printStatusEvents(bufferedOutput);
         controller.print(bufferedOutput);
-        // Vieille méthode de print pour un CSV
-        //controller.printCSVPsychro(bufferedOutput);
 
-        // Juste une méthode temporaire pour avoir la temp de l'ADC sur un sweep
-        //bufferedOutput.printf("ADC_temp : %.2f\n", input.getAdcTemperature());
+        // Diagnostic de jonction froide : température interne de l'ADC, au
+        // format des mesures (« Nom : valeur unité ») pour Trace Série.
+        //bufferedOutput.println(F("----------Carte-----------"));
+        //bufferedOutput.printf("%-16s: %10.2f °C\n", "ADC_temp", sharedAdcTemperature);
+        //bufferedOutput.printf("%-16s: %10.2f °C\n", "CJ_temp", sharedColdJunctionTemperature);
 
         mutex_exit(&processDataMutex);
 

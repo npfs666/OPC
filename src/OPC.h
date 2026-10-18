@@ -180,6 +180,10 @@ private:
     double_t pendingHomeSetpoint = 0.0;
     ProcessSnapshot sharedProcessSnapshot;
     ProcessSnapshot displayProcessSnapshot;
+    // Température interne de l'ADC et jonction froide (avec C.J. offset),
+    // copiées avec l'instantané pour la sortie série.
+    double_t sharedAdcTemperature = NAN;
+    double_t sharedColdJunctionTemperature = NAN;
     RTC::DateTime sharedClockDateTime;
     bool sharedClockValid = false;
     uint32_t lastClockRefresh = 0;
