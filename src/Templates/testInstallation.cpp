@@ -15,7 +15,7 @@
 namespace
 {
     // Entrée 1 : false = PT100 4 fils, true = thermocouple type K.
-    constexpr bool INPUT1_IS_THERMOCOUPLE = false;
+    constexpr bool INPUT1_IS_THERMOCOUPLE = true;
 
     constexpr uint16_t SAMPLES = 16;
 
@@ -134,10 +134,12 @@ bool TestInstallation::begin(
     // ----- Pression et humidité -----
 
     pressure.begin("BMP580", bmp580);
+    bmpTemperature.begin("TempBMP", bmp580);
     psychrometer.begin(dryBulbTemperature(), rtd2Temperature, pressure);
     humidity.begin("RH psychrom", psychrometer);
 
-    if (!process.add(pressure) || !process.add(humidity))
+    if (!process.add(pressure) || !process.add(humidity) ||
+        !process.add(bmpTemperature))
         return fail("Mesures pression / humidité non enregistrées");
 
     // ----- Paramètres du menu -----

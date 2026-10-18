@@ -919,7 +919,7 @@ contacteur et le temps écoulé.
 | Catégorie | Classes |
 | --- | --- |
 | Entrée analogique | `Sensor` : PT100 / PT1000 (2, 3 ou 4 fils), thermocouple B, E, J, K, N, R, S, T |
-| Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
+| Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `TemperatureBMP580` (température de la carte, au BMP581), `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
 | Régulateurs | `Thermostat`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
 | Loi d'eau | `HeatingCurve` : consigne de départ selon l'extérieur, suivie par un PID ou un thermostat, voir [Loi d'eau](#loi-deau) |
 | Programme | `SetpointProgram` : consigne en paliers et rampes (four, étuve), suivie par un PID ou un thermostat, voir [Programme paliers-rampes](#programme-paliers-rampes) |

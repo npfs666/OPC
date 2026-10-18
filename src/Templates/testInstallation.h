@@ -12,6 +12,7 @@
 #include <Measurements/Temperature/TemperatureRTD.h>
 #include <Measurements/Temperature/TemperatureTC.h>
 #include <Measurements/Pressure/PressureBMP580.h>
+#include <Measurements/Temperature/TemperatureBMP580.h>
 #include <Measurements/Psychrometer.h>
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 
@@ -24,7 +25,8 @@ class SensorBoard;
  *
  * - Entrée 1 : température sèche (PT100 4 fils ou thermocouple K) ;
  * - Entrée 2 : température humide (PT100 4 fils) ;
- * - BMP580   : pression atmosphérique.
+ * - BMP580   : pression atmosphérique et température de la carte
+ *              (essai de jonction froide des thermocouples).
  *
  * Aucune régulation ni sortie n'est pilotée.
  */
@@ -63,6 +65,7 @@ private:
 
     // Pression et humidité
     PressureBMP580 pressure;
+    TemperatureBMP580 bmpTemperature;
     Psychrometer psychrometer;
     HumidityPsychrometer humidity;
 };

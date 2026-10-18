@@ -6,11 +6,14 @@
 #include <Hardware/SensorBoard.h>
 #include <Measurements/MeasurementStatus.h>
 #include <Measurements/Resistance.h>
+#include <Measurements/Temperature/TemperatureBMP580.h>
 #include <Measurements/Temperature/TemperatureRTD.h>
 #include <Measurements/Temperature/TemperatureTC.h>
 #include <ProcessControl.h>
 #include <ProcessSnapshot.h>
 #include <hmi/MeasurementDisplay.h>
+
+#include <Adafruit_BMP5xx.h>
 
 #include <cstring>
 #include <limits>
@@ -291,6 +294,40 @@ namespace
 
         temperature.begin("TC", sensor);
         CHECK_TRUE(temperature.getStatus() == Status::NotReady);
+    }
+
+    TEST_CASE("etat de mesure : temperature BMP580")
+    {
+        Adafruit_BMP5xx bmp580;
+        TemperatureBMP580 temperature;
+        temperature.begin("TempBMP", bmp580);
+        CHECK_TRUE(temperature.getStatus() == Status::NotReady);
+
+        bmp580.nextTemperature = 22.5f;
+        temperature.update();
+        CHECK_TRUE(temperature.getStatus() == Status::Ok);
+        CHECK_NEAR(temperature.getValue(), 22.5, 1e-6);
+
+        // Lecture I2C en échec : la dernière valeur de la bibliothèque ne
+        // doit pas passer pour une mesure.
+        bmp580.readingSucceeds = false;
+        temperature.update();
+        CHECK_TRUE(temperature.getStatus() == Status::Invalid);
+        CHECK_TRUE(std::isnan(temperature.getValue()));
+
+        bmp580.readingSucceeds = true;
+        bmp580.nextTemperature = NaN;
+        temperature.update();
+        CHECK_TRUE(temperature.getStatus() == Status::Invalid);
+
+        bmp580.nextTemperature = -41.0f;
+        temperature.update();
+        CHECK_TRUE(temperature.getStatus() == Status::UnderRange);
+
+        bmp580.nextTemperature = 86.0f;
+        temperature.update();
+        CHECK_TRUE(temperature.getStatus() == Status::OverRange);
+        CHECK_TRUE(std::isnan(temperature.getValue()));
     }
 
     TEST_CASE("etat de mesure : affichage")

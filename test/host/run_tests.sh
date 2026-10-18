@@ -111,6 +111,7 @@ fi
     "${project_dir}/src/Measurements/Pressure/PressureBME.cpp" \
     "${project_dir}/src/Measurements/Resistance.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureBME.cpp" \
+    "${project_dir}/src/Measurements/Temperature/TemperatureBMP580.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureRTD.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureTC.cpp" \
     "${project_dir}/src/Outputs/Actuator.cpp" \
