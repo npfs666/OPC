@@ -70,10 +70,7 @@ En résumé :
 
 ### P1
 
-5. **Mode manuel sans limite de durée**.
-   - En manuel, la sortie ignore la mesure, les défauts de sonde et l'inhibition.
-   - Une résistance laissée à 100 % en manuel le reste tant qu'on n'y touche pas, ou jusqu'au prochain redémarrage.
-   - À faire : une durée maximale optionnelle (`Manuel max`, 0 = illimité), après laquelle le mode repasse en Auto. Elle serait à régler par défaut sur les templates de chauffage (four, PID).
+5. **Mode manuel sans limite de durée** : écarté le 18/10/2026. Le manuel reste sans sécurité : il engage la responsabilité de l'utilisateur.
 
 6. **Boucle de redémarrages non détectée**.
    - Un blocage reproductible (bus I²C coincé, par exemple) provoque un redémarrage par le watchdog toutes les 8 s environ, sans fin.
@@ -122,7 +119,6 @@ En résumé :
 
 | Faille | Conséquence | Proposition | Prio. |
 | --- | --- | --- | --- |
-| **Reset « 1200 bauds » du cœur Arduino-Pico** : un logiciel PC qui ouvre le port série à 1200 bauds (téléverseur, moniteur mal réglé) redémarre la carte en mode BOOTSEL | Plus de firmware, donc plus de régulation et plus de watchdog, jusqu'à une coupure de courant. Les sorties sont coupées, mais une chambre froide se réchauffe et un chauffage s'arrête | Désactiver ce reset dans le firmware de production (option de compilation, ou surcharge du callback de `SerialUSB` : à vérifier dans le cœur). Garder le bouton BOOTSEL pour la mise à jour | P1 |
 | **Reprogrammation libre par l'USB** | Toute personne qui a accès au port USB peut remplacer le firmware | Acceptable pour un projet ouvert. À documenter : ne pas laisser l'USB accessible en façade. Le *secure boot* du RP2350 est hors sujet | P2 |
 | **USB seul, 24 V absent** : la partie logique tourne, sans les sorties (README, § Isolation) | Le firmware croit piloter : écran, journal et compteurs sont faux. Le même cas se produit si le 24 V disparaît pendant que l'USB est branché | Matériel : détecter la présence du 24 V. Logiciel : défaut `24 V absent`, journalisé, avec les sorties notées hors service | P1 (carte) |
 | **Disque USB : déconnexion et reconnexion à chaque sauvegarde** ([Storage.cpp](../src/Storage.cpp)) | Fenêtres « disque retiré » sous Windows, et gêne pour un logiciel de supervision sur le port série | Ne rafraîchir le disque qu'à la demande (action de menu), ou hors connexion | P2 |
@@ -311,7 +307,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 **v1.0 « publique »** : les P1.
 
 - Version affichée, réinitialisation usine, test des sorties, diagnostic du câblage, confirmations.
-- Reset 1200 bauds désactivé, boucle de redémarrages détectée.
+- Boucle de redémarrages détectée.
 - Export du journal et des courbes par l'USB, import de la configuration.
 - PID chaud / froid, démarrage progressif, fonctions des entrées TOR, détection de mèche sèche.
 - Templates : indicateur / enregistreur, cave d'affinage ou couveuse, protections du solaire.
