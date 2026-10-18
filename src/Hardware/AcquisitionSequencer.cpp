@@ -280,7 +280,7 @@ void AcquisitionSequencer::arm(
         break;
 
     default:
-        // Température : une conversion au débit de la dernière entrée.
+        // Température : une conversion à 20 SPS (SensorBoard).
         startTimer(2 * TC_CONVERSION_MS + TIMEOUT_MARGIN_MS);
         break;
     }

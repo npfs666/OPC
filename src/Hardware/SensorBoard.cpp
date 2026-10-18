@@ -242,6 +242,10 @@ void SensorBoard::selectExtendedGain(const Sensor::Settings& inputSettings)
 
 void SensorBoard::beginTemperature()
 {
+    // Débit le plus bas, indépendant de la dernière entrée : à 1000 SPS
+    // (RTD), la lecture est plus bruitée, et ce bruit passe tel quel dans
+    // la jonction froide des thermocouples.
+    adc.setDataRate(DATARATE_20_SPS);
     adc.setTemperatureMode(TEMP_ON);
 }
 
