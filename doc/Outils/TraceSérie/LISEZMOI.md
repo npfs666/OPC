@@ -22,9 +22,11 @@ Debian/Ubuntu, les paquets correspondants sont `python3`, `python3-tk` et
 `python3-venv` ; sous Fedora, `python3` et `python3-tkinter`. Sous Windows,
 conservez l’option Tcl/Tk dans l’installation de Python. Il n’est pas possible
 d’afficher la fenêtre d’installation si Tkinter lui-même est absent. Le lanceur
-essaie alors d’afficher un diagnostic avec les outils du bureau et l’enregistre
-dans `demarrage.log` à côté de l’application (ou dans le dossier temporaire si
-le dossier de l’application n’est pas accessible en écriture).
+essaie alors d’afficher un diagnostic avec les outils du bureau.
+
+Les journaux `demarrage.log` et `installation.log` sont désactivés pour l’instant :
+leur écriture est en commentaire dans `lancer.pyw` (`startup_log()` et la fin de
+`install_dialog()`), à décommenter pour les retrouver.
 
 ## Démarrage sous Linux Mint
 
@@ -43,16 +45,18 @@ le dossier de l’application n’est pas accessible en écriture).
    ou « Marquer comme fiable » si cette action est proposée. Gardez ce raccourci
    dans le dossier de l’application : le copier seul sur le bureau ne déplace pas
    le programme.
+
+   Pour le bureau, copiez plutôt `Trace Série (bureau).desktop` : il contient le
+   chemin absolu de ce dossier et fonctionne donc depuis n’importe où. Si le
+   dossier de l’application change de place, corrigez ses lignes `Exec=` et `Path=`.
 4. Une autre possibilité est d’ouvrir un terminal **dans le dossier décompressé**
    et de lancer `sh lancer-linux.sh`, ou `python3 lancer.pyw`. Le script Linux
    fonctionne aussi par double-clic si le gestionnaire de fichiers autorise
    l’exécution de scripts. L’utilisation de l’application reste entièrement graphique.
-5. Si rien ne s’ouvre, consultez **demarrage.log** dans ce dossier. Il est créé dès
-   le lancement, puis conserve les étapes et la sortie du processus local, même
-   en cas de plantage natif. Le lanceur attend la confirmation de la fenêtre et
-   signale une sortie prématurée ou un échec (délai de démarrage maximal : 90 s).
-   Les erreurs
-   pendant l’installation des dépendances restent dans **installation.log**.
+5. Le lanceur attend la confirmation de la fenêtre et signale une sortie
+   prématurée ou un échec (délai de démarrage maximal : 90 s), avec la fin de la
+   sortie du processus. Si rien ne s’ouvre, lancez `python3 lancer.pyw` dans un
+   terminal pour voir les messages, ou réactivez les journaux (voir plus haut).
    Notez aussi le résultat de `python3 --version` : Python 3.10 minimum est requis.
 
 Le raccourci des anciennes archives contenait un chemin absolu vers le dossier
@@ -185,6 +189,8 @@ valeur de chaque courbe à cet instant. La barre de défilement horizontale perm
 aussi de parcourir l’historique. Les points hors écran restent dans l’export.
 
 **Image…** (Ctrl+S) enregistre le graphique en PNG, SVG ou PDF, légendes comprises.
+La fenêtre d’enregistrement s’ouvre sur le dossier personnel, comme celle de
+l’export CSV.
 
 ### Mesures
 

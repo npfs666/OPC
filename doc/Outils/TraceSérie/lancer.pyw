@@ -22,20 +22,24 @@ LOG_LIMIT = 256 * 1024
 
 
 def startup_log(detail):
-    """Écrit dès le lancement, pas seulement après une exception Python."""
-    diagnostic = (f"\nDate : {datetime.now().isoformat()}\nPython : {sys.executable}\n"
-                  f"Version : {sys.version}\nDossier : {DIRECTORY}\n{detail}\n")
-    for candidate in (DIRECTORY / "demarrage.log", Path(tempfile.gettempdir()) / "traceserie-demarrage.log"):
-        try:
-            # Le journal grandit à chaque lancement : on ne garde que la fin.
-            if candidate.exists() and candidate.stat().st_size > LOG_LIMIT:
-                tail = candidate.read_bytes()[-LOG_LIMIT // 2:]
-                candidate.write_bytes(tail[tail.find(b"\n") + 1:])
-            with candidate.open("a", encoding="utf-8") as stream:
-                stream.write(diagnostic)
-            return candidate
-        except OSError:
-            continue
+    """Écrit dès le lancement, pas seulement après une exception Python.
+
+    Journal désactivé pour l'instant : décommenter le corps pour retrouver
+    demarrage.log. Sans journal, renvoie None.
+    """
+    # diagnostic = (f"\nDate : {datetime.now().isoformat()}\nPython : {sys.executable}\n"
+    #               f"Version : {sys.version}\nDossier : {DIRECTORY}\n{detail}\n")
+    # for candidate in (DIRECTORY / "demarrage.log", Path(tempfile.gettempdir()) / "traceserie-demarrage.log"):
+    #     try:
+    #         # Le journal grandit à chaque lancement : on ne garde que la fin.
+    #         if candidate.exists() and candidate.stat().st_size > LOG_LIMIT:
+    #             tail = candidate.read_bytes()[-LOG_LIMIT // 2:]
+    #             candidate.write_bytes(tail[tail.find(b"\n") + 1:])
+    #         with candidate.open("a", encoding="utf-8") as stream:
+    #             stream.write(diagnostic)
+    #         return candidate
+    #     except OSError:
+    #         continue
     return None
 
 
@@ -91,13 +95,12 @@ def launch_local(root=None):
         root.title("Trace Série — Démarrage")
         ttk.Label(root, text="Ouverture de Trace Série…", padding=24).pack()
     log_path = startup_log("Démarrage du Python local : " + str(PYTHON))
-    if log_path is None:
-        root.destroy()
-        raise RuntimeError("Impossible de créer demarrage.log. Vérifiez les droits du dossier.")
     temporary = tempfile.TemporaryDirectory(prefix="traceserie-start-")
     ready_path = Path(temporary.name) / "ready"
+    # Sans journal, la sortie du processus reste lisible en cas d'échec.
+    output_path = log_path or Path(temporary.name) / "sortie.log"
     try:
-        with log_path.open("a", encoding="utf-8") as stream:
+        with output_path.open("a", encoding="utf-8") as stream:
             process = subprocess.Popen(
                 [str(PYTHON), "-u", "-X", "faulthandler", str(Path(__file__).resolve()),
                  "--local", "--managed", str(ready_path)],
@@ -139,15 +142,17 @@ def launch_local(root=None):
         failure = process_failure(returncode, ready, cancelled)
         if timed_out and not cancelled:
             failure = "L’application n’a pas confirmé son ouverture après 90 secondes."
+        details = ""
+        if failure:
+            try:
+                with output_path.open("rb") as stream:
+                    stream.seek(max(0, output_path.stat().st_size - 5000))
+                    details = stream.read().decode("utf-8", errors="replace")
+            except OSError:
+                pass
         temporary.cleanup()
         root.destroy()
         if failure:
-            try:
-                with log_path.open("rb") as stream:
-                    stream.seek(max(0, log_path.stat().st_size - 5000))
-                    details = stream.read().decode("utf-8", errors="replace")
-            except OSError:
-                details = ""
             report_startup_error(failure + "\n\n" + details)
 
     root.after(150, check)
@@ -196,11 +201,12 @@ def install_dialog():
             if created:
                 shutil.rmtree(ENVIRONMENT, ignore_errors=True)
             events.put((False, str(error)))
-        finally:
-            try:
-                (DIRECTORY / "installation.log").write_text("\n".join(log), encoding="utf-8")
-            except OSError:
-                pass
+        # Journal d'installation désactivé pour l'instant.
+        # finally:
+        #     try:
+        #         (DIRECTORY / "installation.log").write_text("\n".join(log), encoding="utf-8")
+        #     except OSError:
+        #         pass
 
     def check():
         try:
@@ -217,7 +223,7 @@ def install_dialog():
         else:
             status.set("Installation incomplète. Vérifiez Internet et les droits du dossier.")
             button.configure(state="normal")
-            messagebox.showerror("Installation", detail + "\n\nSur Debian/Ubuntu, le paquet python3-venv doit être installé.\nVoir aussi installation.log dans le dossier de l’application.", parent=root)
+            messagebox.showerror("Installation", detail + "\n\nSur Debian/Ubuntu, le paquet python3-venv doit être installé.", parent=root)
 
     def install():
         button.configure(state="disabled")
@@ -262,8 +268,7 @@ def main():
         if "--local" in sys.argv:
             raise RuntimeError("L’environnement .venv ne peut pas charger les dépendances installées.\n"
                                "Supprimez le dossier .venv à côté de l’application puis relancez :\n"
-                               "l’installation sera proposée à nouveau.\n"
-                               "Consultez le détail de l’erreur dans demarrage.log.") from error
+                               "l’installation sera proposée à nouveau.") from error
         install_dialog()
         return
     startup_log("Import de l’interface graphique.")

@@ -96,7 +96,8 @@ class LauncherTests(unittest.TestCase):
                 self.assertTrue(window.destroyed)
                 self.assertEqual(window.hidden, hidden)
                 self.assertEqual(bool(reported), failure)
-                self.assertTrue((Path(temporary) / "demarrage.log").exists())
+                # Journal désactivé : rien n'est écrit dans le dossier de l'application.
+                self.assertFalse((Path(temporary) / "demarrage.log").exists())
                 if "avant le crash" in script:
                     self.assertIn("avant le crash", reported[0])
                     self.assertIn("code 7", reported[0])
@@ -134,7 +135,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), "OK")
 
-    def test_missing_tkinter_gets_installation_instructions_and_log(self):
+    def test_missing_tkinter_gets_installation_instructions(self):
         launcher = runpy.run_path(str(DIRECTORY / "lancer.pyw"))
         original_import = builtins.__import__
 
@@ -153,10 +154,9 @@ class LauncherTests(unittest.TestCase):
                     patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)) as dialog, \
                     patch("sys.stderr", None):
                 report(str(caught.exception))
-                log = (Path(temporary) / "demarrage.log").read_text(encoding="utf-8")
-                self.assertIn("python3-tk", log)
-                self.assertIn(sys.executable, log)
                 self.assertEqual(dialog.call_args.args[0][0], "zenity")
+                self.assertIn("python3-tk", " ".join(dialog.call_args.args[0]))
+                self.assertFalse((Path(temporary) / "demarrage.log").exists())
 
     def test_old_python_is_reported_before_importing_application(self):
         launcher = runpy.run_path(str(DIRECTORY / "lancer.pyw"))

@@ -1395,7 +1395,7 @@ class Application(tk.Tk):
             return None
         return filedialog.asksaveasfilename(
             parent=self, title="Exporter les mesures", defaultextension=".csv",
-            filetypes=[("Données CSV", "*.csv")],
+            filetypes=[("Données CSV", "*.csv")], initialdir=os.path.expanduser("~"),
             initialfile="mesures_" + time.strftime("%Y%m%d_%H%M%S") + ".csv") or None
 
     def export(self):
@@ -1443,6 +1443,7 @@ class Application(tk.Tk):
         path = filedialog.asksaveasfilename(
             parent=self, title="Enregistrer le graphique", defaultextension=".png",
             filetypes=[("Image PNG", "*.png"), ("Image SVG", "*.svg"), ("Document PDF", "*.pdf")],
+            initialdir=os.path.expanduser("~"),
             initialfile="courbes_" + time.strftime("%Y%m%d_%H%M%S") + ".png")
         if not path:
             return
