@@ -72,7 +72,9 @@ En résumé :
 
 5. **Mode manuel sans limite de durée** : écarté le 18/10/2026. Le manuel reste sans sécurité : il engage la responsabilité de l'utilisateur.
 
-6. **Boucle de redémarrages non détectée**.
+6. **Boucle de redémarrages non détectée** : reportée à la v1.0 le 18/10/2026.
+   - Analyse du 18/10/2026 : les blocages matériels sont couverts (I²C avec délai et déblocage, ADC avec délais, écriture série abandonnée après 1 s). Une boucle demande maintenant un bug qui se reproduit à chaque démarrage, typiquement dans un template écrit par un tiers : utile pour une publication, peu pour un usage personnel.
+   - Une alimentation trop faible peut aussi faire boucler la carte, par la protection de sous-tension et non par le watchdog : le compteur ne la verrait pas.
    - Un blocage reproductible (bus I²C coincé, par exemple) provoque un redémarrage par le watchdog toutes les 8 s environ, sans fin.
    - Les sorties sans `Arrêt mini` peuvent alors battre à chaque démarrage.
    - Le compresseur reste protégé : `Arrêt mini` part du démarrage.
