@@ -108,8 +108,8 @@ namespace
         process.registerParameters(parameters);
         CHECK_FALSE(parameters.hasError());
         // Les deux réglages de l'entrée, plus les heures de fonctionnement
-        // de la carte (Divers > Entretien).
-        CHECK_TRUE(parameters.count() == 3);
+        // de la carte (Divers > Entretien) et l'altitude (Divers > Site).
+        CHECK_TRUE(parameters.count() == 4);
         CHECK_TRUE(parameters.find("counters", "operating_hours") != nullptr);
         CHECK_TRUE(parameters.find("permit", "pin") == nullptr);
 

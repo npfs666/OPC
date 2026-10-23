@@ -108,6 +108,7 @@ fi
     "${project_dir}/src/Measurements/Psychrometer.cpp" \
     "${project_dir}/src/Measurements/Measurement.cpp" \
     "${project_dir}/src/ProcessSnapshot.cpp" \
+    "${project_dir}/src/Measurements/Pressure/PressureAltitude.cpp" \
     "${project_dir}/src/Measurements/Pressure/PressureBME.cpp" \
     "${project_dir}/src/Measurements/Resistance.cpp" \
     "${project_dir}/src/Measurements/Temperature/TemperatureBME.cpp" \

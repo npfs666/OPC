@@ -5,9 +5,12 @@
 
 #include <Measurements/Humidity/HumidityPsychrometer.h>
 #include <Measurements/Pressure/Pressure.h>
+#include <Measurements/Pressure/PressureAltitude.h>
 #include <Measurements/Psychrometer.h>
 #include <Measurements/Temperature/Temperature.h>
 #include <Physics/Psychrometrics.h>
+#include <ProcessControl.h>
+#include <SiteSettings.h>
 #include <hmi/ParameterList.h>
 
 #include <cmath>
@@ -227,5 +230,75 @@ namespace
         const Parameter* coefficient = list.find("hr_psy", "coefficient");
         CHECK_TRUE(coefficient != nullptr);
         CHECK_TRUE(list.find("hr_psy", "frozen_bulb") != nullptr);
+    }
+
+    TEST_CASE("pression d'altitude : atmosphère normalisée")
+    {
+        CHECK_NEAR(PressureAltitude::standardPressure(0.0), SEA_LEVEL, 0.01);
+        CHECK_NEAR(PressureAltitude::standardPressure(500.0), 95461.0, 5.0);
+        CHECK_NEAR(PressureAltitude::standardPressure(1000.0), 89875.0, 5.0);
+        CHECK_NEAR(PressureAltitude::standardPressure(-500.0), 107478.0, 5.0);
+    }
+
+    TEST_CASE("pression d'altitude : suit le réglage du site")
+    {
+        SiteSettings site;
+        PressureAltitude pressure;
+
+        // Sans site : invalide.
+        pressure.update();
+        CHECK_FALSE(pressure.isValid());
+
+        pressure.begin("pression_site", site);
+        pressure.update();
+        CHECK_TRUE(pressure.isValid());
+        CHECK_NEAR(pressure.getValue(), SEA_LEVEL, 0.01);
+
+        site.altitude = 1000;
+        pressure.update();
+        CHECK_NEAR(pressure.getValue(), 89875.0, 5.0);
+    }
+
+    TEST_CASE("pression d'altitude : psychromètre sans capteur de pression")
+    {
+        SiteSettings site;
+        PressureAltitude pressure;
+        pressure.begin("pression_site", site);
+        pressure.update();
+
+        FakeTemperature dry{"seche"};
+        FakeTemperature wet{"humide"};
+        Psychrometer psychrometer;
+        psychrometer.begin(dry, wet, pressure);
+
+        Bench reference;
+        const double_t expected = reference.measure(20.0, 15.0).relativeHumidity;
+
+        dry.set(20.0);
+        wet.set(15.0);
+        CHECK_NEAR(psychrometer.evaluate().relativeHumidity, expected, 1e-9);
+
+        // Plus haut, A·P·(T - Tw) baisse : l'humidité calculée monte.
+        site.altitude = 1000;
+        pressure.update();
+        CHECK_TRUE(psychrometer.evaluate().relativeHumidity > expected + 1.0);
+    }
+
+    TEST_CASE("pression d'altitude : réglage Divers > Site sauvegardé avec la carte")
+    {
+        ProcessControl process;
+
+        Parameter storage[8];
+        ParameterList list;
+        list.begin(storage, 8);
+
+        process.registerParameters(list);
+        CHECK_FALSE(list.hasError());
+
+        const Parameter* altitude = list.find("site", "altitude");
+        CHECK_TRUE(altitude != nullptr);
+        CHECK_TRUE(altitude->board);
+        CHECK_TRUE(altitude->persistent);
+        CHECK_EQ(altitude->type, Parameter::Type::Integer);
     }
 }

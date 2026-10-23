@@ -334,8 +334,8 @@ Points à retenir :
   en ASCII, unique. Le second est le libellé affiché, modifiable librement.
 - De même, `configurationKey()` identifie l'installation dans `config.json`
   et ne doit plus changer une fois l'installation utilisée. `name()` n'est
-  qu'un libellé. Les calibrations et le fuseau horaire sont dans
-  `board.json` et survivent à un changement d'installation.
+  qu'un libellé. Les calibrations, le fuseau horaire et l'altitude sont
+  dans `board.json` et survivent à un changement d'installation.
 - Si l'installation a besoin du BMP580, surcharger `requiresBMP580()` pour
   renvoyer `true`.
 - Pour régler une consigne à l'encodeur depuis l'écran d'accueil (voir
@@ -533,7 +533,7 @@ Prêts à l'emploi ou à copier comme point de départ, dans
 | `KilnInstallation` | Four céramique : thermocouple K, 3 programmes paliers-rampes de 8 segments, PID sur un relais statique (sortie DC 1), contacteur de sécurité (relais 1) piloté par la glue, alarmes de surchauffe, d'écart haut et de boucle ouverte actives, durées maxi de cuisson |
 | `HeatingCircuitInstallation` | Circuit de chauffage à vanne mélangeuse : départ (Pt100), extérieure (Pt1000), loi d'eau avec programme confort / réduit, PID du départ sur une vanne 3 points (relais 1 et 2), pompe avec post-circulation (sortie DC 1, par un relais d'interface) ; sans glue |
 | `TestIO` | Test matériel : entrée N → relais N et PWM N (50 %, 20 kHz). Banc d'essai de la glue : la sortie 2 dépend aussi de la PT100, mode manuel sur la commande 1 seulement, action « Simuler oubli glue » |
-| `TestInstallation` (`testInstallation.h`) | Développement du psychromètre : température sèche (PT100 4 fils, ou thermocouple K avec `INPUT1_IS_THERMOCOUPLE`), température humide (PT100 4 fils), pression BMP580 (obligatoire) et humidité relative ; aucune sortie |
+| `TestInstallation` (`testInstallation.h`) | Développement du psychromètre : température sèche (PT100 4 fils, ou thermocouple K avec `INPUT1_IS_THERMOCOUPLE`), température humide (PT100 4 fils), pression fixe d'après l'altitude (`Divers > Site`) et humidité relative ; aucune sortie |
 
 ### PID et autotune
 
@@ -920,7 +920,7 @@ contacteur et le temps écoulé.
 | Catégorie | Classes |
 | --- | --- |
 | Entrée analogique | `Sensor` : PT100 / PT1000 (2, 3 ou 4 fils), thermocouple B, E, J, K, N, R, S, T |
-| Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `TemperatureBMP580` (température de la carte, au BMP581), `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
+| Mesures | `Resistance`, `TemperatureRTD`, `TemperatureTC`, `PressureBMP580`, `PressureAltitude` (pression fixe, d'après l'altitude du site), `TemperatureBMP580` (température de la carte, au BMP581), `HumidityPsychrometer`, classes BME280 (`TemperatureBME`, `HumidityBME`, `PressureBME`) |
 | Régulateurs | `Thermostat`, `PID` (+ `PIDAutoTune`, `SetpointRamp`), `TimeSchedule` (programmation horaire) |
 | Loi d'eau | `HeatingCurve` : consigne de départ selon l'extérieur, suivie par un PID ou un thermostat, voir [Loi d'eau](#loi-deau) |
 | Programme | `SetpointProgram` : consigne en paliers et rampes (four, étuve), suivie par un PID ou un thermostat, voir [Programme paliers-rampes](#programme-paliers-rampes) |
@@ -949,6 +949,13 @@ Notes sur les mesures :
   - `Bulbe < 0°C` : `Glace` (défaut) pour une mèche givrée, `Eau surfondue`
     sinon. Sur la glace, la pression saturante et A (× 0,88) changent : à
     -5 / -6 °C, 73,5 % contre 77,1 %.
+
+  Sans capteur de pression, `PressureAltitude` fournit la pression de
+  l'atmosphère normalisée à l'altitude réglée dans `Divers > Site`
+  (`pressure.begin("pression", process.site())`). La météo (±30 hPa)
+  n'est pas suivie : l'erreur reste sous 0,5 point d'HR (0,06 point en
+  cave à 12 °C / 95 %). Une altitude oubliée pèse davantage : à 1000 m,
+  près de 2 points d'HR à 20 °C / 50 %.
 
   Le point de rosée (`Psychrometer::dewPoint()`) est l'inverse exact de la
   même formule de Magnus. Une mèche sèche n'est pas détectable : le bulbe
@@ -1436,13 +1443,22 @@ et l'oscillateur s'arrête. Au démarrage suivant, le DS3231 le signale (bit
   affiche `HEURE A REGLER` en orange quand aucune alarme n'est signalée. Les
   événements du journal ne sont plus datés (`+42 s`) jusqu'au réglage.
 
+### Site
+
+`Divers > Site > Altitude` (0 m par défaut, de -500 à 5000 m, au pas de
+10 m) donne la pression atmosphérique aux installations sans capteur de
+pression (`PressureAltitude`, pour le psychromètre). Comme le fuseau
+horaire, c'est un réglage du lieu : il est sauvegardé dans `/board.json`
+et présent quelle que soit l'installation.
+
 ### Configuration et USB
 
 La configuration est sauvegardée dans la flash (LittleFS), en deux fichiers :
 
 - `/board.json` : les réglages **de la carte**, indépendants de
   l'installation : calibrations (`Zéros ADC`, profils PT100 et PT1000,
-  `C.J. offset`) et fuseau horaire (`Décalage UTC`, `Heure d'été`). Il n'est
+  `C.J. offset`), fuseau horaire (`Décalage UTC`, `Heure d'été`) et
+  altitude (`Divers > Site`). Il n'est
   réécrit que lorsqu'un de ces réglages change ;
 - `/config.json` : les réglages **de l'installation** (consignes, régulateurs,
   sorties, alarmes, entrées et leurs offsets...), liés à son

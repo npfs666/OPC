@@ -568,6 +568,11 @@ const ClockSample& ProcessControl::clock() const
     return clockSample;
 }
 
+const SiteSettings& ProcessControl::site() const
+{
+    return siteSettings;
+}
+
 bool ProcessControl::beginOutputs()
 {
     for (uint8_t i = 0; i < outputCount; i++)
@@ -732,6 +737,26 @@ void ProcessControl::registerParameters(ParameterList& list)
         "h",
         true,
         1);
+
+    // Divers > Site : réglage du lieu, sauvegardé avec la carte
+    // (/board.json) comme le fuseau horaire. Enregistré par toutes les
+    // installations pour survivre à un changement d'installation.
+    ParameterOwner siteOwner{
+        "miscellaneous",
+        "Divers",
+        "site",
+        "Site"
+    };
+    siteOwner.board = true;
+
+    list.forOwner(siteOwner).addInteger(
+        "altitude",
+        "Altitude",
+        siteSettings.altitude,
+        SiteSettings::MIN_ALTITUDE,
+        SiteSettings::MAX_ALTITUDE,
+        10,
+        "m");
 
     for (uint8_t i = 0; i < measurementCount; i++)
     {

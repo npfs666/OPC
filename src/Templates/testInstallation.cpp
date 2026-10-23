@@ -75,11 +75,6 @@ const char* TestInstallation::configurationKey() const
     return "test_installation";
 }
 
-bool TestInstallation::requiresBMP580() const
-{
-    return true;
-}
-
 const Temperature& TestInstallation::dryBulbTemperature() const
 {
     if (INPUT1_IS_THERMOCOUPLE)
@@ -93,6 +88,8 @@ bool TestInstallation::begin(
     Adafruit_BMP5xx& bmp580,
     ProcessControl& process)
 {
+    (void)bmp580;
+
     // ----- Entrées physiques -----
 
     if (INPUT1_IS_THERMOCOUPLE)
@@ -133,13 +130,11 @@ bool TestInstallation::begin(
 
     // ----- Pression et humidité -----
 
-    pressure.begin("BMP580", bmp580);
-    bmpTemperature.begin("TempBMP", bmp580);
+    pressure.begin("Pression", process.site());
     psychrometer.begin(dryBulbTemperature(), rtd2Temperature, pressure);
     humidity.begin("RH psychrom", psychrometer);
 
-    if (!process.add(pressure) || !process.add(humidity) ||
-        !process.add(bmpTemperature))
+    if (!process.add(pressure) || !process.add(humidity))
         return fail("Mesures pression / humidité non enregistrées");
 
     // ----- Paramètres du menu -----

@@ -9,6 +9,7 @@
 #include <Hardware/pinout.h>
 #include <Hardware/RTC.h>
 #include <EventLog.h>
+#include <SiteSettings.h>
 #include <Measurements/MeasurementStatus.h>
 #include <hmi/MenuBuilder.h>
 
@@ -96,6 +97,9 @@ public:
 
     /** Heure courante pour les régulateurs horaires (TimeSchedule). */
     const ClockSample& clock() const;
+
+    /** Réglages du lieu (altitude), pour PressureAltitude. */
+    const SiteSettings& site() const;
 
     bool beginOutputs();
 
@@ -193,6 +197,8 @@ private:
     bool countersChanged = false;
 
     ClockSample clockSample;
+
+    SiteSettings siteSettings;
 
     MeasurementStatus loggedStatus[MAX_MEASUREMENTS] = {};
 
