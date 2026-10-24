@@ -2185,6 +2185,7 @@ namespace
         ParameterEditor editor;
         editor.begin(parameters);
         editor.capture();
+        bool zoneChanged = false;
 
         CHECK_TRUE(setClockDraft(editor, "year", 2023));
         CHECK_TRUE(setClockDraft(editor, "month", 2));
@@ -2202,7 +2203,7 @@ namespace
         CHECK_TRUE(setClockDraft(editor, "second", 57));
 
         // Écriture comme à la validation du menu Horloge.
-        CHECK_TRUE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
         CHECK_TRUE(wire.registers[0x00] == 0x57);
         CHECK_TRUE(wire.registers[0x01] == 0x58);
         CHECK_TRUE(wire.registers[0x02] == 0x23);
@@ -2237,6 +2238,7 @@ namespace
         editor.begin(parameters);
         editor.capture();
         editor.get(8).integerValue = 20;
+        bool zoneChanged = false;
 
         // L'entrée dans Horloge recharge le RTC sans perdre les autres edits.
         CHECK_TRUE(clock.onMenuOpened());
@@ -2248,13 +2250,13 @@ namespace
 
         // Valider sans modification ne remet pas l'heure à celle de l'entrée.
         wire.registers[0x00] = 0x15;
-        CHECK_TRUE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
         CHECK_TRUE(wire.registers[0x00] == 0x15);
 
         // Une date impossible ne touche ni le RTC ni le brouillon.
         CHECK_TRUE(setClockDraft(editor, "day", 30));
         const auto beforeInvalidDate = wire.registers;
-        CHECK_FALSE(clock.applyMenuParameters(editor));
+        CHECK_FALSE(clock.applyMenuParameters(editor, zoneChanged));
         CHECK_TRUE(wire.registers == beforeInvalidDate);
         CHECK_TRUE(editor.hasChanges(RTC::MENU_OWNER_KEY));
 
@@ -2271,7 +2273,8 @@ namespace
         CHECK_TRUE(setClockDraft(editor, "hour", 23));
         CHECK_TRUE(setClockDraft(editor, "minute", 59));
         CHECK_TRUE(setClockDraft(editor, "second", 58));
-        CHECK_TRUE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
+        CHECK_FALSE(zoneChanged);
         CHECK_TRUE(wire.registers[0x04] == 0x29);
         CHECK_TRUE(wire.registers[0x03] == 4);
         CHECK_TRUE(wire.registers[0x02] == 0x23);
@@ -2284,10 +2287,10 @@ namespace
         // Une panne I2C conserve les champs à réessayer.
         CHECK_TRUE(setClockDraft(editor, "minute", 12));
         wire.nextTransmissionError = 4;
-        CHECK_FALSE(clock.applyMenuParameters(editor));
+        CHECK_FALSE(clock.applyMenuParameters(editor, zoneChanged));
         CHECK_TRUE(wire.registers[0x01] == 0x59);
         CHECK_TRUE(editor.hasChanges(RTC::MENU_OWNER_KEY));
-        CHECK_TRUE(clock.applyMenuParameters(editor));
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
         CHECK_TRUE(wire.registers[0x01] == 0x12);
 
         // Une nouvelle saisie abandonnée conserve l'heure déjà validée.
@@ -2301,6 +2304,104 @@ namespace
         CHECK_TRUE(editor.apply());
         CHECK_TRUE(otherValue == 20);
         CHECK_FALSE(editor.hasChanges());
+    }
+
+    bool setTimeZoneDraft(
+        ParameterEditor& editor,
+        double_t offsetHours)
+    {
+        for (size_t i = 0; i < editor.count(); i++)
+        {
+            ParameterDraft& draft = editor.get(i);
+
+            if (draft.parameter != nullptr &&
+                std::strcmp(
+                    draft.parameter->ownerKey,
+                    RTC::TIME_ZONE_OWNER_KEY) == 0 &&
+                std::strcmp(draft.parameter->key, "utc_offset") == 0)
+            {
+                draft.numberValue = offsetHours;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    TEST_CASE("menu horloge : fuseau saisi avec l'heure")
+    {
+        TwoWire wire;
+        RTC clock;
+        clock.timeZone = {1.0, RTC::DstRule::None};
+        CHECK_TRUE(clock.begin(wire));
+
+        // 10:00 à UTC+1, soit 09:00 UTC.
+        RTC::DateTime initial;
+        initial.year = 2026;
+        initial.month = 1;
+        initial.day = 15;
+        initial.hour = 10;
+        CHECK_TRUE(clock.setDateTime(initial));
+        CHECK_TRUE(wire.registers[0x02] == 0x09);
+
+        Parameter storage[8];
+        ParameterList parameters;
+        parameters.begin(storage, 8);
+        clock.registerParameters(parameters);
+
+        ParameterEditor editor;
+        editor.begin(parameters);
+        CHECK_TRUE(clock.onMenuOpened());
+        editor.capture();
+
+        bool zoneChanged = true;
+
+        // Fuseau changé, heure intacte : Valider n'écrit rien, le fuseau
+        // attend la sortie du menu comme les autres réglages.
+        CHECK_TRUE(setTimeZoneDraft(editor, 2.0));
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
+        CHECK_FALSE(zoneChanged);
+        CHECK_NEAR(clock.timeZone.utcOffsetHours, 1.0, 0.0);
+        CHECK_TRUE(wire.registers[0x02] == 0x09);
+        CHECK_TRUE(editor.hasChanges(RTC::TIME_ZONE_OWNER_KEY));
+
+        // Heure saisie après le fuseau : 14:00 à UTC+2, soit 12:00 UTC. Le
+        // fuseau est appliqué avec elle, et n'est plus en attente.
+        CHECK_TRUE(setClockDraft(editor, "hour", 14));
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
+        CHECK_TRUE(zoneChanged);
+        CHECK_TRUE(wire.registers[0x02] == 0x12);
+        CHECK_NEAR(clock.timeZone.utcOffsetHours, 2.0, 0.0);
+        CHECK_FALSE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+        CHECK_FALSE(editor.hasChanges(RTC::TIME_ZONE_OWNER_KEY));
+
+        RTC::DateTime local;
+        CHECK_TRUE(clock.readDateTime(local));
+        CHECK_TRUE(local.hour == 14);
+
+        // Même fuseau : rien de plus à sauvegarder.
+        CHECK_TRUE(setClockDraft(editor, "minute", 30));
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
+        CHECK_FALSE(zoneChanged);
+        CHECK_TRUE(wire.registers[0x01] == 0x30);
+
+        // Panne I2C : rien n'est écrit, le fuseau en vigueur reste, et les
+        // champs sont gardés pour un nouvel essai.
+        CHECK_TRUE(setTimeZoneDraft(editor, 3.0));
+        CHECK_TRUE(setClockDraft(editor, "hour", 16));
+        wire.nextTransmissionError = 4;
+        CHECK_FALSE(clock.applyMenuParameters(editor, zoneChanged));
+        CHECK_FALSE(zoneChanged);
+        CHECK_TRUE(wire.registers[0x02] == 0x12);
+        CHECK_NEAR(clock.timeZone.utcOffsetHours, 2.0, 0.0);
+        CHECK_TRUE(editor.hasChanges(RTC::MENU_OWNER_KEY));
+        CHECK_TRUE(editor.hasChanges(RTC::TIME_ZONE_OWNER_KEY));
+
+        // 16:00 à UTC+3, soit 13:00 UTC.
+        CHECK_TRUE(clock.applyMenuParameters(editor, zoneChanged));
+        CHECK_TRUE(zoneChanged);
+        CHECK_TRUE(wire.registers[0x02] == 0x13);
+        CHECK_NEAR(clock.timeZone.utcOffsetHours, 3.0, 0.0);
     }
 
     uint8_t toTestBcd(uint8_t value)
@@ -2710,6 +2811,71 @@ namespace
         CHECK_NEAR(editor.get(2).numberValue, 60.0, 0.0);
         CHECK_TRUE(editor.apply());
         CHECK_NEAR(z, 60.0, 0.0);
+    }
+
+    TEST_CASE("menu refusé : groupe en cause")
+    {
+        Parameter storage[4];
+        ParameterList list;
+        list.begin(storage, 4);
+
+        double_t x = 10.0;
+        int32_t y = 5;
+        double_t z = 50.0;
+
+        auto a = list.forOwner({"test", "Test", "a", "Groupe A"});
+        auto b = list.forOwner({"test", "Test", "b", "Groupe B"});
+        CHECK_TRUE(a.addDouble("x", "X", x, 0.0, 100.0, 1.0, 0));
+        CHECK_TRUE(a.addInteger("y", "Y", y, 0, 10, 1));
+        CHECK_TRUE(b.addDouble("z", "Z", z, 0.0, 100.0, 1.0, 0));
+
+        const OrderedThresholds validator;
+        ParameterEditor editor;
+        editor.begin(list);
+        editor.capture();
+
+        auto ownerName = [&]()
+        {
+            const Parameter* owner = editor.findRejectedOwner(validator);
+            return owner != nullptr ? owner->ownerName : "";
+        };
+
+        // Sans modification : aucun groupe à désigner.
+        CHECK_TRUE(editor.findRejectedOwner(validator) == nullptr);
+
+        // Seuil de A monté au-dessus de B : A est en cause. Les brouillons
+        // sont rendus intacts.
+        editor.get(0).numberValue = 70.0;
+        editor.get(1).integerValue = 7;
+        CHECK_TRUE(std::strcmp(ownerName(), "Groupe A") == 0);
+        CHECK_NEAR(editor.get(0).numberValue, 70.0, 0.0);
+        CHECK_TRUE(editor.get(1).integerValue == 7);
+        CHECK_NEAR(editor.get(2).numberValue, 50.0, 0.0);
+        CHECK_TRUE(editor.hasChanges("a"));
+        CHECK_FALSE(editor.hasChanges("b"));
+
+        // A modifié sans conflit, seuil de B descendu sous celui de A : B
+        // est en cause, pas le premier groupe modifié.
+        editor.capture();
+        editor.get(1).integerValue = 8;
+        editor.get(2).numberValue = 5.0;
+        CHECK_TRUE(std::strcmp(ownerName(), "Groupe B") == 0);
+        CHECK_TRUE(editor.get(1).integerValue == 8);
+        CHECK_NEAR(editor.get(2).numberValue, 5.0, 0.0);
+
+        // Valeur hors plage (refus de validate()) : son groupe.
+        editor.capture();
+        editor.get(1).integerValue = 50;
+        CHECK_TRUE(std::strcmp(ownerName(), "Groupe A") == 0);
+
+        // Refus qui ne vient d'aucune modification (réglages en place déjà
+        // incohérents) : aucun groupe ne suffit seul.
+        z = 5.0;
+        editor.capture();
+        editor.get(1).integerValue = 6;
+        CHECK_TRUE(editor.findRejectedOwner(validator) == nullptr);
+        CHECK_TRUE(editor.get(1).integerValue == 6);
+        CHECK_NEAR(editor.get(2).numberValue, 5.0, 0.0);
     }
 
     TEST_CASE("consigne PID hors plage d'autotune")

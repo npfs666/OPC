@@ -26,7 +26,9 @@ enum class InterCoreMessage : uint32_t
     ClockParametersRejected = 16,
     StartupFailed = 17,
     ApplyHomeSetpoint = 18,
-    HomeSetpointApplied = 19
+    HomeSetpointApplied = 19,
+    CancelMenuParameters = 20,
+    MenuParametersCancelled = 21
 };
 
 constexpr uint32_t interCoreMessageValue(

@@ -8,6 +8,13 @@
 
 namespace
 {
+    /*
+     * Valeurs mises de côté par keepValidDrafts() (au démarrage) et
+     * findRejectedOwner() (au refus du menu). Statiques, hors de la pile ;
+     * partagées : les deux tournent sur le cœur contrôle, jamais ensemble.
+     */
+    double_t savedValues[MAX_PARAMETERS];
+
     double_t draftValue(const ParameterDraft& draft)
     {
         switch (draft.parameter->type)
@@ -286,16 +293,13 @@ size_t ParameterEditor::keepValidDrafts(
     if (!anyRejected && isValidSet(validator))
         return 0;
 
-    for (size_t i = 0; i < draftCount; i++)
-    {
-        if (drafts[i].parameter == nullptr)
-            return 0;
-    }
+    if (!allDraftsBound())
+        return 0;
 
     // Valeurs lues et réglages remis par défaut ; les valeurs capturées
     // avant la lecture sont les réglages par défaut. Statiques : hors de la
     // pile, pour une fonction appelée au démarrage seulement.
-    static double_t loaded[MAX_PARAMETERS];
+    double_t* const loaded = savedValues;
     static bool reset[MAX_PARAMETERS];
 
     // Hors plage (plage réduite par une nouvelle version...) : ce seul
@@ -320,16 +324,6 @@ size_t ParameterEditor::keepValidDrafts(
         return true;
     };
 
-    // Valeurs du propriétaire de first : lues, ou par défaut.
-    auto setOwner = [this](size_t first, const double_t* values)
-    {
-        for (size_t j = first; j < draftCount; j++)
-        {
-            if (sameOwner(drafts[first], drafts[j]))
-                setDraftValue(drafts[j], values[j]);
-        }
-    };
-
     // Validation croisée : tout par défaut, puis chaque propriétaire repris
     // avec ses valeurs lues, gardé seulement si l'ensemble reste valide.
     for (size_t i = 0; i < draftCount; i++)
@@ -340,12 +334,12 @@ size_t ParameterEditor::keepValidDrafts(
         if (!isFirstOfOwner(i))
             continue;
 
-        setOwner(i, loaded);
+        setOwnerValues(i, loaded);
 
         if (isValidSet(validator))
             continue;
 
-        setOwner(i, capturedValues);
+        setOwnerValues(i, capturedValues);
 
         for (size_t j = i; j < draftCount; j++)
         {
@@ -379,6 +373,67 @@ size_t ParameterEditor::keepValidDrafts(
     }
 
     return resetCount;
+}
+
+const Parameter* ParameterEditor::findRejectedOwner(
+    const ParameterRestoreValidator& validator)
+{
+    if (!allDraftsBound())
+        return nullptr;
+
+    // Brouillons de l'utilisateur, remis après chaque essai.
+    double_t* const edited = savedValues;
+
+    for (size_t i = 0; i < draftCount; i++)
+        edited[i] = draftValue(drafts[i]);
+
+    for (size_t i = 0; i < draftCount; i++)
+    {
+        if (!isChanged(i))
+            continue;
+
+        // Un essai par propriétaire, à son premier réglage modifié.
+        bool tried = false;
+
+        for (size_t j = 0; j < i && !tried; j++)
+            tried = isChanged(j) && sameOwner(drafts[i], drafts[j]);
+
+        if (tried)
+            continue;
+
+        // Ce propriétaire remis à ses valeurs capturées : si l'ensemble
+        // devient valide, c'est lui que la validation refuse.
+        setOwnerValues(i, capturedValues);
+        const bool valid = isValidSet(validator);
+        setOwnerValues(i, edited);
+
+        if (valid)
+            return drafts[i].parameter;
+    }
+
+    return nullptr;
+}
+
+void ParameterEditor::setOwnerValues(
+    size_t index,
+    const double_t* values)
+{
+    for (size_t j = 0; j < draftCount; j++)
+    {
+        if (sameOwner(drafts[index], drafts[j]))
+            setDraftValue(drafts[j], values[j]);
+    }
+}
+
+bool ParameterEditor::allDraftsBound() const
+{
+    for (size_t i = 0; i < draftCount; i++)
+    {
+        if (drafts[i].parameter == nullptr)
+            return false;
+    }
+
+    return true;
 }
 
 bool ParameterEditor::apply()

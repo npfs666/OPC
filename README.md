@@ -64,7 +64,7 @@ mise en sécurité des sorties.
 | Entrées analogiques | 3 : PT100, PT1000 (2, 3 ou 4 fils), thermocouples B, E, J, K, N, R, S, T |
 | Entrées TOR | 2, 24 V isolées |
 | Relais | 2, contact travail (NO), 5 A sous 250 V CA ou 30 V CC |
-| Sorties transistor | 2, côté bas (open drain), 55 V max, PWM 1 à 100 kHz |
+| Sorties transistor | 2, côté bas (open drain), charge alimentée en 30 V au plus (TVS de 33 V), PWM 1 à 100 kHz |
 | Interface | Écran IPS 240 × 240, encodeur rotatif avec bouton |
 | Horloge | DS3231M (±5 ppm), secourue par supercondensateur |
 | Pression | BMP581 |
@@ -1233,8 +1233,25 @@ sauvegardées automatiquement à la sortie du menu ou après 10 s d'inactivité
 (réglable dans `Divers > Menu`). Une simple consultation ne change rien.
 
 Pendant l'application de modifications, les sorties sont mises en sécurité,
-puis la régulation reprend dès que de nouvelles mesures valides arrivent. Une
-valeur invalide reste dans le menu pour correction.
+puis la régulation reprend dès que de nouvelles mesures valides arrivent.
+
+**Réglages refusés.** Quand une vérification croisée refuse les
+modifications (seuil d'arrêt d'un comparateur du mauvais côté de son seuil
+de marche, `Sortie min` au-dessus de `Sortie max`, deux sorties sur la même
+broche...), rien n'est appliqué et la régulation continue avec les réglages
+en place. L'écran `REGLAGES REFUSES` nomme le groupe en cause et propose :
+
+- `Corriger` : retour au menu, avec les modifications ;
+- `Abandonner` : toutes les modifications de cette ouverture du menu sont
+  oubliées.
+
+Sans action pendant le délai du menu, les modifications sont abandonnées
+(`Réglages abandonnés` au journal).
+
+Une **action refusée** (`Démarrer` le four sur une alarme non acquittée,
+calibration instable...) affiche `ACTION REFUSEE` quelques secondes (un clic
+l'abrège), et le journal note `Action refusée : <action>`. Les réglages
+modifiés en même temps sont, eux, appliqués.
 
 Exception : les **réglages de conduite** sont appliqués sans arrêter la
 régulation (ni pause de l'acquisition, ni état sûr), quand ce sont les seuls
@@ -1249,8 +1266,8 @@ propriétaire, clé)`.
 ### Consigne depuis l'accueil
 
 Comme les touches ▲/▼ d'un régulateur compact, l'encodeur règle la consigne
-directement depuis l'écran d'accueil (templates thermostat, PID et chambre
-froide) :
+directement depuis l'écran d'accueil (templates thermostat, PID, chambre
+froide, et circuit de chauffage pour sa consigne d'ambiance) :
 
 - tourner : la consigne s'affiche en jaune et change d'un pas (0,1 °C) par
   cran, dans le même sens que l'édition d'une valeur dans le menu ; une
@@ -1313,9 +1330,9 @@ clic revient au menu.
 | Défaut de sonde et sa fin | `Temperature : RUPTURE`, `Temperature : OK` | oui |
 | Défaut d'acquisition de la carte et sa fin (voir [Défauts de mesure](#défauts-de-mesure)) | `Défaut multiplexeur`, `Multiplexeur rétabli`, `ADC muet`, `ADC rétabli`, `Broche MCP non conforme` | oui |
 | Alarme | `Alarme Temp. haute : ACTIVE`, `MEMORISEE`, `FIN` | oui |
-| Acquittement, remise à zéro, actions du menu | `Alarmes acquittées`, `RAZ compteurs Relais 1`, `Action : Mesurer N0 E1` | oui |
+| Acquittement, remise à zéro, actions du menu | `Alarmes acquittées`, `RAZ compteurs Relais 1`, `Action : Mesurer N0 E1`, `Action refusée : Démarrer` | oui |
 | Entretien, heure perdue ou retrouvée | `Entretien Relais 1 (150000 man.)`, `Heure perdue` | oui |
-| Réglages modifiés, consigne réglée à l'accueil | `Réglages modifiés`, `Consigne : 21.5 °C` | non |
+| Réglages modifiés ou abandonnés, consigne réglée à l'accueil | `Réglages modifiés`, `Réglages abandonnés`, `Consigne : 21.5 °C` | non |
 
 Chaque événement porte l'heure locale (`04/10 14:32:05`), ou le temps depuis
 le démarrage si l'heure est inconnue (`+42 s`). Le port série affiche les
@@ -1379,7 +1396,9 @@ aussi le [journal](#journal-des-événements)) :
     l'offset de la sonde ;
 - **Profils PT100 et PT1000** : résistance de référence, valeur de l'étalon
   et action `Calibrer Rref (E1)` avec un étalon branché en 4 fils sur
-  l'entrée 1 ;
+  l'entrée 1. `Coeff` (ppm/°C) et `adcCalTemp` sont **sans effet** : la
+  compensation en température de la chaîne de mesure est désactivée, aucun
+  écart notable n'ayant été mesuré sur la carte ;
 - **Thermocouples** : `C.J. offset` pour corriger la soudure froide, avec
   affichage de la température de l'ADC.
 
@@ -1417,8 +1436,10 @@ négligeable.
 de l'heure.
 
 Le DS3231 contient l'heure **UTC**. L'heure locale est calculée à chaque
-lecture d'après le sous-menu `Divers > Horloge > Fuseau horaire`, appliqué
-à la sortie du menu comme les autres réglages :
+lecture d'après le sous-menu `Divers > Horloge > Fuseau horaire`. Il
+s'applique à la sortie du menu comme les autres réglages ; mais si la date
+ou l'heure sont modifiées dans le même menu, elles sont saisies dans ce
+fuseau, qui est alors appliqué et sauvegardé avec elles, dès `Valider` :
 
 - **Décalage UTC** : décalage de l'heure d'hiver (`1.00 h` pour la France,
   réglable au quart d'heure) ;

@@ -1,6 +1,6 @@
 # Revue du code OPC v0.2
 
-Revue initiale du 28/09/2026. Statuts mis à jour le 07/10/2026. Relecture complète du code le 12/10/2026 : résumé mis à jour, points 28 à 35 ajoutés, compléments aux points 13, 16 et 20.
+Revue initiale du 28/09/2026. Statuts mis à jour le 07/10/2026. Relecture complète du code le 12/10/2026 : résumé mis à jour, points 28 à 35 ajoutés, compléments aux points 13, 16 et 20. Nouvelle relecture complète le 23/10/2026, sur le commit `90d9ab7` : points 36 à 43 ajoutés.
 
 Légende : ✅ corrigé · ⬜ à faire
 
@@ -28,9 +28,9 @@ Légende : ✅ corrigé · ⬜ à faire
   - Watchdog à deux cœurs : le cœur 0 nourrit le watchdog seulement si le cœur 1 a aussi progressé.
   - Mise en sécurité des sorties pendant l'application des réglages, sauf pour les réglages de conduite (`Parameter::live`).
   - Journal des événements en RAM, écrit en flash par lots.
-- **Tests** : 281 tests hôte (doctest), dont des templates entiers sur `TemplateBench`. `SensorBoard`, le pilote ADS1120, `OPC`, `Storage` et l'interface ne sont vérifiés que par la compilation du firmware et sur banc.
+- **Tests** : 299 tests hôte (doctest, 5 092 assertions au 24/10/2026), dont cinq templates entiers sur `TemplateBench` (solaire, chambre froide, chauffage, four, PID). `SensorBoard`, le pilote ADS1120, `OPC`, `Storage`, l'interface et les templates thermostat et programmation horaire ne sont vérifiés que par la compilation du firmware et sur banc. En `-Wall -Wextra`, aucun avertissement côté hôte ; côté firmware, deux `-Wswitch` sans effet (point 41).
 
-L'architecture est propre et défensive : validations nombreuses, écriture atomique des fichiers par *rename*, handshake FIFO entre cœurs, acquisition hors ISR avec vérification du routage. La relecture du 12/10/2026 trouve deux défauts réels (points 28 et 29) ; le reste est mineur.
+L'architecture est propre et défensive : validations nombreuses, écriture atomique des fichiers par *rename*, handshake FIFO entre cœurs, acquisition hors ISR avec vérification du routage. La relecture du 12/10/2026 trouve deux défauts réels (points 28 et 29) ; le reste est mineur. Celle du 23/10/2026 ne trouve aucun défaut de sécurité : un piège d'ergonomie du menu (point 36), trois incohérences de comportement (points 37 à 39) et du nettoyage.
 
 ---
 
@@ -167,6 +167,47 @@ Points 30 à 35 ajoutés le 12/10/2026.
 35. ✅ **Allocations dynamiques** : la règle « pas d'allocation dynamique » de `CLAUDE.md` a deux exceptions, documentées le 18/10/2026 (CLAUDE.md et README).
     - `ArduinoMenuUI` crée les éléments du menu par `new`, une seule fois au démarrage : sans risque de fragmentation.
     - Les `JsonDocument` d'ArduinoJson 7 (`Storage`, `OPC::saveCounters()`) allouent sur le tas à chaque sauvegarde, puis libèrent. Volumes faibles et sauvegardes rares, donc risque faible, mais c'est le seul usage répété du tas.
+
+Points 36 à 43 ajoutés le 23/10/2026.
+
+36. ✅ **Menu refusé : impasse** (`OPC::handleControlMessage`, `OPC::handleUIMessage`, cas `MenuParametersRejected`).
+    - Quand une validation croisée refuse les brouillons (par exemple `Temp. ballon max` du solaire baissé sous `Reprise ballon`, `Sortie min` au-dessus de `Sortie max` d'un PID, deux relais sur la même broche), le menu revient à sa racine sans dire quel réglage est en cause. Seul le port série écrit `Menu parameter validation failed`.
+    - Aucun abandon possible : `Quitter` et le délai d'inactivité renvoient les mêmes brouillons, de nouveau refusés. Après chaque délai d'inactivité, le menu repart de sa racine.
+    - Sans danger : la validation précède la pause de l'acquisition, la régulation continue avec les anciens réglages. Mais l'utilisateur reste bloqué jusqu'à trouver la valeur fautive.
+    - Même famille : une action refusée (`Démarrer` le four sur une alarme non acquittée, calibration rejetée) ramène à l'accueil sans message ; seul le port série écrit `Menu action rejected`, et le journal n'en garde rien.
+    - Corrigé le 24/10/2026 :
+      - `ParameterEditor::findRejectedOwner()` remet chaque groupe modifié à ses valeurs capturées ; le premier qui rend l'ensemble valide est celui en cause. Tests `menu refusé : groupe en cause` ;
+      - écran `REGLAGES REFUSES` avec le nom du groupe, `Corriger` (retour au menu) ou `Abandonner` (message `CancelMenuParameters` : session fermée, brouillons oubliés, `Réglages abandonnés` au journal). Le délai d'inactivité abandonne, ce qui casse la boucle ;
+      - action refusée : `Action refusée : <action>` au journal, écran `ACTION REFUSEE` pendant 3 s ;
+      - le tampon statique de `findRejectedOwner()` est partagé avec `keepValidDrafts()` : pas de RAM en plus.
+    - Écrans et échanges entre les cœurs : vérifiés seulement par la compilation du firmware ; à essayer sur la carte.
+37. ⬜ **`Coeff` et `adcCalTemp` sans effet** (`SensorBoard::computeResistance()`).
+    - `Calibration > PT100 / PT1000 > Coeff` (ppm/°C) est réglable et sauvegardé dans `/board.json`, mais la compensation en température est commentée (« incapable de mesurer une différence notable »). `adcCalTemp`, en lecture seule, n'a pas d'autre usage.
+    - Le README le signale depuis le 24/10/2026. À trancher : retirer les deux réglages du menu (une entrée inconnue de `/board.json` est ignorée à la relecture), ou réactiver la compensation.
+    - Si elle est réactivée : `calibrateReference()` lit la température de l'ADC à 1000 SPS (`readInternalTemp()` ne change pas le débit), alors que le cycle la lit à 20 SPS (`beginTemperature()`).
+38. ✅ **Heure et fuseau réglés dans la même session** (`RTC::applyMenuParameters()`).
+    - `Valider` convertit l'heure saisie en UTC avec le fuseau en vigueur (`localToUtc()` lit `timeZone`). Un fuseau modifié dans la même session n'est appliqué qu'à la sortie du menu : l'heure affichée se décale alors de l'écart entre les deux fuseaux.
+    - Cas de mise en service seulement (fuseau puis heure, dans la même session).
+    - Corrigé le 24/10/2026 : avec une date ou une heure modifiée, `Valider` applique le fuseau des brouillons avant la conversion (ancien fuseau rétabli sur un échec), puis `OPC` demande la sauvegarde de `/board.json` et relit l'heure. Sans date ni heure modifiée, le fuseau attend toujours la sortie du menu. Test `menu horloge : fuseau saisi avec l'heure`.
+    - Reste, mineur : un champ non retouché garde la valeur lue à l'ouverture d'`Horloge`, dans l'ancien fuseau (date près de minuit, fuseaux décalés d'une demi-heure).
+39. ⬜ **DS3231 muet au démarrage : jamais réessayé** (`OPC::initRTC()`, `RTC::begin()`).
+    - `RTC::begin()` n'est appelé que dans `setup()`. Si sa première transaction échoue, `initialized` reste faux toute la session : `Heure perdue` jusqu'au redémarrage suivant, et `Valider` échoue aussi (`Erreur date / RTC`).
+    - Le MCP23017, lui, est réinitialisé à chaud (point 4). Correction possible : relancer `clock.begin(Wire1)` depuis `refreshClock()` tant qu'il n'a pas réussi, par exemple toutes les 10 s. Probabilité faible.
+40. ⬜ **Code mort**.
+    - `PT100::getResistanceToTemperature()` (ancienne table d'interpolation) n'est plus appelée que par les tests ; son commentaire la dit plus précise qu'une formule, alors que la conversion passe par Callendar-Van Dusen (point 9).
+    - `pressureSeaLevel()` de `PressureBMP580` et de `PressureBME` n'est appelée par aucun template ; seul un test appelle celle du BME280.
+    - `RTClib` est dans `lib_deps` de `platformio.ini` (et dans la liste des licences du README), mais le code utilise son propre pilote DS3231.
+    - Depuis la pression d'altitude (23/10/2026), aucun template n'utilise le BMP581 : `requiresBMP580()` et l'erreur de démarrage `BMP580` ne servent plus qu'à une installation écrite par un utilisateur. À garder comme point d'extension.
+41. ⬜ **Nettoyage**.
+    - Commentaires en espagnol dans `ADS1120::writeRegisterMasked()`.
+    - Deux `-Wswitch` dans `SensorBoard::routeInput()` (montages 3 et 4 fils sans cas `Tc`), sans effet : un thermocouple est ramené en 2 fils avant le `switch`.
+42. ⬜ **Clé `pid_autotune_test` du template PID** (`PIDInstallation::configurationKey()`).
+    - Gardée volontairement (« identifiant historique ») pour relire les configurations existantes, mais un nom de test pour un template de production. À trancher avant la v1.0 : la renommer fait perdre les réglages sauvegardés des cartes déjà en service.
+43. ✅ **Documentation désynchronisée**, corrigée le 24/10/2026.
+    - README : sorties transistor annoncées à 55 V au lieu de 30 V (TVS de 33 V) ; consigne d'accueil du circuit de chauffage oubliée ; `Coeff` sans effet signalé (point 37).
+    - `test/README` réécrit : il datait d'avant le séquenceur, le MCP, le JSON, la loi d'eau, le programme paliers-rampes et la vanne 3 points, et citait `Divers > Compteurs`.
+    - `CLAUDE.md` citait `doc/Old code/`, retiré du dépôt.
+    - Bilan mis à jour (nombre de tests, templates testés, chambre froide, nettoyage du dépôt).
 
 ---
 

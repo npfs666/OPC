@@ -2,69 +2,104 @@
 Tests OPC
 =========
 
-Les tests hôte nécessitent un compilateur C++ (`g++` par défaut) et
-s'exécutent sans carte connectée :
+Les tests hôte (doctest) nécessitent un compilateur C++ (`g++` par défaut)
+et s'exécutent sans carte connectée. ArduinoJson est pris dans
+`.pio/libdeps/opc_v02/` : lancer `pio run` une fois avant.
 
-    bash test/host/run_tests.sh
+    bash test/host/run_tests.sh                # tous les tests
+    bash test/host/run_tests.sh -tc="PID*"     # tests dont le nom correspond
+    bash test/host/run_tests.sh -ltc           # liste des tests
+    bash test/host/run_tests.sh --build-only   # compilation seule
+
+Le script compile une liste explicite de fichiers : un nouveau fichier de
+test, ou un fichier de `src/` dont les tests ont besoin, doit y être ajouté.
+Dans VS Code, la vue Testing liste chaque test (C++ TestMate).
 
 Ils couvrent actuellement :
 
-- la validation et la propagation des mesures BME280 ;
-- le driver et l'interface du DS3231 (date, heure 24 h, alarme et erreurs I2C),
-  le fuseau horaire et l'heure d'été européenne (DS3231 en UTC) ;
-- l'interpolation PT100 et la conversion en température PT100/PT1000 ;
-- les calculs psychrométriques ;
-- les régulateurs thermostat et PID en chauffage/refroidissement, dont
-  l'autotune par relais dans les deux sens, sa plage d'essai vérifiée au
-  lancement, et la plage de consigne du thermostat ;
-- le timeout, la stabilité des oscillations et le verrouillage sûr des relais ;
-- les sorties PWM : rapport cyclique, polarité, fréquence commune, menu et repli ;
-- l'éditeur de paramètres et la séparation des menus PID/autotune ;
-- les actions de menu non persistantes et l'événement de nouveaux gains ;
-- l'ordre régulateur, actionneur, sortie et snapshot ;
-- la restauration tolérante de la configuration (réglage hors plage,
-  propriétaire refusé par la validation croisée) ;
-- la programmation horaire : plages, jours, passage de minuit, modes forcés,
-  heure inconnue, paramètres HH:MM et sous-menus imbriqués ;
-- le thermostat et le PID programmés (consigne réduite, arrêt programmé à
-  commande 0 valide, autotune prioritaire) ;
-- la détection de l'alerte horloge dans le snapshot ;
-- les plages RTD : gains ADC selon le câblage et la plage, diagnostic de
-  saturation (rupture ou dépassement) ;
-- les temps minimaux de marche et d'arrêt des relais (démarrage, état sûr
-  prioritaire, validation du menu, attente dans le snapshot) et l'impulsion
-  minimale de l'actionneur temporel ;
-- le filtre d'entrée du 2e ordre (réponse indicielle, cas limites, remise à
-  zéro sur défaut) ;
-- le repli sur défaut de sonde (sécurité, maintien limité, PID sans à-coup,
-  verrouillage) et le thermostat dans sa bande d'hystérésis ;
-- la consigne réglée depuis l'accueil (pas, accélération, limites, grille,
-  abandon sur inactivité, désignation par l'installation) ;
-- le mode manuel du PID et du thermostat (suivi, sortie fixe, défaut de
-  sonde ignoré, retour sans à-coup même après le menu, réglages non
-  sauvegardés, alarmes relatives toujours actives) et les réglages de
-  conduite appliqués sans arrêt ;
-- les compteurs d'entretien (manœuvres, heures en marche, heures de la
-  carte, seuil, remise à zéro, menu Divers > Compteurs, bandeau) ;
-- l'alarme de boucle ouverte (butées haute et basse, chaud et froid,
-  fenêtre de détection, surveillance suspendue, options, verrouillage du PID,
-  mise en sécurité toujours mémorisée) ;
-- le journal des événements (ordre, capacité, regroupement des rafales,
-  port série, sauvegarde, CSV et relecture, visionneuse) ;
-- les alarmes de seuil (types absolus et relatifs, hystérésis, temporisation,
-  masquage, mémorisation et acquittement, défaut de sonde, journal, bandeau) ;
-- les états de mesure : acquisition (saturations), classement des
-  résistances RTD, thermocouple ouvert ou hors domaine, propagation,
-  affichage (libellés, couleurs), journal des changements et snapshot ;
-- les thermocouples (tables NIST, domaines, jonction froide) et les entrées
-  numériques (polarité, rebonds, paramètres) ;
-- la glue : ordre d'appel, `LogicCommand` (commande non écrite, dépendances,
-  mode manuel, verrouillage), inhibition des régulateurs et des alarmes ;
-- les blocs comparateur, temporisation (dont la post-circulation après un
-  arrêt programmé) et alarme sur condition (entrée TOR ou glue) ;
-- des templates complets sur le banc `TemplateBench.h` : solaire (charge,
-  hystérésis des limites, décharge vacances), chambre froide (dégivrage,
-  porte, alarme haute, manuel) et l'exemple minimal.
+Acquisition et mesures
 
-Les tests qui dépendent réellement de l'ADS1120, des multiplexeurs, de
-LittleFS ou de l'USB devront être ajoutés comme tests d'intégration sur Pico.
+- le séquencement de l'acquisition hors ISR : cycle des entrées, inversion
+  des courants en 3 fils, diagnostic d'étendue, thermocouple, arrêt et
+  reprise, routage refusé ou perdu pendant la série, ADC muet, température
+  de l'ADC muette ;
+- le routage analogique et le pilote MCP23017 : octets des ports,
+  initialisation, absence au démarrage, routage en une transaction,
+  relecture, NACK isolé rattrapé, réinitialisation après un reset, broche
+  non conforme ;
+- les plages RTD (gains ADC selon le câblage et la plage, diagnostic de
+  saturation), la validité de la résistance et la conversion PT100/PT1000
+  (Callendar-Van Dusen, inversée par Newton) ;
+- les thermocouples : tables NIST, domaines, inversion, jonction froide ;
+- les états de mesure : saturations, classement des résistances RTD,
+  thermocouple ouvert ou hors domaine, propagation, libellés et couleurs,
+  journal et snapshot ; les mesures BME280 et la température du BMP581
+  (lecture ratée) ;
+- le filtre d'entrée du 2e ordre ;
+- la psychrométrie (Magnus sur l'eau et sur la glace, coefficient réglable,
+  incohérences des bulbes, point de rosée) et la pression d'altitude
+  (`Divers > Site`) ;
+- les entrées numériques : polarité, rebonds, paramètres.
+
+Régulation
+
+- le thermostat et le PID, en chaud et en froid : rampe de consigne, plage
+  de consigne, anti-windup, reprise sans à-coup, gains Ti/Td ;
+- l'autotune par relais : règles de calcul, plage d'essai vérifiée au
+  lancement, timeout, oscillations instables, interruption par le menu ;
+- le mode manuel (PID, thermostat, glue) et les réglages de conduite
+  appliqués sans arrêt ;
+- le repli sur défaut de sonde : sécurité, maintien limité, PID sans à-coup,
+  verrouillage ;
+- la programmation horaire (plages, jours, passage de minuit, modes forcés,
+  heure inconnue, paramètres HH:MM), le thermostat et le PID programmés,
+  l'alerte horloge ;
+- la loi d'eau et la consigne d'exécution (`followSetpoint()`) ;
+- le programme paliers-rampes : rampe et palier, écart maxi, attente max et
+  durée max, pleine puissance et descente, départ différé, pause, défaut et
+  inhibition, PID suiveur ;
+- les comparateurs, les temporisations (dont la post-circulation) et les
+  alarmes sur condition (entrée TOR ou glue) ;
+- les alarmes de seuil (types absolus et relatifs, hystérésis,
+  temporisation, masquage, mémorisation, acquittement, durée de plus de
+  49 jours) et de boucle ouverte (butées, progression, verrouillage du PID,
+  mise en sécurité mémorisée) ;
+- la glue : ordre d'appel, `LogicCommand` (commande non écrite, dépendances,
+  mode manuel, verrouillage), inhibition des régulateurs et des alarmes.
+
+Sorties
+
+- les relais : temps minimaux de marche et d'arrêt, état sûr prioritaire,
+  niveau sûr écrit avant la mise en sortie, broche unique, attente dans le
+  snapshot ; l'actionneur temporel (impulsion minimale) ;
+- les sorties PWM : rapport cyclique, polarité, fréquence commune, repli ;
+- la vanne 3 points : recalage, inversion, butées, repli fermé ou figé,
+  câblage Marche / Sens, temps minimaux des relais ;
+- les compteurs d'entretien : manœuvres, heures en marche, heures de la
+  carte, seuil, remise à zéro, menu `Divers > Entretien`, bandeau.
+
+Paramètres, horloge, interface et journal
+
+- l'éditeur de paramètres, les brouillons pendant la régulation, le groupe
+  désigné quand le menu est refusé, la restauration tolérante et la
+  sérialisation JSON (`/config.json` et `/board.json`) ;
+- l'horloge : pilote DS3231, interface RTC (date, heure 24 h, alarme,
+  erreurs I2C), menu Horloge (fuseau saisi avec l'heure), fuseau horaire et
+  heure d'été européenne (DS3231 en UTC) ;
+- la consigne réglée depuis l'accueil (pas, accélération, limites, grille,
+  abandon sur inactivité) ;
+- le journal des événements : ordre, capacité, regroupement des rafales,
+  port série, CSV et relecture, visionneuse.
+
+Templates complets sur le banc `TemplateBench.h`
+
+- solaire, chambre froide, circuit de chauffage, four céramique, PID, et
+  l'exemple minimal (`examples/MinimalInstallation`) ;
+- le thermostat, la programmation horaire, `TestIO` et `TestInstallation`
+  ne sont vérifiés que par la compilation du firmware.
+
+Ne sont pas couverts sur l'hôte : `SensorBoard` (remplacé par un double
+dans `test/host/fakes/`), le pilote ADS1120, `OPC` (démarrage, échanges
+entre les cœurs, menu), `Storage` (LittleFS, disque USB) et l'interface
+réelle (ArduinoMenu, écran). Ils ne sont vérifiés que par `pio run` et sur
+la carte.

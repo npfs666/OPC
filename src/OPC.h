@@ -124,6 +124,9 @@ private:
     static constexpr uint8_t CLOCK_READ_FAILURES_TOLERATED =
         3;
 
+    // Écran « Action refusée », avant le retour à l'accueil (un clic l'abrège).
+    static constexpr uint32_t ACTION_REJECTED_DISPLAY_MS = 3000;
+
     enum class UIState : uint8_t
     {
         Starting,
@@ -135,7 +138,11 @@ private:
         Menu,
         ApplyRequested,
         HomeSetpointApplyRequested,
-        EventLog
+        EventLog,
+        // Réglages refusés : Corriger ou Abandonner.
+        MenuRejected,
+        CancelRequested,
+        ActionRejected
     };
 
     Installation& userInstall;
@@ -173,6 +180,18 @@ private:
     // Écrit par le cœur contrôle avant StartupFailed, lu ensuite par le cœur UI.
     StartupError startupError = StartupError::None;
     uint32_t lastStartupErrorPrint = 0;
+
+    // Écrits par le cœur contrôle avant sa réponse à ApplyMenuParameters, lus
+    // ensuite par le cœur UI : groupe de réglages refusé (nullptr si la cause
+    // n'est pas isolée), action du menu refusée.
+    const char* rejectedOwnerName = nullptr;
+    bool menuActionRejected = false;
+
+    // Cœur UI : choix de l'écran de refus, action demandée et affichage de
+    // son refus.
+    bool rejectionAbandonSelected = false;
+    MenuBuilder::ActionId requestedMenuAction = MenuBuilder::NO_ACTION;
+    uint32_t actionRejectedAt = 0;
 
     MenuBuilder::ActionId pendingMenuAction =
         MenuBuilder::NO_ACTION;
@@ -216,6 +235,18 @@ private:
 
     void requestMenu();
     void requestClockApply();
+
+    // Cœur contrôle : refus de ApplyMenuParameters (rejectedOwnerName écrit).
+    void rejectMenuParameters();
+
+    // Cœur UI : réglages refusés, Corriger ou Abandonner.
+    void showMenuRejection(bool fullRefresh);
+    void menuRejectionPoll(int32_t movement, bool clicked);
+    void requestMenuCancel();
+
+    // Cœur UI : action du menu refusée, puis retour à l'accueil.
+    void showActionRejected();
+    void actionRejectedPoll(bool clicked);
 
     // Cœur UI : encodeur à l'accueil (réglage de la consigne ou menu).
     void homePoll(int32_t movement, bool clicked);

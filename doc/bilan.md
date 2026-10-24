@@ -1,6 +1,6 @@
 # Bilan OPC v0.2 : ce qui reste avant un usage réel et une publication
 
-Bilan du 09/10/2026, sur le commit `dc06a03` (bloc et template four). Mis à jour le 16/10/2026, sur le commit `3af7140` : routage analogique vérifié et bus I²C récupéré ([Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md)), ADC muet détecté, psychrométrie corrigée (sauf la mèche sèche), points 28 à 35 de la revue repris.
+Bilan du 09/10/2026, sur le commit `dc06a03` (bloc et template four). Mis à jour le 16/10/2026, sur le commit `3af7140` : routage analogique vérifié et bus I²C récupéré ([Plan_acquisition_hors_ISR.md](Plan_acquisition_hors_ISR.md)), ADC muet détecté, psychrométrie corrigée (sauf la mèche sèche), points 28 à 35 de la revue repris. Mis à jour le 24/10/2026, sur le commit `90d9ab7` : nouvelle relecture complète du code (revue, points 36 à 43), pression fixe d'après l'altitude (le BMP581 n'est plus utilisé), menu `Divers` réorganisé.
 
 Il complète deux documents sans les répéter :
 
@@ -24,7 +24,7 @@ Les points réglés depuis le bilan initial sont marqués ✅.
 | Domaine | État |
 | --- | --- |
 | Architecture logicielle | Solide : deux cœurs séparés, snapshot, états sûrs, watchdog à deux cœurs, sauvegarde atomique, restauration tolérante |
-| Tests | 281 tests hôte, tous OK (16/10/2026). Templates testés complets sur PC. Firmware compilé (RAM 23 %, flash 6 %) |
+| Tests | 299 tests hôte, tous OK (24/10/2026). Cinq templates sur sept testés complets sur PC (solaire, chambre froide, chauffage, four, PID ; pas le thermostat ni la programmation horaire). Firmware compilé (RAM 24 %, flash 6 %), sans avertissement en `-Wall -Wextra` hors deux `-Wswitch` sans effet |
 | Sécurité de la régulation | Bonne base : défauts de sonde, timeout, LBA, alarmes, temps mini des relais, verrous d'état sûr |
 | Robustesse matérielle (bus, démarrage, alimentation) | Acquisition hors ISR, routage MCP vérifié, bus I²C débloqué, ADC muet détecté. **Points ouverts** : sorties en haute impédance avant leur initialisation (erratum E9, pull-down matériels), boucle de redémarrages, 24 V non surveillé |
 | Templates | 7 templates applicatifs + 2 de test. Il manque des applications phares (humidité, couveuse, chaud / froid) |
@@ -114,6 +114,8 @@ En résumé :
     - ✅ Heure perdue rendue visible : écran `ALERTE HORLOGE` (« Coupure longue », « Régler l'heure »), et bandeau `HEURE A REGLER` sur l'accueil des installations sans programme.
     - Si le besoin revient : la loi d'eau passerait d'elle-même sur la consigne réduite quand l'heure est inconnue (une dizaine de lignes), ou un réglage `Heure inconnue` dans `ScheduledSetpoint`.
     - Mesure de la tension du supercondensateur par l'ADC : écartée le 16/10/2026. Le bit `OSF` du DS3231 dit déjà si l'heure a été perdue.
+15. **DS3231 muet au démarrage, jamais réessayé** (revue, point 39). Si sa première transaction échoue, l'heure reste inconnue jusqu'au redémarrage suivant, et le menu `Horloge` ne peut pas la régler. À faire : relancer l'initialisation depuis la lecture périodique de l'heure.
+16. **Calibration : `Coeff` (ppm/°C) et `adcCalTemp` sans effet** (revue, point 37). La compensation en température est désactivée ; le README le signale. À trancher : retirer les réglages ou réactiver la compensation.
 
 ---
 
@@ -205,7 +207,8 @@ Thermostat, PID, programmation horaire, solaire, chambre froide positive, circui
 | `PIDInstallation` | ✅ Sortie DC 1 (relais statique) (§ 2, point 3) | P0 |
 | `KilnInstallation` | ✅ LBA active par défaut, durée maximale de cuisson (§ 2, point 2). Reste : consignes d'isolation du thermocouple (§ 4, point 1) | P0 |
 | `HeatingCircuitInstallation` | Repli sur heure inconnue (§ 2, P2 n°14, risque accepté) | P2 |
-| `ColdRoomInstallation` | Documenter le contacteur du compresseur. Ajouter une alarme `Temp. basse` (gel des produits, thermostat collé) | P1 |
+| `ColdRoomInstallation` | ✅ Contacteur du compresseur documenté. Reste : une alarme `Temp. basse` (gel des produits, thermostat collé) | P1 |
+| `PIDInstallation` | Clé `pid_autotune_test`, nom de test d'un template de production (revue, point 42) : la garder ou la renommer avant la v1.0, ce qui fait perdre les réglages sauvegardés | P1 |
 | `SolarInstallation` | Protection du capteur : stagnation (arrêt de la pompe au-dessus de ~120 °C, pour protéger la pompe et le glycol) et antigel (installations sans glycol). Proposé dans la revue, non fait | P1 |
 | `testInstallation` | En faire un template propre « **Indicateur / enregistreur** » : 3 voies, alarmes sur les relais, sans régulation. Très demandé en usage réel (surveillance d'une chambre, d'une cuve, d'un congélateur) | P1 |
 
@@ -254,6 +257,8 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 | **Test des sorties à la mise en service** : aujourd'hui, il faut flasher `TestIO` | Un menu `Divers > Test sorties` dans toutes les installations : forcer un relais pendant 10 s, avec confirmation et retour en Auto | P1 |
 | **Diagnostic du câblage** | Afficher en lecture seule la résistance brute (Ω), ou la tension (µV), de chaque entrée, pour vérifier une sonde sans PC | P1 |
 | **Confirmation des actions** (calibration, RAZ des compteurs, RAZ des N0, `Arrêter` la cuisson) | Un clic de trop efface une calibration. Proposé dans la revue | P1 |
+| ✅ **Menu refusé sans explication ni abandon** (revue, point 36) | Fait le 24/10/2026 : écran `REGLAGES REFUSES` avec le groupe en cause, `Corriger` ou `Abandonner` ; action refusée signalée à l'écran et au journal | P1 |
+| ✅ **Heure et fuseau réglés dans la même session** (revue, point 38) | Fait le 24/10/2026 : `Valider` applique et sauvegarde le fuseau saisi avec l'heure | P2 |
 | **Mini-courbe de tendance** à l'accueil | Voir si la température monte ou baisse, sans PC | P2 |
 | **Aide en ligne courte** dans le menu (unité, plage, rôle) | Beaucoup de réglages techniques (Ti, Td, `Variation min.`) | P2 |
 | **Langue** : tout est en français | Une version anglaise (au moins le README et les menus) élargit fortement la diffusion. C'est un gros chantier : à décider, pas à imposer | P2 |
@@ -283,9 +288,11 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
    - une FAQ et un dépannage, à partir des messages de l'écran et du journal.
 7. **Nettoyage du dépôt avant publication** :
    - ✅ `.continue/` (configuration d'un outil local) : retiré du dépôt et ignoré ;
-   - le fichier de verrou `.~lock.mesures_…csv#` dans `doc/V0.2 Measurements/4 - …` ;
+   - le fichier de verrou `.~lock.mesures_20260921_180658.csv#`, toujours suivi par git dans `doc/V0.2 Measurements/4 - …` ;
    - les journaux bruts de `doc/Random measurements/` ;
-   - `doc/Old code/` (archive morte) : à sortir du dépôt publié, ou à mettre dans une branche.
+   - ✅ `doc/Old code/` (archive morte) : retiré du dépôt ;
+   - le code mort (revue, point 40) : ancienne table PT100, `pressureSeaLevel()`, et `RTClib` dans `platformio.ini`, inutilisée (pilote DS3231 maison) ;
+   - les commentaires en espagnol de l'ADS1120 et les deux `-Wswitch` (revue, point 41).
 
 ### P2
 
@@ -308,7 +315,7 @@ Reprises du comparatif quand elles y figurent déjà ; la colonne « Pourquoi »
 
 **v1.0 « publique »** : les P1.
 
-- Version affichée, réinitialisation usine, test des sorties, diagnostic du câblage, confirmations.
+- Version affichée, réinitialisation usine, test des sorties, diagnostic du câblage, confirmations. ✅ Menu refusé lisible, avec abandon.
 - Boucle de redémarrages détectée.
 - Export du journal et des courbes par l'USB, import de la configuration.
 - PID chaud / froid, démarrage progressif, fonctions des entrées TOR, détection de mèche sèche.

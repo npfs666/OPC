@@ -58,6 +58,16 @@ public:
         const Parameter** resetOwners,
         size_t capacity,
         const bool* rejected = nullptr);
+
+    /**
+     * Après le refus d'un ensemble de brouillons (validate() ou validation
+     * croisée) : un réglage du premier propriétaire modifié dont le retour
+     * aux valeurs capturées rend l'ensemble valide, ou nullptr si aucun ne
+     * suffit seul. Les brouillons sont rendus intacts.
+     */
+    const Parameter* findRejectedOwner(
+        const ParameterRestoreValidator& validator);
+
     bool hasChanges(const char* ownerKey = nullptr) const;
 
     /**
@@ -86,6 +96,12 @@ private:
     static bool isDraftValid(const ParameterDraft& draft);
 
     bool isValidSet(const ParameterRestoreValidator& validator) const;
+
+    /** values[j] dans chaque brouillon j du propriétaire de drafts[index]. */
+    void setOwnerValues(size_t index, const double_t* values);
+
+    /** Tous les brouillons sont liés à un paramètre. */
+    bool allDraftsBound() const;
 };
 
 #endif

@@ -145,8 +145,16 @@ public:
     /** Recharge les champs du menu depuis le DS3231. */
     bool onMenuOpened();
 
-    /** Valide et écrit uniquement les champs de l'horloge modifiés. */
-    bool applyMenuParameters(ParameterEditor& editor);
+    /**
+     * Valide et écrit la date et l'heure du menu, si elles ont été
+     * modifiées. Elles sont saisies dans le fuseau du menu : un fuseau
+     * modifié dans la même session est appliqué avec elles, et
+     * timeZoneChanged le signale (réglage de la carte à sauvegarder).
+     * Sans heure modifiée, le fuseau attend la sortie du menu.
+     */
+    bool applyMenuParameters(
+        ParameterEditor& editor,
+        bool& timeZoneChanged);
 
     static bool isValidDateTime(
         const DateTime& dateTime);
@@ -180,6 +188,11 @@ private:
     bool readMenuDateTime(
         const ParameterEditor& editor,
         DateTime& dateTime) const;
+
+    /** Fuseau des brouillons ; zone inchangée s'il n'est pas au menu. */
+    bool readMenuTimeZone(
+        const ParameterEditor& editor,
+        TimeZoneSettings& zone) const;
 
     static uint8_t toBcd(uint8_t value);
 

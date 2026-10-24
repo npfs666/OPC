@@ -852,6 +852,9 @@ void OPC::requestParameterApply(
 
     pendingMenuAction = actionId;
 
+    // Copie du cœur UI : le cœur contrôle remet pendingMenuAction à zéro.
+    requestedMenuAction = actionId;
+
     uiState = UIState::ApplyRequested;
 
     /*
@@ -873,6 +876,168 @@ void OPC::requestClockApply()
     __dmb();
     rp2040.fifo.push(interCoreMessageValue(
         InterCoreMessage::ApplyClockParameters));
+}
+
+void OPC::rejectMenuParameters()
+{
+    // rejectedOwnerName visible du cœur UI avant le message.
+    __dmb();
+    rp2040.fifo.push(interCoreMessageValue(
+        InterCoreMessage::MenuParametersRejected));
+}
+
+void OPC::showMenuRejection(bool fullRefresh)
+{
+    constexpr uint16_t COLOR_GREY = 0x8410;
+    constexpr int16_t CHOICES_Y = 150;
+
+    tft.cp437(true);
+    tft.setTextWrap(false);
+    tft.setTextSize(2);
+
+    if (fullRefresh)
+    {
+        tft.fillScreen(ST77XX_BLACK);
+
+        tft.fillRect(0, 0, tft.width(), 32, ST77XX_RED);
+        tft.setTextColor(ST77XX_WHITE, ST77XX_RED);
+        tft.setCursor(STARTUP_ERROR_MARGIN, 9);
+        tft.print("REGLAGES REFUSES");
+
+        // Groupe refusé par la validation croisée, sinon cause générale.
+        tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+        int16_t y = printWrapped(
+            tft,
+            rejectedOwnerName != nullptr ? rejectedOwnerName : "Réglages",
+            50,
+            2);
+
+        y += 6;
+
+        tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+        printWrapped(
+            tft,
+            rejectedOwnerName != nullptr
+                ? "Valeurs incohérentes"
+                : "Application impossible",
+            y,
+            2);
+
+        tft.setTextColor(COLOR_GREY, ST77XX_BLACK);
+        printWrapped(tft, "Clic : valider", 212, 1);
+    }
+
+    // Le choix courant en jaune, avec un repère.
+    const char* const choices[] = {"Corriger", "Abandonner"};
+
+    for (uint8_t i = 0; i < 2; i++)
+    {
+        const bool selected = (i == 1) == rejectionAbandonSelected;
+
+        tft.setTextColor(
+            selected ? ST77XX_YELLOW : ST77XX_WHITE,
+            ST77XX_BLACK);
+        tft.setCursor(
+            STARTUP_ERROR_MARGIN,
+            CHOICES_Y + i * STARTUP_ERROR_LINE_HEIGHT);
+        tft.print(selected ? "> " : "  ");
+        tft.print(choices[i]);
+    }
+}
+
+void OPC::menuRejectionPoll(int32_t movement, bool clicked)
+{
+    const uint32_t now = millis();
+
+    if (clicked)
+    {
+        if (rejectionAbandonSelected)
+        {
+            requestMenuCancel();
+            return;
+        }
+
+        // Retour aux brouillons, pour corriger la valeur refusée.
+        menu.show();
+        lastMenuActivity = now;
+        uiState = UIState::Menu;
+        return;
+    }
+
+    // Sans action : abandon, comme pour la consigne réglée à l'accueil. Les
+    // réglages en place sont conservés, et le menu ne reste pas ouvert.
+    if (now - lastMenuActivity >= userInstall.menuTimeoutMs())
+    {
+        requestMenuCancel();
+        return;
+    }
+
+    if (movement == 0)
+        return;
+
+    lastMenuActivity = now;
+
+    // Même sens que le menu : un cran positif descend vers Abandonner.
+    const bool abandon = movement > 0;
+
+    if (abandon == rejectionAbandonSelected)
+        return;
+
+    rejectionAbandonSelected = abandon;
+    showMenuRejection(false);
+}
+
+void OPC::requestMenuCancel()
+{
+    uiState = UIState::CancelRequested;
+    __dmb();
+    rp2040.fifo.push(interCoreMessageValue(
+        InterCoreMessage::CancelMenuParameters));
+}
+
+void OPC::showActionRejected()
+{
+    constexpr uint16_t COLOR_ORANGE = 0xFD20;
+    constexpr uint16_t COLOR_GREY = 0x8410;
+
+    const MenuBuilder::Action* action =
+        menuDefinition.findAction(requestedMenuAction);
+
+    tft.cp437(true);
+    tft.setTextWrap(false);
+    tft.setTextSize(2);
+    tft.fillScreen(ST77XX_BLACK);
+
+    tft.fillRect(0, 0, tft.width(), 32, COLOR_ORANGE);
+    tft.setTextColor(ST77XX_BLACK, COLOR_ORANGE);
+    tft.setCursor(STARTUP_ERROR_MARGIN, 9);
+    tft.print("ACTION REFUSEE");
+
+    tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+    int16_t y = printWrapped(
+        tft, action != nullptr ? action->name : "Action", 50, 2);
+
+    y += 6;
+
+    // Les réglages modifiés avec l'action, eux, sont appliqués.
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    printWrapped(tft, "Conditions non réunies", y, 2);
+
+    tft.setTextColor(COLOR_GREY, ST77XX_BLACK);
+    printWrapped(tft, "Voir le journal", 212, 1);
+}
+
+void OPC::actionRejectedPoll(bool clicked)
+{
+    if (!clicked &&
+        millis() - actionRejectedAt < ACTION_REJECTED_DISPLAY_MS)
+    {
+        return;
+    }
+
+    copyProcessSnapshot();
+    uiState = UIState::Home;
+    showHomeScreen(true);
 }
 
 void OPC::restoreCounters()
@@ -1254,6 +1419,18 @@ void OPC::uiPoll()
         return;
     }
 
+    if (uiState == UIState::MenuRejected)
+    {
+        menuRejectionPoll(movement, clicked);
+        return;
+    }
+
+    if (uiState == UIState::ActionRejected)
+    {
+        actionRejectedPoll(clicked);
+        return;
+    }
+
     if (uiState != UIState::Menu)
         return;
 
@@ -1365,8 +1542,19 @@ void OPC::handleControlMessage(
     {
         __dmb();
         bool saved = false;
+        bool timeZoneChanged = false;
+
         if (menuSessionOpen)
-            saved = clock.applyMenuParameters(parameterEditor);
+            saved = clock.applyMenuParameters(parameterEditor, timeZoneChanged);
+
+        // Fuseau appliqué avec l'heure : /board.json est écrit sans attendre
+        // la sortie du menu, et l'heure affichée passe au nouveau fuseau.
+        if (saved && timeZoneChanged)
+        {
+            requestConfigurationSave();
+            refreshClock();
+        }
+
         __dmb();
         rp2040.fifo.push(interCoreMessageValue(saved
             ? InterCoreMessage::ClockParametersApplied
@@ -1446,11 +1634,12 @@ void OPC::handleControlMessage(
         pendingMenuAction =
             MenuBuilder::NO_ACTION;
 
+        rejectedOwnerName = nullptr;
+        menuActionRejected = false;
+
         if (!menuSessionOpen)
         {
-            rp2040.fifo.push(
-                interCoreMessageValue(
-                    InterCoreMessage::MenuParametersRejected));
+            rejectMenuParameters();
             break;
         }
 
@@ -1497,9 +1686,16 @@ void OPC::handleControlMessage(
             !userInstall.validateParameters(
                 parameterEditor))
         {
-            rp2040.fifo.push(
-                interCoreMessageValue(
-                    InterCoreMessage::MenuParametersRejected));
+            // Groupe à corriger, affiché par le cœur UI. La validation
+            // précède la pause : la régulation continue avec les anciens
+            // réglages.
+            const Parameter* owner =
+                parameterEditor.findRejectedOwner(*this);
+
+            rejectedOwnerName =
+                owner != nullptr ? owner->ownerName : nullptr;
+
+            rejectMenuParameters();
             break;
         }
 
@@ -1529,9 +1725,7 @@ void OPC::handleControlMessage(
 
             if (!liveApplied)
             {
-                rp2040.fifo.push(
-                    interCoreMessageValue(
-                        InterCoreMessage::MenuParametersRejected));
+                rejectMenuParameters();
                 break;
             }
 
@@ -1571,9 +1765,7 @@ void OPC::handleControlMessage(
 
         if (!outputsApplied)
         {
-            rp2040.fifo.push(
-                interCoreMessageValue(
-                    InterCoreMessage::MenuParametersRejected));
+            rejectMenuParameters();
             break;
         }
 
@@ -1605,15 +1797,17 @@ void OPC::handleControlMessage(
                               actionId);
 
             // Acquittement et remise à zéro sont journalisés par
-            // ProcessControl ; les autres actions ici.
+            // ProcessControl ; les autres actions ici, refus compris
+            // (Démarrer sur une alarme, calibration instable...).
             const MenuBuilder::Action* action =
                 menuDefinition.findAction(actionId);
 
-            if (!controllerAction && actionSucceeded && action != nullptr)
+            if (!controllerAction && action != nullptr)
             {
                 controller.logEvent(
                     millis(), EventKind::Info, true,
-                    "Action : %s", action->name);
+                    actionSucceeded ? "Action : %s" : "Action refusée : %s",
+                    action->name);
             }
 
             controller.forceSafeOutputs();
@@ -1674,6 +1868,9 @@ void OPC::handleControlMessage(
         controlOutputsEnabled = false;
         lastMeasurementTime = millis();
 
+        // Réglages appliqués, mais action refusée : le cœur UI le dit.
+        menuActionRejected = !actionSucceeded;
+
         __dmb();
 
         rp2040.fifo.push(
@@ -1683,6 +1880,35 @@ void OPC::handleControlMessage(
                     : InterCoreMessage::MenuParametersAppliedNotSaved));
         break;
     }
+
+    case InterCoreMessage::CancelMenuParameters:
+        if (menuSessionOpen)
+        {
+            // Brouillons oubliés : la prochaine ouverture du menu les
+            // recapture. Après un refus de la validation, rien n'a été
+            // appliqué et la régulation n'a pas cessé.
+            menuSessionOpen = false;
+
+            // Refus après une application ratée (sorties) : l'acquisition
+            // ne reste jamais en pause.
+            if (acquisitionPausedForMenu)
+            {
+                input.startAcquisition();
+                acquisitionPausedForMenu = false;
+                controlOutputsEnabled = false;
+                lastMeasurementTime = millis();
+            }
+
+            mutex_enter_blocking(&processDataMutex);
+            controller.logEvent(
+                millis(), EventKind::Info, false, "Réglages abandonnés");
+            mutex_exit(&processDataMutex);
+        }
+
+        __dmb();
+        rp2040.fifo.push(interCoreMessageValue(
+            InterCoreMessage::MenuParametersCancelled));
+        break;
 
     default:
         break;
@@ -1817,6 +2043,15 @@ void OPC::handleUIMessage(
 
         copyProcessSnapshot();
 
+        // menuActionRejected a été écrit par le cœur contrôle avant l'envoi.
+        if (menuActionRejected)
+        {
+            actionRejectedAt = millis();
+            uiState = UIState::ActionRejected;
+            showActionRejected();
+            break;
+        }
+
         uiState = UIState::Home;
         showHomeScreen(true);
         break;
@@ -1828,12 +2063,28 @@ void OPC::handleUIMessage(
             break;
         }
 
-        Serial.println(
-            "Menu parameter validation failed");
+        // rejectedOwnerName a été écrit par le cœur contrôle avant l'envoi.
+        __dmb();
 
-        menu.show();
+        Serial.print("Menu parameters rejected: ");
+        Serial.println(
+            rejectedOwnerName != nullptr ? rejectedOwnerName : "?");
+
+        rejectionAbandonSelected = false;
         lastMenuActivity = millis();
-        uiState = UIState::Menu;
+        uiState = UIState::MenuRejected;
+        showMenuRejection(true);
+        break;
+
+    case InterCoreMessage::MenuParametersCancelled:
+        if (uiState != UIState::CancelRequested)
+            break;
+
+        __dmb();
+
+        copyProcessSnapshot();
+        uiState = UIState::Home;
+        showHomeScreen(true);
         break;
 
     default:

@@ -690,9 +690,9 @@ void RTC::registerParameters(
     };
     timeZoneOwner.board = true;
 
-    // Sous-menu de Horloge. Valider et Quitter ne concernent que la date et
-    // l'heure : le fuseau s'applique à la sortie du menu, comme les autres
-    // réglages.
+    // Sous-menu de Horloge. Quitter n'abandonne que la date et l'heure. Le
+    // fuseau s'applique à la sortie du menu, comme les autres réglages, ou
+    // dès Valider avec une heure modifiée, saisie dans ce fuseau.
     timeZoneOwner.parentOwnerKey = MENU_OWNER_KEY;
 
     auto timeZoneParameters = list.forOwner(timeZoneOwner);
@@ -830,18 +830,76 @@ bool RTC::onMenuOpened()
     return true;
 }
 
-bool RTC::applyMenuParameters(ParameterEditor& editor)
+bool RTC::readMenuTimeZone(
+    const ParameterEditor& editor,
+    TimeZoneSettings& zone) const
 {
+    const ParameterDraft* offset =
+        editor.find(TIME_ZONE_OWNER_KEY, "utc_offset");
+
+    const ParameterDraft* dst =
+        editor.find(TIME_ZONE_OWNER_KEY, "dst");
+
+    if (offset == nullptr || dst == nullptr)
+        return true;
+
+    if (offset->parameter == nullptr ||
+        offset->parameter->type != Parameter::Type::Double ||
+        dst->parameter == nullptr ||
+        dst->parameter->type != Parameter::Type::Selection ||
+        !std::isfinite(offset->numberValue) ||
+        offset->numberValue < MINIMUM_UTC_OFFSET_HOURS ||
+        offset->numberValue > MAXIMUM_UTC_OFFSET_HOURS ||
+        (dst->selectionValue != static_cast<int32_t>(DstRule::None) &&
+         dst->selectionValue != static_cast<int32_t>(DstRule::Europe)))
+    {
+        return false;
+    }
+
+    zone.utcOffsetHours = offset->numberValue;
+    zone.dst = static_cast<DstRule>(dst->selectionValue);
+    return true;
+}
+
+bool RTC::applyMenuParameters(
+    ParameterEditor& editor,
+    bool& timeZoneChanged)
+{
+    timeZoneChanged = false;
+
     // Une simple consultation ne doit pas faire reculer l'horloge.
     if (!editor.hasChanges(MENU_OWNER_KEY))
         return true;
 
     DateTime dateTime;
-    if (!readMenuDateTime(editor, dateTime) || !setDateTime(dateTime))
+    TimeZoneSettings zone = timeZone;
+
+    if (!readMenuDateTime(editor, dateTime) ||
+        !readMenuTimeZone(editor, zone))
+    {
         return false;
+    }
+
+    // L'heure est saisie dans le fuseau du menu : il s'applique avec elle.
+    // Appliqué à la sortie du menu seulement, il décalerait l'heure écrite.
+    const TimeZoneSettings previous = timeZone;
+    timeZone = zone;
+
+    if (!setDateTime(dateTime))
+    {
+        timeZone = previous;
+        return false;
+    }
+
+    timeZoneChanged =
+        zone.utcOffsetHours != previous.utcOffsetHours ||
+        zone.dst != previous.dst;
 
     menuDateTime = dateTime;
     editor.capture(MENU_OWNER_KEY);
+
+    // Fuseau appliqué : ce n'est plus une modification en attente.
+    editor.capture(TIME_ZONE_OWNER_KEY);
     return true;
 }
 
